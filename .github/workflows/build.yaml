@@ -28,7 +28,7 @@ jobs:
         run: |
           echo "Setting up dependencies on macOS..."
           brew update
-          brew install gcc cmake
+          brew install --formula cmake
 
       # --- Windows Setup using MSYS2 ---
       - name: Setup MSYS2 on Windows
