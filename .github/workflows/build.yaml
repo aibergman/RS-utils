@@ -38,12 +38,20 @@ jobs:
           update: true
           install: mingw-w64-x86_64-gcc-fortran mingw-w64-x86_64-cmake mingw-w64-x86_64-make
 
-      # --- Build Step for Linux and macOS ---
+      # --- Build Step for Linux ---
       - name: Build project on Linux/macOS
-        if: runner.os != 'Windows'
+        if: runner.os == 'Linux"
         run: |
           echo "Configuring and building with CMake on $RUNNER_OS..."
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build
+
+      # --- Build Step for macOS ---
+      - name: Build project on macOS
+        if: runner.os == 'macOS'
+        run: |
+          echo "Configuring and building with CMake on $RUNNER_OS..."
+          FC=gfortran-14 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
           cmake --build build
 
       # --- Build Step for Windows (using MSYS2) ---
