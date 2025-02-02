@@ -1,0 +1,62 @@
+name: CI Build 
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, macos-latest, windows-latest ]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # --- Linux (Ubuntu) Setup ---
+      - name: Install dependencies on Ubuntu
+        if: runner.os == 'Linux'
+        run: |
+          echo "Setting up dependencies on Ubuntu..."
+          sudo apt-get update
+          sudo apt-get install -y gfortran cmake make
+
+      # --- macOS Setup ---
+      - name: Install dependencies on macOS
+        if: runner.os == 'macOS'
+        run: |
+          echo "Setting up dependencies on macOS..."
+          brew update
+          brew install --formula cmake
+
+      # --- Windows Setup using MSYS2 ---
+      - name: Setup MSYS2 on Windows
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          install: mingw-w64-x86_64-gcc-fortran mingw-w64-x86_64-cmake mingw-w64-x86_64-make
+
+      # --- Build Step for Linux ---
+      - name: Build project on Linux/macOS
+        if: runner.os == 'Linux'
+        run: |
+          echo "Configuring and building with CMake on $RUNNER_OS..."
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build
+
+      # --- Build Step for macOS ---
+      - name: Build project on macOS
+        if: runner.os == 'macOS'
+        run: |
+          echo "Configuring and building with CMake on $RUNNER_OS..."
+          FC=gfortran-14 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build
+
+      # --- Build Step for Windows (using MSYS2) ---
+      - name: Build project on Windows
+        if: runner.os == 'Windows'
+        run: |
+          echo "Configuring and building with CMake in MSYS2 on Windows..."
+          msys2 -c "cmake -S . -B build -G 'MinGW Makefiles' -DCMAKE_BUILD_TYPE=Release && cmake --build build"
