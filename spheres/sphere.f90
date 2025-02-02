@@ -227,7 +227,8 @@ contains
 
         NATOMNEW = NATOM
         if (NEED_ES == 0) then
-            call EMPTYSPHERES(AV, BV, CV, BAS, IMQ, ALAT, NATOM, NSORT, RWS, NSORTES, TAUES, SES, MAX2SORT, ITOP, IQA, NG, ISNEW, BASNEW, NATOMNEW)
+            call EMPTYSPHERES(AV, BV, CV, BAS, IMQ, ALAT, NATOM, NSORT, RWS, NSORTES, TAUES, SES, MAX2SORT, ITOP, IQA, NG, &
+               ISNEW, BASNEW, NATOMNEW)
             do I = NATOM+1, NATOMNEW
                 RWS(I) = SES(ISNEW(I)-NM)
             end do
