@@ -1,0 +1,50 @@
+name: CI Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, macos-latest, windows-latest ]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # --- Linux (Ubuntu) Setup ---
+      - name: Install dependencies on Ubuntu
+        if: runner.os == 'Linux'
+        run: |
+          echo "Running on Linux (Ubuntu)"
+          sudo apt-get update
+          sudo apt-get install -y gfortran make
+
+      # --- macOS Setup ---
+      - name: Install dependencies on macOS
+        if: runner.os == 'macOS'
+        run: |
+          echo "Running on macOS"
+          brew update
+          brew install gcc
+
+      # --- Windows Setup using MSYS2 ---
+      - name: Setup MSYS2 on Windows
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          install: mingw-w64-x86_64-gcc-fortran
+
+      # --- Build Steps ---
+      - name: Build project on Windows
+        if: runner.os == 'Windows'
+        run: msys2 -c "make"
+      - name: Build project on Linux/macOS
+        if: runner.os != 'Windows'
+        run: make
+
