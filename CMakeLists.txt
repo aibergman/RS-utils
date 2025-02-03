@@ -6,16 +6,16 @@ set(CMAKE_Fortran_STANDARD 2008)
 set(CMAKE_Fortran_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# Ensure -fPIC is enabled for shared library
+# ✅ Ensure -fPIC is enabled for static library linking
 set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fPIC")
 
-# Ensure module files are placed correctly
+# ✅ Ensure module files are placed correctly
 set(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/modules)
 
-# Set source directory path
+# ✅ Set source directory path
 set(SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/source)
 
-# Collect Fortran source files for the library
+# ✅ Collect Fortran source files for the static library
 set(LIB_SOURCES
     ${SOURCE_DIR}/rsutil_lib.f90
     ${SOURCE_DIR}/io/atom_io.f90
@@ -32,55 +32,49 @@ set(LIB_SOURCES
     ${SOURCE_DIR}/types/system_data.f90
 )
 
-# Create a SHARED library for linking
-add_library(rsutil_lib SHARED ${LIB_SOURCES})
+# ✅ Step 1: Create a STATIC library (not SHARED)
+add_library(rsutil_lib STATIC ${LIB_SOURCES})
 
-# Ensure correct module paths for the library
+# ✅ Ensure correct module paths for the library
 target_include_directories(rsutil_lib PRIVATE ${CMAKE_Fortran_MODULE_DIRECTORY})
 
-# Install the shared library so Python can find it
-set_target_properties(rsutil_lib PROPERTIES PREFIX "" SUFFIX ".so")
+# ✅ Install the static library
+set_target_properties(rsutil_lib PROPERTIES PREFIX "lib" SUFFIX ".a")
 
-# Find Python3 and NumPy
+# ✅ Python Wrapping: Find Python3 and NumPy
 find_package(Python3 REQUIRED COMPONENTS Interpreter Development NumPy)
 
-# Generate f90wrap Python bindings
+# ✅ Step 2: Ensure f90wrap waits for rsutil_lib to be built
 add_custom_command(
     OUTPUT f90wrap_rsutil_lib.f90
     COMMAND ${Python3_EXECUTABLE} -m numpy.f2py -m rsutil -h f90wrap_rsutil.pyf --overwrite-signature ${SOURCE_DIR}/rsutil_lib.f90
     COMMAND f90wrap -m rsutil_lib ${SOURCE_DIR}/rsutil_lib.f90
-    DEPENDS ${SOURCE_DIR}/rsutil_lib.f90
+    DEPENDS rsutil_lib ${SOURCE_DIR}/rsutil_lib.f90
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 
-# Define f90wrap as a separate build step
+# ✅ Step 3: Define f90wrap as a separate build step
 add_custom_target(f90wrap_target DEPENDS f90wrap_rsutil_lib.f90)
 
-# Create a Python extension module (Fix: `MODULE`, not `SHARED`)
-add_library(rsutil MODULE f90wrap_rsutil_lib.f90 ${LIB_SOURCES})
+# ✅ Step 4: Ensure Python module compilation includes the correct module path
+add_custom_command(
+    OUTPUT rsutil.so
+    COMMAND ${Python3_EXECUTABLE} -m numpy.f2py --fcompiler=gnu95 -c f90wrap_rsutil_lib.f90 -L. -L${CMAKE_BINARY_DIR} -I${CMAKE_BINARY_DIR}/modules -lrsutil_lib -m rsutil
+    DEPENDS f90wrap_rsutil_lib.f90 rsutil_lib
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
 
-# Link against rsutil_lib
-target_link_libraries(rsutil PRIVATE rsutil_lib)
+# ✅ Define Python extension as a build target
+add_custom_target(rsutil_python_extension ALL DEPENDS rsutil.so)
 
-# Ensure correct module paths for the Python module
-target_include_directories(rsutil PRIVATE ${CMAKE_BINARY_DIR}/modules)
+# ✅ Ensure f90wrap runs after `rsutil_lib.mod` is created
+add_dependencies(f90wrap_target rsutil_lib)
+add_dependencies(rsutil_python_extension f90wrap_target)
 
-# Ensure the Python module is named correctly
-set_target_properties(rsutil PROPERTIES PREFIX "" SUFFIX ".so")
-
-# ✅ FIX: Ensure macOS uses the correct flags
-if(APPLE)
-    set_target_properties(rsutil PROPERTIES LINK_FLAGS "-bundle -undefined dynamic_lookup -fPIC")
-else()
-    set_target_properties(rsutil PROPERTIES LINK_FLAGS "-shared -fPIC")
-endif()
-
-# Ensure f90wrap runs before the final shared library is built
-add_dependencies(rsutil f90wrap_target)
-
-# Create the executable and link with rsutil_lib
+# ✅ Step 5: Create the executable and link with rsutil_lib
 set(EXE_SOURCES ${SOURCE_DIR}/process_lattice.f90)
 add_executable(process_lattice.x ${EXE_SOURCES})
 target_link_libraries(process_lattice.x PRIVATE rsutil_lib)
 
-# Ensure correct module paths for the executable
+# ✅ Ensure correct module paths for the executable
 target_include_directories(process_lattice.x PRIVATE ${CMAKE_Fortran_MODULE_DIRECTORY})
