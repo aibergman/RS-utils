@@ -1,6 +1,7 @@
 import os
 import sys
 import subprocess
+import glob
 import setuptools
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
@@ -30,11 +31,13 @@ class CMakeBuild(build_ext):
         subprocess.check_call(["cmake", ext.sourcedir] + cmake_args, cwd=self.build_temp)
         subprocess.check_call(["cmake", "--build", "."] + build_args, cwd=self.build_temp)
 
-        # Locate the built shared library
-        shared_lib = os.path.join(extdir, "rsutil.cpython-310-darwin.so")
+        # Locate the built shared library dynamically
+        shared_libs = glob.glob(os.path.join(extdir, "rsutil*.so"))
 
-        if not os.path.exists(shared_lib):
-            raise FileNotFoundError(f"Expected shared library {shared_lib} not found!")
+        if not shared_libs:
+            raise FileNotFoundError(f"Expected shared library rsutil*.so not found in {extdir}")
+
+        shared_lib = shared_libs[0]  # Pick the first match (should be the correct one)
 
         # Ensure the library is copied into the rsutil package directory
         package_dir = os.path.abspath(os.path.join(self.build_lib, "rsutil"))

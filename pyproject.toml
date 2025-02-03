@@ -1,0 +1,7 @@
+[build-system]
+requires = ["setuptools", "wheel", "cmake", "f90wrap>0.2.10"]
+
+[tool.cibuildwheel]
+skip = "pp* *-musllinux*"  # Skip PyPy and musl Linux builds
+test-requires = ["pytest"]
+test-command = "pytest {package}/tests"
