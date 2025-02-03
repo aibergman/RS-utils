@@ -91,6 +91,13 @@ if(ENABLE_PYTHON_BINDINGS)
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     )
 
+    # ✅ Copy the compiled shared library to the `rsutil/` package
+    file(GLOB SHARED_LIBRARY "${CMAKE_BINARY_DIR}/_rsutil*.so")
+
+    if(SHARED_LIBRARY)
+        file(COPY ${SHARED_LIBRARY} DESTINATION ${CMAKE_SOURCE_DIR}/rsutil)
+    endif()
+
     # ✅ Define Python extension as a build target
     add_custom_target(rsutil_python_extension ALL DEPENDS _rsutil.so)
 
