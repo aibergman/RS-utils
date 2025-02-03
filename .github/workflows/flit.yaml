@@ -1,6 +1,7 @@
 name: Publish Python Package with Flit
 
 on:
+  push:
   release:
     types:
       - created
