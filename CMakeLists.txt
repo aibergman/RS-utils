@@ -64,7 +64,7 @@ if(PYTHON_BINDINGS)
 
     # Generate a properly named shared library for Python
     add_library(rsutil MODULE ${F90WRAP_OUTPUT})
-    set_target_properties(rsutil PROPERTIES PREFIX "" SUFFIX ".cpython-310-darwin.so")
+    set_target_properties(rsutil PROPERTIES PREFIX "" )
     
     add_dependencies(rsutil f90wrap_generate)
     target_link_libraries(rsutil PRIVATE rsutil_lib)
