@@ -54,7 +54,7 @@ setup(
     ext_modules=[CMakeExtension("rsutil")],
     cmdclass={"build_ext": CMakeBuild},
     packages=setuptools.find_packages(),
-    include_package_data=True,
+    include_package_data=True,  # ✅ Ensures non-Python files are included
     zip_safe=False,
     entry_points={
         "console_scripts": [
