@@ -1,0 +1,22 @@
+# Build artifacts
+build/
+dist/
+*.egg-info/
+rsutil/_rsutil*.so
+
+# Compiled Fortran files
+*.mod
+*.o
+*.a
+
+# CMake temporary files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+
+# Python virtual environments
+venv/
+.env/
+__pycache__/
+*.pyc
+
