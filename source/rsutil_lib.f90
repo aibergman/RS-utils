@@ -21,7 +21,8 @@
   integer :: i
 
   contains 
-subroutine process_lattice()
+subroutine process_lattice()  bind(c,name='process_lattice')
+   use iso_c_binding
   !-----------------------------------------------------------------
   ! Read the lattice namelist from lattice.nml using lattice_io.
   !-----------------------------------------------------------------

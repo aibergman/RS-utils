@@ -62,10 +62,11 @@ if(PYTHON_BINDINGS)
     # Create a custom target to ensure f90wrap runs before building rsutil
     add_custom_target(f90wrap_generate DEPENDS ${F90WRAP_OUTPUT})
 
-    # Create shared library for Python module rsutil, depending on f90wrap
+    # Generate a properly named shared library for Python
     add_library(rsutil MODULE ${F90WRAP_OUTPUT})
-    add_dependencies(rsutil f90wrap_generate)
+    set_target_properties(rsutil PROPERTIES PREFIX "" SUFFIX ".cpython-310-darwin.so")
     
+    add_dependencies(rsutil f90wrap_generate)
     target_link_libraries(rsutil PRIVATE rsutil_lib)
     target_include_directories(rsutil PRIVATE ${CMAKE_Fortran_MODULE_DIRECTORY})
 endif()

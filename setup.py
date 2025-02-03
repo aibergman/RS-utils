@@ -30,15 +30,33 @@ class CMakeBuild(build_ext):
         subprocess.check_call(["cmake", ext.sourcedir] + cmake_args, cwd=self.build_temp)
         subprocess.check_call(["cmake", "--build", "."] + build_args, cwd=self.build_temp)
 
+        # Locate the built shared library
+        shared_lib = os.path.join(extdir, "rsutil.cpython-310-darwin.so")
+
+        if not os.path.exists(shared_lib):
+            raise FileNotFoundError(f"Expected shared library {shared_lib} not found!")
+
+        # Ensure the library is copied into the rsutil package directory
+        package_dir = os.path.abspath(os.path.join(self.build_lib, "rsutil"))
+        os.makedirs(package_dir, exist_ok=True)
+        self.copy_file(shared_lib, package_dir)
+
 setup(
     name="rsutil",
-    version="0.1.0",
-    author="Your Name",
-    author_email="your@email.com",
-    description="Fortran-based utilities for lattice processing",
-    long_description="Python bindings for rsutil, a Fortran-based numerical library.",
+    version="0.9.0",
+    author="Anders Bergman",
+    author_email="anders.bergman@physics.uu.se",
+    description="Utilities for the RS-LMTO code",
+    long_description="Utilities for the RS-LMTO code",
     ext_modules=[CMakeExtension("rsutil")],
     cmdclass={"build_ext": CMakeBuild},
+    packages=setuptools.find_packages(),
+    include_package_data=True,
     zip_safe=False,
+    entry_points={
+        "console_scripts": [
+            "rsutil=rsutil.cli:main"
+        ],
+    },
 )
 
