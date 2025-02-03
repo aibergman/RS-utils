@@ -41,6 +41,15 @@ target_include_directories(rsutil_lib PRIVATE ${CMAKE_Fortran_MODULE_DIRECTORY})
 # ✅ Install the static library
 set_target_properties(rsutil_lib PROPERTIES PREFIX "lib" SUFFIX ".a")
 
+# ✅ Ensure `_rsutil.so` is copied to the correct Python package directory
+add_custom_command(
+    TARGET rsutil_lib POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+    ${CMAKE_BINARY_DIR}/_rsutil.so
+        ${CMAKE_SOURCE_DIR}/rsutil/_rsutil.so
+    COMMENT "Copying _rsutil.so to the Python package directory (rsutil/)"
+)
+
 # ✅ Step 2: Create the executable and link with rsutil_lib
 set(EXE_SOURCES ${SOURCE_DIR}/process_lattice.f90)
 add_executable(process_lattice.x ${EXE_SOURCES})
@@ -65,50 +74,69 @@ endif()
 
 option(ENABLE_PYTHON_BINDINGS "Enable Python bindings using f90wrap" OFF)
 
+
 if(ENABLE_PYTHON_BINDINGS)
     message(STATUS "Python bindings enabled")
 
-    # ✅ Python Wrapping: Find Python3 and NumPy
-    find_package(Python3 REQUIRED COMPONENTS Interpreter Development NumPy)
+        # ✅ Force CMake to Use Virtual Environment Python (Poetry, venv, Conda)
+        execute_process(
+            COMMAND python3 -c "import sys; print(sys.executable)"
+            OUTPUT_VARIABLE VENV_PYTHON
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+    
+        if(NOT VENV_PYTHON)
+            message(FATAL_ERROR "No valid Python found in virtual environment.")
+        endif()
+    
+        message(STATUS "Using Python Executable: ${VENV_PYTHON}")
 
-    # ✅ Step 3: Ensure f90wrap waits for rsutil_lib to be built
-    add_custom_command(
-        OUTPUT f90wrap_rsutil_lib.f90
-        COMMAND ${Python3_EXECUTABLE} -m numpy.f2py -m rsutil -h f90wrap_rsutil.pyf --overwrite-signature ${SOURCE_DIR}/rsutil_lib.f90
-        COMMAND f90wrap -m rsutil_lib ${SOURCE_DIR}/rsutil_lib.f90
-        DEPENDS rsutil_lib ${SOURCE_DIR}/rsutil_lib.f90
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-    )
+    # ✅ Find Python3 + NumPy
+    find_package(Python3 REQUIRED COMPONENTS Interpreter Development.Module NumPy)
 
-    # ✅ Step 4: Define f90wrap as a separate build step
-    add_custom_target(f90wrap_target DEPENDS f90wrap_rsutil_lib.f90)
+    message(STATUS "============================================")
+    message(STATUS "Python3_EXECUTABLE         ${Python3_EXECUTABLE}")
+    message(STATUS "Python3_SOABI              ${Python3_SOABI}")
+    message(STATUS "Python3_INCLUDE_DIRS       ${Python3_INCLUDE_DIRS}")
+    message(STATUS "Python3_NumPy_INCLUDE_DIRS ${Python3_NumPy_INCLUDE_DIRS}")
+    message(STATUS "============================================")
 
-    # ✅ Step 5: Ensure Python module compilation includes the correct module path
-    add_custom_command(
-        OUTPUT _rsutil.so
-        COMMAND ${Python3_EXECUTABLE} -m numpy.f2py --fcompiler=gnu95 -c f90wrap_rsutil_lib.f90 -L. -L${CMAKE_BINARY_DIR} -I${CMAKE_BINARY_DIR}/modules -lrsutil_lib -m _rsutil
-        DEPENDS f90wrap_rsutil_lib.f90 rsutil_lib
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-    )
+    if (Python3_FOUND)
+        # ✅ Extract NumPy headers
+        execute_process(
+            COMMAND "${Python3_EXECUTABLE}" -c "import numpy; print(numpy.get_include())"
+            OUTPUT_VARIABLE NUMPY_INCLUDE_DIR
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        file(TO_CMAKE_PATH ${NUMPY_INCLUDE_DIR} NUMPY_INCLUDE_DIR)
 
-    # ✅ Copy the compiled shared library to the `rsutil/` package
-    file(GLOB SHARED_LIBRARY "${CMAKE_BINARY_DIR}/_rsutil*.so")
+        # ✅ Generate `f90wrap` wrapper files
+        add_custom_command(
+            OUTPUT f90wrap_rsutil_lib.f90
+            COMMAND ${Python3_EXECUTABLE} -m f90wrap -m rsutil_lib ${SOURCE_DIR}/rsutil_lib.f90
+            COMMENT "Generating f90wrap Python wrapper"
+            DEPENDS ${SOURCE_DIR}/rsutil_lib.f90
+        )
 
-    if(SHARED_LIBRARY)
-        file(COPY ${SHARED_LIBRARY} DESTINATION ${CMAKE_SOURCE_DIR}/rsutil)
+        # ✅ Compile Fortran bindings
+        add_library(rsutil SHARED f90wrap_rsutil_lib.f90)
+        target_link_libraries(rsutil PRIVATE rsutil_lib)
+        set_target_properties(rsutil PROPERTIES PREFIX "" OUTPUT_NAME "_rsutil")
+
+                # ✅ Force `.so` instead of `.dylib` (macOS fix)
+                set_target_properties(rsutil PROPERTIES
+                PREFIX ""                # Remove 'lib' prefix
+                SUFFIX ".so"             # Force .so instead of .dylib
+                OUTPUT_NAME "_rsutil"    # Ensure correct Python import name
+            )
+
+        # ✅ Ensure correct paths
+        target_include_directories(rsutil PRIVATE ${CMAKE_Fortran_MODULE_DIRECTORY} ${NUMPY_INCLUDE_DIR})
+    else()
+        message(FATAL_ERROR "Python environment with NumPy is required for building Python bindings.")
     endif()
-
-    # ✅ Define Python extension as a build target
-    add_custom_target(rsutil_python_extension ALL DEPENDS _rsutil.so)
-
-    # ✅ Ensure f90wrap runs after `rsutil_lib.mod` is created
-    add_dependencies(f90wrap_target rsutil_lib)
-    add_dependencies(rsutil_python_extension f90wrap_target)
-    # ✅ Print the path of the generated shared library to the screen
-
-    # ✅ Ensure compiled `.so` is installed correctly
-    install(FILES ${CMAKE_BINARY_DIR}/rsutil/_rsutil${CMAKE_SHARED_LIBRARY_SUFFIX} DESTINATION rsutil)
-
 else()
     message(STATUS "Python bindings disabled (default)")
 endif()
+
+
