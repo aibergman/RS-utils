@@ -1,5 +1,5 @@
 [build-system]
-requires = ["flit_core>=3.8", "numpy", "cmake"]
+requires = ["flit_core>=3.8", "numpy", "cmake", "cibuildwheel"]
 build-backend = "flit_core.buildapi"
 
 [project]
@@ -18,4 +18,13 @@ Repository = "https://github.com/yourusername/rsutil"
 
 [project.scripts]
 rsutil = "rsutil.cli:cli"
+
+[tool.cibuildwheel]
+build = "cp39-* cp310-* cp311-* cp312-*"
+skip = "*-musllinux_*"
+archs = "auto"
+before-build = "pip install numpy cmake && cmake -DENABLE_PYTHON_BINDINGS=ON . && make"
+
+[tool.flit.sdist]
+include = ["rsutil/_rsutil*.so"]
 
