@@ -29,8 +29,6 @@ jobs:
         run: pip install cibuildwheel
 
       - name: Build Wheels
-        env:
-          CIBW_BEFORE_BUILD: "cmake -DENABLE_PYTHON_BINDINGS=ON . && make"
         run: python -m cibuildwheel --output-dir wheelhouse
 
       - name: Upload Wheels as Artifacts

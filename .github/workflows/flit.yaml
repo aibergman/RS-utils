@@ -25,6 +25,11 @@ jobs:
       - name: Install Flit
         run: flit build
 
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+
+
+
           #      - name: Build and Publish to PyPI
           #        env:
           #          FLIT_USERNAME: __token__
