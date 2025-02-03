@@ -41,7 +41,7 @@ jobs:
 
       - name: Verify installed package
         run: |
-          ls -l $(python -c "import rsutil; print(rsutil.__file__)")
+          unzip -l $(ls dist/*.whl) 
 
       - name: Run tests
         run: |
