@@ -52,6 +52,17 @@ target_include_directories(process_lattice.x PRIVATE ${CMAKE_Fortran_MODULE_DIRE
 # 🔹🔹🔹 Python Bindings (Optional) 🔹🔹🔹
 
 # ✅ Add an option to enable Python bindings (default OFF)
+#if("$ENV{PIP_BUILD}" STREQUAL "1")
+#    set(ENABLE_PYTHON_BINDINGS ON)
+#else()
+#    option(ENABLE_PYTHON_BINDINGS "Enable Python bindings using f90wrap" OFF)
+#endif()
+##option(ENABLE_PYTHON_BINDINGS "Enable Python bindings using f90wrap" OFF)
+if(DEFINED ENV{FLIT_BUILD})
+    message(STATUS "Flit detected: Enabling Python bindings")
+    set(ENABLE_PYTHON_BINDINGS ON)
+endif()
+
 option(ENABLE_PYTHON_BINDINGS "Enable Python bindings using f90wrap" OFF)
 
 if(ENABLE_PYTHON_BINDINGS)
@@ -74,18 +85,22 @@ if(ENABLE_PYTHON_BINDINGS)
 
     # ✅ Step 5: Ensure Python module compilation includes the correct module path
     add_custom_command(
-        OUTPUT rsutil.so
-        COMMAND ${Python3_EXECUTABLE} -m numpy.f2py --fcompiler=gnu95 -c f90wrap_rsutil_lib.f90 -L. -L${CMAKE_BINARY_DIR} -I${CMAKE_BINARY_DIR}/modules -lrsutil_lib -m rsutil
+        OUTPUT _rsutil.so
+        COMMAND ${Python3_EXECUTABLE} -m numpy.f2py --fcompiler=gnu95 -c f90wrap_rsutil_lib.f90 -L. -L${CMAKE_BINARY_DIR} -I${CMAKE_BINARY_DIR}/modules -lrsutil_lib -m _rsutil
         DEPENDS f90wrap_rsutil_lib.f90 rsutil_lib
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     )
 
     # ✅ Define Python extension as a build target
-    add_custom_target(rsutil_python_extension ALL DEPENDS rsutil.so)
+    add_custom_target(rsutil_python_extension ALL DEPENDS _rsutil.so)
 
     # ✅ Ensure f90wrap runs after `rsutil_lib.mod` is created
     add_dependencies(f90wrap_target rsutil_lib)
     add_dependencies(rsutil_python_extension f90wrap_target)
+    # ✅ Print the path of the generated shared library to the screen
+
+    # ✅ Ensure compiled `.so` is installed correctly
+    install(FILES ${CMAKE_BINARY_DIR}/rsutil/_rsutil${CMAKE_SHARED_LIBRARY_SUFFIX} DESTINATION rsutil)
 
 else()
     message(STATUS "Python bindings disabled (default)")
