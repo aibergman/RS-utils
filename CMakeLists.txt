@@ -41,40 +41,52 @@ target_include_directories(rsutil_lib PRIVATE ${CMAKE_Fortran_MODULE_DIRECTORY})
 # ✅ Install the static library
 set_target_properties(rsutil_lib PROPERTIES PREFIX "lib" SUFFIX ".a")
 
-# ✅ Python Wrapping: Find Python3 and NumPy
-find_package(Python3 REQUIRED COMPONENTS Interpreter Development NumPy)
-
-# ✅ Step 2: Ensure f90wrap waits for rsutil_lib to be built
-add_custom_command(
-    OUTPUT f90wrap_rsutil_lib.f90
-    COMMAND ${Python3_EXECUTABLE} -m numpy.f2py -m rsutil -h f90wrap_rsutil.pyf --overwrite-signature ${SOURCE_DIR}/rsutil_lib.f90
-    COMMAND f90wrap -m rsutil_lib ${SOURCE_DIR}/rsutil_lib.f90
-    DEPENDS rsutil_lib ${SOURCE_DIR}/rsutil_lib.f90
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-)
-
-# ✅ Step 3: Define f90wrap as a separate build step
-add_custom_target(f90wrap_target DEPENDS f90wrap_rsutil_lib.f90)
-
-# ✅ Step 4: Ensure Python module compilation includes the correct module path
-add_custom_command(
-    OUTPUT rsutil.so
-    COMMAND ${Python3_EXECUTABLE} -m numpy.f2py --fcompiler=gnu95 -c f90wrap_rsutil_lib.f90 -L. -L${CMAKE_BINARY_DIR} -I${CMAKE_BINARY_DIR}/modules -lrsutil_lib -m rsutil
-    DEPENDS f90wrap_rsutil_lib.f90 rsutil_lib
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-)
-
-# ✅ Define Python extension as a build target
-add_custom_target(rsutil_python_extension ALL DEPENDS rsutil.so)
-
-# ✅ Ensure f90wrap runs after `rsutil_lib.mod` is created
-add_dependencies(f90wrap_target rsutil_lib)
-add_dependencies(rsutil_python_extension f90wrap_target)
-
-# ✅ Step 5: Create the executable and link with rsutil_lib
+# ✅ Step 2: Create the executable and link with rsutil_lib
 set(EXE_SOURCES ${SOURCE_DIR}/process_lattice.f90)
 add_executable(process_lattice.x ${EXE_SOURCES})
 target_link_libraries(process_lattice.x PRIVATE rsutil_lib)
 
 # ✅ Ensure correct module paths for the executable
 target_include_directories(process_lattice.x PRIVATE ${CMAKE_Fortran_MODULE_DIRECTORY})
+
+# 🔹🔹🔹 Python Bindings (Optional) 🔹🔹🔹
+
+# ✅ Add an option to enable Python bindings (default OFF)
+option(ENABLE_PYTHON_BINDINGS "Enable Python bindings using f90wrap" OFF)
+
+if(ENABLE_PYTHON_BINDINGS)
+    message(STATUS "Python bindings enabled")
+
+    # ✅ Python Wrapping: Find Python3 and NumPy
+    find_package(Python3 REQUIRED COMPONENTS Interpreter Development NumPy)
+
+    # ✅ Step 3: Ensure f90wrap waits for rsutil_lib to be built
+    add_custom_command(
+        OUTPUT f90wrap_rsutil_lib.f90
+        COMMAND ${Python3_EXECUTABLE} -m numpy.f2py -m rsutil -h f90wrap_rsutil.pyf --overwrite-signature ${SOURCE_DIR}/rsutil_lib.f90
+        COMMAND f90wrap -m rsutil_lib ${SOURCE_DIR}/rsutil_lib.f90
+        DEPENDS rsutil_lib ${SOURCE_DIR}/rsutil_lib.f90
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
+
+    # ✅ Step 4: Define f90wrap as a separate build step
+    add_custom_target(f90wrap_target DEPENDS f90wrap_rsutil_lib.f90)
+
+    # ✅ Step 5: Ensure Python module compilation includes the correct module path
+    add_custom_command(
+        OUTPUT rsutil.so
+        COMMAND ${Python3_EXECUTABLE} -m numpy.f2py --fcompiler=gnu95 -c f90wrap_rsutil_lib.f90 -L. -L${CMAKE_BINARY_DIR} -I${CMAKE_BINARY_DIR}/modules -lrsutil_lib -m rsutil
+        DEPENDS f90wrap_rsutil_lib.f90 rsutil_lib
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
+
+    # ✅ Define Python extension as a build target
+    add_custom_target(rsutil_python_extension ALL DEPENDS rsutil.so)
+
+    # ✅ Ensure f90wrap runs after `rsutil_lib.mod` is created
+    add_dependencies(f90wrap_target rsutil_lib)
+    add_dependencies(rsutil_python_extension f90wrap_target)
+
+else()
+    message(STATUS "Python bindings disabled (default)")
+endif()
