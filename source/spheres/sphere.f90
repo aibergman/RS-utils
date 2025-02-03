@@ -380,7 +380,7 @@ contains
         !    end do
         !end if
 
-        lat_input%wav = sum(lat_data%ws(1:NATOMNEW)) / NATOMNEW
+        lat_input%wav = sum(lat_data%ws(1:NATOMNEW)) / NATOMNEW / ANGSTROM_TO_BOHR
 
     end subroutine transfer_to_struct
 
