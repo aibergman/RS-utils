@@ -6,6 +6,9 @@ set(CMAKE_Fortran_STANDARD 2008)
 set(CMAKE_Fortran_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+# Ensure -fPIC is enabled for shared library
+set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fPIC")
+
 # Ensure module files are placed correctly
 set(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/modules)
 
@@ -29,21 +32,54 @@ set(LIB_SOURCES
     ${SOURCE_DIR}/types/system_data.f90
 )
 
-# Create the static library for rsutil_lib
-add_library(rsutil_lib STATIC ${LIB_SOURCES})
+# Create a SHARED library for linking
+add_library(rsutil_lib SHARED ${LIB_SOURCES})
 
 # Ensure correct module paths for the library
 target_include_directories(rsutil_lib PRIVATE ${CMAKE_Fortran_MODULE_DIRECTORY})
 
-# Collect Fortran source files for the executable
-set(EXE_SOURCES
-    ${SOURCE_DIR}/process_lattice.f90
+# Install the shared library so Python can find it
+set_target_properties(rsutil_lib PROPERTIES PREFIX "" SUFFIX ".so")
+
+# Find Python3 and NumPy
+find_package(Python3 REQUIRED COMPONENTS Interpreter Development NumPy)
+
+# Generate f90wrap Python bindings
+add_custom_command(
+    OUTPUT f90wrap_rsutil_lib.f90
+    COMMAND ${Python3_EXECUTABLE} -m numpy.f2py -m rsutil -h f90wrap_rsutil.pyf --overwrite-signature ${SOURCE_DIR}/rsutil_lib.f90
+    COMMAND f90wrap -m rsutil_lib ${SOURCE_DIR}/rsutil_lib.f90
+    DEPENDS ${SOURCE_DIR}/rsutil_lib.f90
 )
 
-# Create the executable and link with rsutil_lib
-add_executable(process_lattice.x ${EXE_SOURCES})
+# Define f90wrap as a separate build step
+add_custom_target(f90wrap_target DEPENDS f90wrap_rsutil_lib.f90)
 
-# Link the executable with rsutil_lib
+# Create a Python extension module (Fix: `MODULE`, not `SHARED`)
+add_library(rsutil MODULE f90wrap_rsutil_lib.f90 ${LIB_SOURCES})
+
+# Link against rsutil_lib
+target_link_libraries(rsutil PRIVATE rsutil_lib)
+
+# Ensure correct module paths for the Python module
+target_include_directories(rsutil PRIVATE ${CMAKE_BINARY_DIR}/modules)
+
+# Ensure the Python module is named correctly
+set_target_properties(rsutil PROPERTIES PREFIX "" SUFFIX ".so")
+
+# ✅ FIX: Ensure macOS uses the correct flags
+if(APPLE)
+    set_target_properties(rsutil PROPERTIES LINK_FLAGS "-bundle -undefined dynamic_lookup -fPIC")
+else()
+    set_target_properties(rsutil PROPERTIES LINK_FLAGS "-shared -fPIC")
+endif()
+
+# Ensure f90wrap runs before the final shared library is built
+add_dependencies(rsutil f90wrap_target)
+
+# Create the executable and link with rsutil_lib
+set(EXE_SOURCES ${SOURCE_DIR}/process_lattice.f90)
+add_executable(process_lattice.x ${EXE_SOURCES})
 target_link_libraries(process_lattice.x PRIVATE rsutil_lib)
 
 # Ensure correct module paths for the executable
