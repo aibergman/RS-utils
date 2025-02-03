@@ -36,7 +36,7 @@ The RS‐LMTO‐ASA method requires a variety of input and processing routines t
 2. **Navigate to the project directory:**
 
     ```bash
-    cd LMTO-utils
+    cd RS-utils
     ```
 
 3. **Create a build directory and configure the project with CMake:**
@@ -51,13 +51,18 @@ The RS‐LMTO‐ASA method requires a variety of input and processing routines t
     cmake --build .
     ```
 
+This will create a binary `process_lattice.x` in the `./build/bin` directory of your repository.
+
 ## Usage
 
-After building, an executable (for example, `expand_lattice`) will be available in your build directory. To run the program:
+After building, an executable (for example, `process_lattics`) will be available in your build directory. To run the program 
+you need to have RS-LMTO-ASA compliant `input.nml` and `lattice.nml` files present. Based on the structural information in 
+`lattice.nml`  and the chemical information in `input.nml`. the binary `process_lattice.x`  will calculate optimal Wigner-Seitz radii
+and reasonable starting guesses for occupations, moments, and potential parameters. This will be stored in atomic `.nml` files as well
+as in the created `input_new.nml` and `lattice_new.nml`.
 
-```bash
-./expand_lattice
-```
+Caution: The f-electron treatment is not fully optimal yet so please double check occupations and core/valence electrons in the input is properly 
+described.
 
 ## License
 
