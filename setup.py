@@ -31,18 +31,21 @@ class CMakeBuild(build_ext):
         subprocess.check_call(["cmake", ext.sourcedir] + cmake_args, cwd=self.build_temp)
         subprocess.check_call(["cmake", "--build", "."] + build_args, cwd=self.build_temp)
 
-        # Locate the built shared library dynamically
-        shared_libs = glob.glob(os.path.join(extdir, "rsutil*.so"))
+        # Locate the built shared library
+        shared_lib = os.path.join(extdir, "rsutil.so")
 
-        if not shared_libs:
-            raise FileNotFoundError(f"Expected shared library rsutil*.so not found in {extdir}")
-
-        shared_lib = shared_libs[0]  # Pick the first match (should be the correct one)
+        if not os.path.exists(shared_lib):
+            raise FileNotFoundError(f"Expected shared library {shared_lib} not found!")
 
         # Ensure the library is copied into the rsutil package directory
         package_dir = os.path.abspath(os.path.join(self.build_lib, "rsutil"))
         os.makedirs(package_dir, exist_ok=True)
         self.copy_file(shared_lib, package_dir)
+
+        # Explicitly add rsutil.so to package_data to ensure it's inside the wheel
+        self.distribution.package_data = {
+            "rsutil": ["rsutil.so"]
+        }
 
 setup(
     name="rsutil",
@@ -54,8 +57,9 @@ setup(
     ext_modules=[CMakeExtension("rsutil")],
     cmdclass={"build_ext": CMakeBuild},
     packages=setuptools.find_packages(),
-    include_package_data=True,  # ✅ Ensures non-Python files are included
+    include_package_data=True,  # ✅ Ensures package_data is included in the wheel
     zip_safe=False,
+    package_data={"rsutil": ["rsutil.so"]},  # ✅ Explicitly include rsutil.so
     entry_points={
         "console_scripts": [
             "rsutil=rsutil.cli:main"
