@@ -3,7 +3,7 @@ module element_info_mod
   private
   public :: get_element_info
 
-  ! Number of elements in our lookup (105 entries).
+  ! Number of elements in our lookup (119 entries).
   integer, parameter :: nElements = 105
 
   ! The lookup table of element symbols.
@@ -19,8 +19,9 @@ module element_info_mod
        'Yb','Lu','Hf','Ta','W ', 'Re','Os','Ir','Pt','Au', &
        'Hg','Tl','Pb','Bi','Po','At','Rn','Fr','Ra','Ac', &
        'Th','Pa','U ', 'Np','Pu','Am','Cm','Bk','Cf','Es', &
-       'Fm','Md','No','Lr','Rf','Db','Sg','Bh','Hs','Mt', &
-       'Ds','Rg','Cn','Nh','Fl','Mc','Lv','Ts','Og' /)
+       'Fm','Md','No','Lr','Rf'/)
+       !'Fm','Md','No','Lr','Rf','Db','Sg','Bh','Hs','Mt', &
+       !'Ds','Rg','Cn','Nh','Fl','Mc','Lv','Ts','Og' /)
 
   ! The corresponding lookup table for the IZCOR values.
   ! This table is taken from the original data statement:
