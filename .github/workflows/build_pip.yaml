@@ -29,9 +29,20 @@ jobs:
         run: |
           python -m build
 
+      - name: Upload built package
+        uses: actions/upload-artifact@v3
+        with:
+          name: rsutil-package
+          path: dist/*
+
+      - name: Install built wheel
+        run: |
+          pip install $(ls dist/*.whl)
+
+      - name: Verify installed package
+        run: |
+          ls -l $(python -c "import rsutil; print(rsutil.__file__)")
+
       - name: Run tests
         run: |
-          pip install .
           python -c "import rsutil; rsutil.process_lattice()"
-
-
