@@ -1,0 +1,59 @@
+name: Build and Publish Wheels
+
+on:
+  push:
+    branches:
+      - main
+  release:
+    types:
+      - created
+
+jobs:
+  build_wheels:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install cibuildwheel
+        run: pip install cibuildwheel
+
+      - name: Build Wheels
+        env:
+          CIBW_BEFORE_BUILD: "cmake -DENABLE_PYTHON_BINDINGS=ON . && make"
+        run: python -m cibuildwheel --output-dir wheelhouse
+
+      - name: Upload Wheels as Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels
+          path: wheelhouse/*.whl
+
+            #   upload_wheels:
+            #     needs: build_wheels
+            #     runs-on: ubuntu-latest
+            #     steps:
+            #       - name: Download Built Wheels
+            #         uses: actions/download-artifact@v4
+            #         with:
+            #           name: wheels
+            #           path: wheelhouse
+            # 
+            #       - name: Upload Wheels to PyPI
+            #         env:
+            #           TWINE_USERNAME: __token__
+            #           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+            #         run: |
+            #           pip install twine
+            #           twine upload wheelhouse/*.whl
+
+
