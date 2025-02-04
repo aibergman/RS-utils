@@ -6,8 +6,6 @@ skip = "pp* *-musllinux* cp36* cp37* cp38*"  # Skip PyPy and musl Linux builds
 before-build ='python -m pip install --upgrade numpy>1.19 ninja f90wrap'
 # test-requires = ["pytest"]
 # test-command = "pytest {package}/tests"
-[tool.cibuildwheel.linux]
-before-all = "yum clean packages && yum install -y python3-devel"
 
 [tool.cibuildwheel.linux]
 before-all = "yum clean packages && yum install -y python3-devel"
