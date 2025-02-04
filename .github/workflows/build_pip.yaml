@@ -45,6 +45,5 @@ jobs:
 
       - name: Run tests
         run: |
-          mkdir -p /tmp/test_env
-          cd /tmp/test_env
+          cd examples/FeCo
           python -c "import rsutil; rsutil.process_lattice()"

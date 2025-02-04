@@ -21,8 +21,10 @@ class CMakeBuild(build_ext):
         cmake_args = [
             f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={extdir}",
             f"-DPython3_EXECUTABLE={sys.executable}",
+            f"-DPython3_ROOT_DIR={sys.prefix}",  # ✅ Add this to explicitly set the Python root
             "-DPYTHON_BINDINGS=ON",
         ]
+
         build_args = ["--config", "Release"]
 
         if not os.path.exists(self.build_temp):
