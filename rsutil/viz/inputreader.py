@@ -1,6 +1,7 @@
 from glyphs import Atom
 from helpers import get_element_color
 from structure import Structure
+import numpy as np
 from pymatgen.io.vasp import Poscar
 
 
@@ -67,9 +68,10 @@ class InputReader:
         pg_struct = poscar.structure
         atoms = []
         for site in pg_struct:
+            cart_coords = pg_struct.lattice.get_cartesian_coords(site.frac_coords)
             atoms.append(
                 Atom(
-                    position=site.coords,
+                    position=cart_coords,
                     species=site.species_string,
                     atom_type=site.species_string,
                     color=get_element_color(site.species_string),

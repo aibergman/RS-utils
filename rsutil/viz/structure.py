@@ -66,6 +66,18 @@ class Structure:
         )
         self.bond_cutoff = bond_cutoff
 
+    def _create_pymatgen_structure(self):
+        """
+        Create a pymatgen Structure object from the current unit cell and atom list.
+
+        Returns:
+            PymatgenStructure: A pymatgen Structure object.
+        """
+        lattice = self.unit_cell
+        species = [atom.species for atom in self.atoms]
+        positions = [np.dot(np.linalg.inv(lattice).T, atom.position) for atom in self.atoms]
+        return PymatgenStructure(lattice, species, positions)
+    
     def get_atom_spin_objects(self):
         """
         Returns a list of tuples (Atom, Spin). If a spin is not provided
@@ -120,15 +132,16 @@ class Structure:
         """
 
         # Build a pymatgen structure from current unit cell and atoms.
-        species = [atom.species for atom in self.atoms]
-        coords = [atom.position for atom in self.atoms]
-        if self.unit_cell is None:
-            raise ValueError("Unit cell is not defined in the structure.")
-
-        pg_struct = PymatgenStructure(self.unit_cell, species, coords)
+        pg_struct = self._create_pymatgen_structure()
+        print("pg_struct"+'-'*50)
+        print(pg_struct)
 
         # Use SpacegroupAnalyzer to get the conventional standard structure.
         sga = SpacegroupAnalyzer(pg_struct)
+        print("spacegroup_struct"+'-'*50)
+        print(sga.get_conventional_standard_structure())
+        print(sga.get_space_group_number())
+        print(sga.get_space_group_symbol())
         conv_struct = sga.get_conventional_standard_structure()
 
         # Save the conventional cell lattice.

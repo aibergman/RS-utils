@@ -54,10 +54,10 @@ class Visualizer:
         self.plotter = pv.Plotter()
 
         # Toggle options (default settings)
-        self.show_bonds = True
-        self.show_spins = True
-        self.use_conventional = False  # False means use unit cell
-        self.show_extents = False
+        self.show_bonds = False
+        self.show_spins = False
+        self.use_conventional = True  # False means use unit cell
+        self.show_extents = True 
         self.periodicity = None  # Options: None, '2d', '3d'
 
     def toggle_bonds(self):
