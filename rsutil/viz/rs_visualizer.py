@@ -38,13 +38,12 @@ if __name__ == "__main__":
     if structure.unit_cell is not None:
         print("Unit Cell:")
         print(structure.unit_cell)
-        print(len(structure.atoms))
+        print(len(structure.atoms_uc))
 
     if structure.conventional_cell is not None:
         print("Conventional Cell:")
         print(len(structure.atoms_cc))
 
-    exit()
     # Create a Visualizer instance with the structure.
     viz = Visualizer(structure=structure)
     # Uncomment toggles as desired:

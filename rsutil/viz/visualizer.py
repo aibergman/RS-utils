@@ -9,35 +9,36 @@ import pyvista as pv
 # ----------------------------
 class Visualizer:
     """
-        Provides interactive toggles for visualizing different aspects of a 
-        structure, including bonds, spins, cell type, extents, and periodicity.
+    Provides interactive toggles for visualizing different aspects of a
+    structure, including bonds, spins, cell type, extents, and periodicity.
 
-        Attributes:
-            structure (Structure): The structure to visualize.
-            plotter (pv.Plotter): The pyvista plotter instance.
-            show_bonds (bool): Toggle for showing bonds.
-            show_spins (bool): Toggle for showing spins.
-            use_conventional (bool): Toggle for using conventional cell.
-            show_extents (bool): Toggle for showing extents.
-            periodicity (str or None): Periodicity type ('2d', '3d', or None).
+    Attributes:
+        structure (Structure): The structure to visualize.
+        plotter (pv.Plotter): The pyvista plotter instance.
+        show_bonds (bool): Toggle for showing bonds.
+        show_spins (bool): Toggle for showing spins.
+        use_conventional (bool): Toggle for using conventional cell.
+        show_extents (bool): Toggle for showing extents.
+        periodicity (str or None): Periodicity type ('2d', '3d', or None).
 
-        Methods:
-            toggle_bonds(): Toggles the display of bonds.
-            toggle_spins(): Toggles the display of spins.
-            toggle_cell(): Toggles between unit cell and conventional cell.
-            toggle_extents(): Toggles the display of cell extents.
-            toggle_periodicity(period="2d"): Toggles periodicity type.
-            get_cell(): Returns the lattice cell matrix based on the toggle.
-            expand_structure(cell, grid_dims): Expands the structure by 
-                replicating the cell.
-            render(): Clears and re-renders the scene with current toggles.
-            _render_atoms(): Renders atoms in the structure.
-            _render_bonds(): Renders bonds in the structure.
-            _render_spins(): Renders spins in the structure.
-            _render_extents(): Renders the extents of the unit or conventional 
-                cell.
-            _render_periodic_images(): Renders periodic images of the structure.
+    Methods:
+        toggle_bonds(): Toggles the display of bonds.
+        toggle_spins(): Toggles the display of spins.
+        toggle_cell(): Toggles between unit cell and conventional cell.
+        toggle_extents(): Toggles the display of cell extents.
+        toggle_periodicity(period="2d"): Toggles periodicity type.
+        get_cell(): Returns the lattice cell matrix based on the toggle.
+        expand_structure(cell, grid_dims): Expands the structure by
+            replicating the cell.
+        render(): Clears and re-renders the scene with current toggles.
+        _render_atoms(): Renders atoms in the structure.
+        _render_bonds(): Renders bonds in the structure.
+        _render_spins(): Renders spins in the structure.
+        _render_extents(): Renders the extents of the unit or conventional
+            cell.
+        _render_periodic_images(): Renders periodic images of the structure.
     """
+
     def __init__(self, structure: Structure):
         """
         Visualizer for a Structure using pyvista.
@@ -53,11 +54,25 @@ class Visualizer:
         self.structure = structure
         self.plotter = pv.Plotter()
 
+        # Set default to unit cell
+        self.atoms = structure.atoms_uc
+        self.bonds = structure.bonds_uc
+        self.spins = structure.spins_uc
+        self.cell = structure.unit_cell
+
+        # Qualtiy settings
+        self.plotter.enable_anti_aliasing()
+        self.plotter.enable_depth_peeling()
+        self.plotter.set_background("white")
+        self.plotter.add_light(
+            pv.Light(position=(10, 10, 10), focal_point=(0, 0, 0), intensity=0.5)
+        )
+
         # Toggle options (default settings)
         self.show_bonds = False
         self.show_spins = False
         self.use_conventional = True  # False means use unit cell
-        self.show_extents = True 
+        self.show_extents = True
         self.periodicity = None  # Options: None, '2d', '3d'
 
     def toggle_bonds(self):
@@ -87,14 +102,16 @@ class Visualizer:
             self.periodicity = period
         self.render()
 
-    def get_cell(self):
+    def get_cell(self, conventional=False):
         """
         Returns the lattice cell matrix based on the toggle.
         """
-        if self.use_conventional and self.structure.conventional_cell is not None:
+        if conventional and self.structure.conventional_cell is not None:
             return self.structure.conventional_cell
-        elif self.structure.unit_cell is not None:
+
+        if self.structure.unit_cell is not None:
             return self.structure.unit_cell
+
         return None
 
     def expand_structure(self, cell, grid_dims):
@@ -113,7 +130,7 @@ class Visualizer:
             for j in range(grid_dims[1]):
                 for k in range(grid_dims[2]):
                     translation = np.dot(cell.T, [i, j, k])
-                    for atom in self.structure.atoms:
+                    for atom in self.atoms:
                         new_pos = atom.position + translation
                         atoms_expanded.append(
                             Atom(
@@ -149,21 +166,25 @@ class Visualizer:
         """
         Renders atoms in the structure.
         """
-        for atom in self.structure.atoms:
+        for atom in self.atoms:
             sphere = pv.Sphere(radius=atom.radius, center=atom.position)
+            #sphere.compute_normals(cell_normals=True, point_normals=True, auto_orient_normals=True)
+            print(atom.color)
             self.plotter.add_mesh(
                 sphere,
                 color=atom.color,
                 smooth_shading=True,
                 specular=0.5,
                 specular_power=10,
+                lighting=True,
             )
+        # self.plotter.enable_shadows()
 
     def _render_bonds(self):
         """
         Renders bonds in the structure.
         """
-        bonds = self.structure.get_bond_objects()
+        bonds = self.structure.get_bond_objects(self.use_conventional)
         for bond in bonds:
             vector = bond.end - bond.start
             length = np.linalg.norm(vector)
@@ -181,7 +202,7 @@ class Visualizer:
         """
         Renders spins in the structure.
         """
-        for atom, spin in self.structure.get_atom_spin_objects():
+        for atom, spin in self.structure.get_atom_spin_objects(self.use_conventional):
             if spin.magnitude > 0:
                 arrow = pv.Arrow(
                     start=atom.position,
@@ -197,7 +218,7 @@ class Visualizer:
         """
         Renders the extents of the unit or conventional cell.
         """
-        cell = self.get_cell()
+        cell = self.cell
         if cell is not None:
             origin = np.array([0, 0, 0])
             a, b, c = cell[0], cell[1], cell[2]
@@ -214,7 +235,7 @@ class Visualizer:
         Renders periodic images of the structure.
         """
         grid_dims = (5, 5, 1) if self.periodicity == "2d" else (4, 4, 4)
-        cell = self.get_cell()
+        cell = self.cell
         if cell is not None:
             atoms_expanded = self.expand_structure(cell, grid_dims)
             for atom in atoms_expanded:
@@ -222,3 +243,18 @@ class Visualizer:
                 self.plotter.add_mesh(
                     sphere, color=atom.color, opacity=0.5, smooth_shading=True
                 )
+
+    def _change_representation(self):
+        """
+        Changes the representation of the atoms.
+        """
+        if self.use_conventional:
+            self.atoms = self.structure.atoms_cc
+            self.bonds = self.structure.bonds_cc
+            self.spins = self.structure.spins_cc
+            self.cell = self.structure.conventional_cell
+        else:
+            self.atoms = self.structure.atoms_uc
+            self.bonds = self.structure.bonds_uc
+            self.spins = self.structure.spins_uc
+            self.cell = self.structure.unit_cell

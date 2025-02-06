@@ -104,6 +104,7 @@ class AtomicStructureVisualizer:
     def show_atoms(self, atoms):
         for atom in atoms:
             sphere = pv.Sphere(radius=atom.radius, center=atom.position)
+            print(atom.color)
             self.plotter.add_mesh(sphere, color=atom.color, smooth_shading=True)
 
     def visualize(self, show_bonds=False, show_cell=False, use_conventional_cell=False, bond_threshold=2.0):

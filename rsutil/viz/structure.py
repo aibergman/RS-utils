@@ -54,9 +54,9 @@ class Structure:
             conventional_cell (3x3 array-like): Lattice vectors for the conventional cell.
             bond_cutoff (float): Distance below which atoms are bonded.
         """
-        self.atoms = atoms
-        self.bonds = bonds if bonds is not None else []
-        self.spins = spins if spins is not None else []
+        self.atoms_uc = atoms
+        self.bonds_uc = bonds if bonds is not None else []
+        self.spins_uc = spins if spins is not None else []
         self.atoms_cc = []
         self.bonds_cc = []
         self.spins_cc = []
@@ -74,40 +74,60 @@ class Structure:
             PymatgenStructure: A pymatgen Structure object.
         """
         lattice = self.unit_cell
-        species = [atom.species for atom in self.atoms]
-        positions = [np.dot(np.linalg.inv(lattice).T, atom.position) for atom in self.atoms]
+        species = [atom.species for atom in self.atoms_uc]
+        positions = [np.dot(np.linalg.inv(lattice).T, atom.position) for atom in self.atoms_uc]
         return PymatgenStructure(lattice, species, positions)
-    
-    def get_atom_spin_objects(self):
+
+    def get_atom_spin_objects(self, conventional=False):
         """
         Returns a list of tuples (Atom, Spin). If a spin is not provided
         for a given atom, a default (zero magnitude) spin is created.
+
+        Args:
+            conventional (bool): If True, use atoms_cc and spins_cc; otherwise, use atoms_uc and spins_uc.
         """
         atom_spin_list = []
-        for atom in self.atoms:
+        atoms = self.atoms_cc if conventional else self.atoms_uc
+        spins = self.spins_cc if conventional else self.spins_uc
+
+        for atom in atoms:
             # Look for a spin whose position matches the atom (within tolerance)
             spin = next(
-                (s for s in self.spins if np.allclose(s.position, atom.position)), None
+                (s for s in spins if np.allclose(s.position, atom.position)), None
             )
             if spin is None:
                 spin = Spin(position=atom.position, direction=(0, 0, 0), magnitude=0.0)
             atom_spin_list.append((atom, spin))
         return atom_spin_list
 
-    def get_bond_objects(self):
+    def get_bond_objects(self, conventional=False):
         """
         Returns a list of Bond objects. If the bonds list is empty, automatically
         generates bonds based on the distance cutoff.
+
+        Args:
+            conventional (bool): If True, use bonds_cc; otherwise, use bonds_uc.
         """
-        if not self.bonds:
-            n = len(self.atoms)
-            for i in range(n):
-                for j in range(i + 1, n):
-                    pos_i = self.atoms[i].position
-                    pos_j = self.atoms[j].position
-                    if np.linalg.norm(pos_i - pos_j) <= self.bond_cutoff:
-                        self.bonds.append(Bond(start=pos_i, end=pos_j))
-        return self.bonds
+        if conventional:
+            if not self.bonds_cc:
+                n = len(self.atoms_cc)
+                for i in range(n):
+                    for j in range(i + 1, n):
+                        pos_i = self.atoms_cc[i].position
+                        pos_j = self.atoms_cc[j].position
+                        if np.linalg.norm(pos_i - pos_j) <= self.bond_cutoff:
+                            self.bonds_cc.append(Bond(start=pos_i, end=pos_j))
+            return self.bonds_cc
+        else:
+            if not self.bonds_uc:
+                n = len(self.atoms_uc)
+                for i in range(n):
+                    for j in range(i + 1, n):
+                        pos_i = self.atoms_uc[i].position
+                        pos_j = self.atoms_uc[j].position
+                        if np.linalg.norm(pos_i - pos_j) <= self.bond_cutoff:
+                            self.bonds_uc.append(Bond(start=pos_i, end=pos_j))
+            return self.bonds_uc
 
     def compute_conventional_cell(self, tol=0.01):
         """
