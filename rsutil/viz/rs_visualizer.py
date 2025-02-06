@@ -29,8 +29,8 @@ if __name__ == "__main__":
     #     "/Users/andersb/Jobb/RS_tools_python/POSCAR"
     # )
     structure = InputReader.read_rs_lmto(
-        "/Users/andersb/Jobb/RS_tools_python/examples/Mn3Sn/lattice.nml",
-        "/Users/andersb/Jobb/RS_tools_python/examples/Mn3Sn/input.nml",
+        "/Users/andersb/Jobb/RS_tools_python/examples/FeCo/lattice.nml",
+        "/Users/andersb/Jobb/RS_tools_python/examples/FeCo/input.nml",
     )  # <-- update with your file path
 
     # Optionally, compute the conventional cell using pymatgen's symmetry routines.

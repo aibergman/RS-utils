@@ -1,7 +1,7 @@
 import re
 import f90nml
 from glyphs import Atom
-from helpers import get_element_color
+from helpers import get_element_color, get_atomic_radius, load_cpk_colors
 from structure import Structure
 import numpy as np
 from pymatgen.io.vasp import Poscar
@@ -48,7 +48,6 @@ class InputReader:
                     position=position,
                     species=species,
                     atom_type=species,
-                    color=get_element_color(species),
                 )
             )
         return Structure(atoms=atoms)
@@ -76,7 +75,6 @@ class InputReader:
                     position=cart_coords,
                     species=site.species_string,
                     atom_type=site.species_string,
-                    color=get_element_color(site.species_string),
                 )
             )
         return Structure(atoms=atoms, unit_cell=pg_struct.lattice.matrix)

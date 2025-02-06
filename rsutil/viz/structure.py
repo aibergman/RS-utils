@@ -41,7 +41,7 @@ class Structure:
         spins=None,
         unit_cell=None,
         conventional_cell=None,
-        bond_cutoff=2.5,
+        bond_cutoff=3.0,
     ):
         """
         Contains all the structural information.
@@ -195,7 +195,6 @@ class Structure:
                     position=pos,
                     species=symbol,
                     atom_type=symbol,
-                    color=get_element_color(symbol),
                 )
             )
 

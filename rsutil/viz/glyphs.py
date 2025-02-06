@@ -1,12 +1,12 @@
 import numpy as np
-from helpers import get_element_color
+from helpers import get_element_color, get_atomic_radius, load_cpk_colors
 
 
 # ----------------------------
 # 1. Atom, Bond and Spin Classes
 # ----------------------------
 class Atom:
-    def __init__(self, position, species, atom_type, radius=0.5, color=None, **kwargs):
+    def __init__(self, position, species, atom_type, radius=None, color=None, **kwargs):
         """
         Represents an atom for visualization.
 
@@ -18,11 +18,14 @@ class Atom:
             color (str): Color used to render. If None, a standard color is assigned.
             kwargs: Any additional render information.
         """
+        # Read colors from a JSON file
+        self.cpk_colors = load_cpk_colors()
+        
         self.position = np.array(position)
         self.species = species
         self.atom_type = atom_type
-        self.radius = radius
-        self.color = color if color is not None else get_element_color(species)
+        self.radius = radius if radius is not None else get_atomic_radius(species)
+        self.color = color if color is not None else get_element_color(species, self.cpk_colors)
         self.render_info = kwargs
 
 
