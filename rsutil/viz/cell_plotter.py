@@ -1,148 +1,114 @@
+from itertools import product
 import numpy as np
 import pyvista as pv
 from pymatgen.core.structure import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 
-class AtomicStructureVisualizer:
-    def __init__(self, poscar_file):
-        self.lattice, self.atom_types, self.atom_counts, self.positions = (
-            self.read_poscar(poscar_file)
-        )
-        self.plotter = pv.Plotter()
-        self.atom_colors = self._generate_atom_colors()
-        self.sphere_radius = 0.2
+class InputReader:
+    """
+    A class to read and parse POSCAR files.
 
-    def read_poscar(self, filename):
-        with open(filename, "r") as f:
+    Attributes:
+        filename (str): The path to the POSCAR file.
+
+    Methods:
+        read_poscar():
+            Reads the POSCAR file and extracts lattice vectors, atom positions,
+            and atomic symbols.
+    """
+    def __init__(self, filename):
+        self.filename = filename
+
+    def read_poscar(self):
+        with open(self.filename, "r", encoding="utf-8") as f:
             lines = f.readlines()
 
         scale = float(lines[1].strip())
         lattice_vectors = np.array(
             [list(map(float, line.split())) for line in lines[2:5]]
-        )  # * scale
+        ) * scale
         atom_types = lines[5].split()
-        print(atom_types)
         atom_counts = list(map(int, lines[6].split()))
         total_atoms = sum(atom_counts)
         atom_positions = np.array(
-            [list(map(float, line.split())) for line in lines[8 : 8 + total_atoms]]
+            [list(map(float, line.split())) for line in lines[8: 8 + total_atoms]]
         )
-        return lattice_vectors, atom_types, atom_counts, atom_positions
+        atomic_symbols = []
+        for atom_type, count in zip(atom_types, atom_counts):
+            atomic_symbols.extend([atom_type] * count)
+        return (lattice_vectors, atom_positions, atomic_symbols)
+
+
+class Atom:
+    def __init__(self, position, atom_type, color, radius=1.0):
+        self.position = position
+        self.atom_type = atom_type
+        self.color = color
+        self.radius = radius
+
+
+class AtomicStructureVisualizer:
+    def __init__(self, poscar_file):
+        reader = InputReader(poscar_file)
+        self.plotter = pv.Plotter()
+        self.unit_cell = reader.read_poscar()
+        self.lattice, self.positions, self.atomic_symbols = self.unit_cell
+        self.atom_colors = self._generate_atom_colors()
+        self.unit_cell = self._create_atoms(self.positions, self.atomic_symbols)
+        self.find_conventional_cell()
 
     def _generate_atom_colors(self):
-        color_palette = list(pv.plotting.colors.hexcolors.values())  # Use hex colors
-        return {
-            atom: color_palette[i % len(color_palette)]
-            for i, atom in enumerate(self.atom_types)
-        }
-
-    def show_atoms(self):
-        for i, pos in enumerate(self.positions):
-            cumulative_counts = np.cumsum(self.atom_counts)
-            atom_index = next(
-                (j for j, v in enumerate(cumulative_counts) if v > i),
-                len(cumulative_counts) - 1,
-            )
-            atom_type = self.atom_types[atom_index]
-            color = self.atom_colors[atom_type]
-            sphere = pv.Sphere(radius=self.sphere_radius, center=pos)
-            self.plotter.add_mesh(sphere, color=color, smooth_shading=True)
-
-    def show_bonds(self, bond_threshold=2.0):
-        for i, pos_i in enumerate(self.positions):
-            for j, pos_j in enumerate(self.positions[i + 1 :], start=i + 1):
-                dist = np.linalg.norm(pos_i - pos_j)
-                if dist < bond_threshold:
-                    line = pv.Line(pos_i, pos_j)
-                    self.plotter.add_mesh(line, color="gray", line_width=3)
-
-    def show_cell(self):
-        origin = np.zeros(3)
-        points = [
-            origin,
-            self.lattice[0],
-            self.lattice[0] + self.lattice[1],
-            self.lattice[1],
-            self.lattice[2],
-            self.lattice[0] + self.lattice[2],
-            self.lattice[0] + self.lattice[1] + self.lattice[2],
-            self.lattice[1] + self.lattice[2],
+        color_palette = [
+            "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
+            "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf",
         ]
+        atom_colors = {}
+        for i, atom in enumerate(set(self.atomic_symbols)):
+            color = color_palette[i % len(color_palette)]
+            atom_colors[atom] = color
+        return atom_colors
 
-        edges = [
-            (0, 1),
-            (1, 2),
-            (2, 3),
-            (3, 0),
-            (0, 4),
-            (1, 5),
-            (2, 6),
-            (3, 7),
-            (4, 5),
-            (5, 6),
-            (6, 7),
-            (7, 4),
-        ]
+    def _create_atoms(self, positions, atomic_symbols):
+        atoms = []
+        for pos, atom_symbol in zip(positions, atomic_symbols):
+            color = self.atom_colors[atom_symbol]
+            atoms.append(Atom(pos, atom_symbol, color))
+        return atoms
 
-        lines = pv.PolyData()
-        lines.points = np.array(points)
-        lines.lines = np.hstack([[2, edge[0], edge[1]] for edge in edges])
-
-        self.plotter.add_mesh(lines, color="black", line_width=1)
-
-    def find_conventional_cell(self, repeat_atoms=False):
-        # Create a pymatgen Structure object
-        structure = Structure(self.lattice, self.atom_types, self.positions)
-
-        # Use SpacegroupAnalyzer to find the conventional cell
+    def find_conventional_cell(self):
+        structure = Structure(self.lattice, self.atomic_symbols, self.positions)
         sga = SpacegroupAnalyzer(structure)
         conventional_structure = sga.get_conventional_standard_structure()
 
-        # Update the lattice and positions with the conventional cell
         self.lattice = conventional_structure.lattice.matrix
-        self.positions = conventional_structure.frac_coords
+        self.positions = conventional_structure.cart_coords
+        self.atomic_symbols = [site.species_string for site in conventional_structure]
 
-        if repeat_atoms:
-            # Repeat atoms to include those at the border
-            repeated_structure = conventional_structure * (4, 4, 4)
-            repeated_structure.translate_sites(
-                range(len(repeated_structure)), [-2, -2, -2]
-            )
-            self.positions = repeated_structure.cart_coords
-            self.atom_types = [site.species_string for site in repeated_structure]
-            self.atom_counts = [
-                self.atom_types.count(atom) for atom in set(self.atom_types)
-            ]
+        # Expand to capture all atoms at the boundaries
+        fractional_positions = conventional_structure.frac_coords
+        expanded_positions = []
+        expanded_symbols = []
 
-            # Remove atoms outside the conventional cell with a tolerance of +- 5%
-            tolerance = 0.05
-            within_cell_indices = [
-                i
-                for i, pos in enumerate(self.positions)
-                if np.all((pos >= -tolerance) & (pos <= 1 + tolerance))
-            ]
-            self.positions = self.positions[within_cell_indices]
-            self.atom_types = [self.atom_types[i] for i in within_cell_indices]
-            self.atom_counts = [
-                self.atom_types.count(atom) for atom in set(self.atom_types)
-            ]
+        shifts = np.array(list(product([-1, 0, 1], repeat=3)))
+        for shift in shifts:
+            for pos, symbol in zip(fractional_positions, self.atomic_symbols):
+                new_pos = pos + shift
+                if np.all((new_pos >= -0.01) & (new_pos < 1.01)):
+                    expanded_positions.append(new_pos)
+                    expanded_symbols.append(symbol)
 
-    def visualize(
-        self,
-        show_bonds=False,
-        show_cell=False,
-        use_conventional_cell=False,
-        bond_threshold=2.0,
-    ):
-        if use_conventional_cell:
-            self.find_conventional_cell(repeat_atoms=True)
+        expanded_positions = np.dot(expanded_positions, self.lattice)  # Convert to Cartesian
+        self.conventional_cell = self._create_atoms(expanded_positions, expanded_symbols)
 
-        self.show_atoms()
-        if show_bonds:
-            self.show_bonds(bond_threshold)
-        if show_cell:
-            self.show_cell()
+    def show_atoms(self, atoms):
+        for atom in atoms:
+            sphere = pv.Sphere(radius=atom.radius, center=atom.position)
+            self.plotter.add_mesh(sphere, color=atom.color, smooth_shading=True)
+
+    def visualize(self, show_bonds=False, show_cell=False, use_conventional_cell=False, bond_threshold=2.0):
+        atoms_to_show = self.conventional_cell if use_conventional_cell else self.unit_cell
+        self.show_atoms(atoms_to_show)
         self.plotter.show()
 
 
