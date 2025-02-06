@@ -41,7 +41,7 @@ class Structure:
         spins=None,
         unit_cell=None,
         conventional_cell=None,
-        bond_cutoff=1.5,
+        bond_cutoff=2.5,
     ):
         """
         Contains all the structural information.

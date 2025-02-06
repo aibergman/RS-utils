@@ -27,7 +27,7 @@ class Atom:
 
 
 class Bond:
-    def __init__(self, start, end, radius=0.1, color="grey", **kwargs):
+    def __init__(self, start, end, radius=0.2, color="grey", **kwargs):
         """
         Represents a bond (rendered as a cylinder).
 

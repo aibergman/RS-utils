@@ -22,6 +22,12 @@ class Visualizer:
         """
         self.structure = structure
         self.plotter = pv.Plotter()
+        # --- Quality settings ---
+        self.plotter.add_light(pv.Light(position=(10, 10, 10), focal_point=(0, 0, 0), intensity=0.1))
+        self.plotter.enable_ssao()
+        self.plotter.enable_anti_aliasing()
+        self.plotter.set_background("white")
+        self.plotter.enable_depth_peeling()
 
         # --- Default data selection ---
         # We assume your structure object provides two representations:
@@ -30,16 +36,10 @@ class Visualizer:
         self.use_conventional = True  # True: conventional; False: unit cell
         self._change_representation()  # sets self.atoms, self.bonds, self.spins, self.cell
 
-        # --- Quality settings ---
-        self.plotter.enable_anti_aliasing()
-        self.plotter.enable_depth_peeling()
-        self.plotter.set_background("white")
-        self.plotter.add_light(pv.Light(position=(10, 10, 10), focal_point=(0, 0, 0), intensity=0.5))
-
         # --- Toggle options (initial states) ---
         self.show_bonds = False
         self.show_spins = False
-        self.show_extents = True
+        self.show_extents = False
         self.periodicity = None  # Options: None, '2d', '3d'
 
         # --- Set up interactive key callbacks ---
@@ -55,81 +55,109 @@ class Visualizer:
                         "B: Toggle Bonds    2: 2d Periodicity    3: 3d Periodicity")
         self.plotter.add_text(instructions, position="upper_left", font_size=10, color="black")
 
-        
-        
+        # --- Initialize lists for tracking geometry actors ---
+        self._atom_actors = []
+        self._bond_actors = []
+        self._spin_actors = []
+        self._periodic_actors = []
+        self._extent_actor = None
+
     def _add_icons(self):
         """
         Adds checkbox button widgets at fixed positions in the render window.
         The positions are in pixel coordinates (relative to the lower-left corner).
         Each button is associated with a callback.
         """
-        # The following positions (x, y) and sizes (in pixels) can be adjusted as needed.
         self.plotter.add_checkbox_button_widget(
             callback=self.toggle_cell,
             value=self.use_conventional,
             position=(20, 20),  # Button for "R": Toggle Cell representation
-            size=30,
+            size=50,
             border_size=2,
             color_on="green",
             color_off="red"
         )
-        self.plotter.add_text("R", position=(20, 55), font_size=10, color="black")  # Label above the checkbox
+        self.plotter.add_text("R", position=(30, 30), font_size=14, color="black", font="arial")
 
         self.plotter.add_checkbox_button_widget(
             callback=self.toggle_spins,
             value=self.show_spins,
-            position=(70, 20),  # Button for "M": Toggle Spins
-            size=30,
+            position=(90, 20),  # Button for "M": Toggle Spins
+            size=50,
             border_size=2,
             color_on="green",
             color_off="red"
         )
-        self.plotter.add_text("M", position=(70, 55), font_size=10, color="black")
+        self.plotter.add_text("M", position=(100, 30), font_size=14, color="black", font="arial")
 
         self.plotter.add_checkbox_button_widget(
             callback=self.toggle_extents,
             value=self.show_extents,
-            position=(120, 20),  # Button for "C": Toggle Cell Extents
-            size=30,
+            position=(160, 20),  # Button for "C": Toggle Cell Extents
+            size=50,
             border_size=2,
             color_on="green",
             color_off="red"
         )
-        self.plotter.add_text("C", position=(120, 55), font_size=10, color="black")
+        self.plotter.add_text("C", position=(170, 30), font_size=14, color="black", font="arial")
 
         self.plotter.add_checkbox_button_widget(
             callback=self.toggle_bonds,
             value=self.show_bonds,
-            position=(170, 20),  # Button for "B": Toggle Bonds
-            size=30,
+            position=(230, 20),  # Button for "B": Toggle Bonds
+            size=50,
             border_size=2,
             color_on="green",
             color_off="red"
         )
-        self.plotter.add_text("B", position=(170, 55), font_size=10, color="black")
+        self.plotter.add_text("B", position=(240, 30), font_size=14, color="black", font="arial")
 
-        # For periodicity, we use lambda functions so that toggling one can override the other.
         self.plotter.add_checkbox_button_widget(
             callback=lambda _: self.toggle_periodicity("2d"),
             value=(self.periodicity == "2d"),
-            position=(220, 20),  # Button for "2D": Toggle 2D periodicity
-            size=30,
+            position=(300, 20),  # Button for "2D": Toggle 2D periodicity
+            size=50,
             border_size=2,
             color_on="green",
             color_off="red"
         )
-        self.plotter.add_text("2D", position=(220, 55), font_size=10, color="black")
+        self.plotter.add_text("2D", position=(305, 30), font_size=14, color="black", font="arial")
 
         self.plotter.add_checkbox_button_widget(
             callback=lambda _: self.toggle_periodicity("3d"),
             value=(self.periodicity == "3d"),
-            position=(270, 20),  # Button for "3D": Toggle 3D periodicity
-            size=30,
+            position=(370, 20),  # Button for "3D": Toggle 3D periodicity
+            size=50,
             border_size=2,
             color_on="green",
             color_off="red"
         )
-        self.plotter.add_text("3D", position=(270, 55), font_size=10, color="black")
+        self.plotter.add_text("3D", position=(375, 30), font_size=14, color="black", font="arial")
+
+    def _clear_geo_actors(self):
+        """
+        Remove only the geometry actors (atoms, bonds, spins, extents, and periodic images).
+        This avoids wiping out lights, camera settings, and icon widgets.
+        """
+        for actor in self._atom_actors:
+            self.plotter.remove_actor(actor)
+        self._atom_actors.clear()
+
+        for actor in self._bond_actors:
+            self.plotter.remove_actor(actor)
+        self._bond_actors.clear()
+
+        for actor in self._spin_actors:
+            self.plotter.remove_actor(actor)
+        self._spin_actors.clear()
+
+        if self._extent_actor is not None:
+            self.plotter.remove_actor(self._extent_actor)
+            self._extent_actor = None
+
+        for actor in self._periodic_actors:
+            self.plotter.remove_actor(actor)
+        self._periodic_actors.clear()
 
     def toggle_bonds(self, event=None):
         self.show_bonds = not self.show_bonds
@@ -178,7 +206,9 @@ class Visualizer:
         return atoms_expanded
 
     def render(self):
-        self.plotter.clear()
+        # Remove previously rendered geometry without clearing the whole scene.
+        self._clear_geo_actors()
+
         self._render_atoms()
         if self.show_bonds:
             self._render_bonds()
@@ -189,19 +219,18 @@ class Visualizer:
         if self.periodicity is not None:
             self._render_periodic_images()
         self.plotter.render()
-        
+
         # --- Add icon buttons along the bottom ---
         self._add_icons()
-        
-        # -- Render ! --
-        self.plotter.show(auto_close=False)
 
+        # Start (or update) the interactive window.
+        self.plotter.show(auto_close=False)
 
     def _render_atoms(self):
         for atom in self.atoms:
-            sphere = pv.Sphere(radius=atom.radius, center=atom.position)
-            self.plotter.add_mesh(sphere, color=atom.color, smooth_shading=True, specular=0.5,
-                                  specular_power=10, lighting=True)
+            sphere = pv.Sphere(radius=atom.radius, center=atom.position, theta_resolution=16, phi_resolution=16)
+            actor = self.plotter.add_mesh(sphere, color=atom.color, smooth_shading=True)
+            self._atom_actors.append(actor)
 
     def _render_bonds(self):
         for bond in self.bonds:
@@ -211,7 +240,8 @@ class Visualizer:
             direction = vector / length if length else [0, 0, 1]
             cylinder = pv.Cylinder(center=center, direction=direction,
                                    radius=bond.radius, height=length)
-            self.plotter.add_mesh(cylinder, color=bond.color, smooth_shading=True)
+            actor = self.plotter.add_mesh(cylinder, color=bond.color, smooth_shading=True)
+            self._bond_actors.append(actor)
 
     def _render_spins(self):
         for atom, spin in self.spins:
@@ -222,7 +252,8 @@ class Visualizer:
                                  tip_radius=spin.tip_radius,
                                  shaft_radius=spin.base_radius,
                                  scale=spin.magnitude)
-                self.plotter.add_mesh(arrow, color=spin.color, smooth_shading=True)
+                actor = self.plotter.add_mesh(arrow, color=spin.color, smooth_shading=True)
+                self._spin_actors.append(actor)
 
     def _render_extents(self):
         cell = self.cell
@@ -233,7 +264,7 @@ class Visualizer:
             xmin, ymin, zmin = corners.min(axis=0)
             xmax, ymax, zmax = corners.max(axis=0)
             box = pv.Box(bounds=(xmin, xmax, ymin, ymax, zmin, zmax))
-            self.plotter.add_mesh(box, style="wireframe", color="black", smooth_shading=True)
+            self._extent_actor = self.plotter.add_mesh(box, style="wireframe", color="black")
 
     def _render_periodic_images(self):
         grid_dims = (2, 2, 1) if self.periodicity == "2d" else (2, 2, 2)
@@ -242,7 +273,8 @@ class Visualizer:
             atoms_expanded = self.expand_structure(cell, grid_dims)
             for atom in atoms_expanded:
                 sphere = pv.Sphere(radius=atom.radius, center=atom.position)
-                self.plotter.add_mesh(sphere, color=atom.color, opacity=0.5, smooth_shading=True)
+                actor = self.plotter.add_mesh(sphere, color=atom.color, opacity=0.5)
+                self._periodic_actors.append(actor)
 
     def _change_representation(self):
         """
