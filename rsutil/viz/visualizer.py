@@ -132,7 +132,19 @@ class Visualizer:
             color_on="green",
             color_off="red"
         )
+        
         self.plotter.add_text("3D", position=(375, 30), font_size=14, color="black", font="arial")
+        
+        self.plotter.add_checkbox_button_widget(
+            callback=self.toggle_perspective,
+            value=self.plotter.camera.parallel_projection,
+            position=(440, 20),  # Button for "P": Toggle Perspective
+            size=50,
+            border_size=2,
+            color_on="green",
+            color_off="red"
+        )
+        self.plotter.add_text("P", position=(450, 30), font_size=14, color="black", font="arial")
 
     def _clear_geo_actors(self):
         """
@@ -181,6 +193,13 @@ class Visualizer:
             self.periodicity = None
         else:
             self.periodicity = period
+        self.render()
+
+    def toggle_perspective(self, event=None):
+        if self.plotter.camera.parallel_projection:
+            self.plotter.camera.parallel_projection = False
+        else:
+            self.plotter.camera.parallel_projection = True
         self.render()
 
     def get_cell(self):
