@@ -50,6 +50,9 @@ def get_atomic_radius(element_symbol):
     Returns:
         float: Atomic radius in Ångströms (or None if not available).
     """
+    if element_symbol is 'E':
+        return 1.0
+
     try:
         return Element(element_symbol).atomic_radius #*ANG_TO_BOHR
     except ValueError:

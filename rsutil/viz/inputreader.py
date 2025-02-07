@@ -11,20 +11,23 @@ from .structure import Structure
 # ----------------------------
 class InputReader:
     """
+    read_rs_lmto(lattice_file, input_file):
+        Parses lattice vectors and basis coordinates from lattice.nml.
+        Parses species labels from input.nml.
+        Returns a Structure object with the list of Atom objects and the unit cell.
+    read_rs_lmto_nml(lattice_file, input_file):
+        Parses lattice vectors and basis coordinates from lattice.nml.
+        Parses species labels and scaling factor from input.nml.
+        Returns a Structure object with the list of Atom objects and the scaled unit cell.
+    read_rs_clust(clust_file, input_file):
+        Parses atom positions and species from the cluster file.
+        Parses species labels from input.nml.
+        Returns a Structure object built from the parsed cluster file and input file.
     A utility class for reading different file formats and converting them
     into Structure objects.
-
-    Methods:
-        read_xyz(file_path):
-            Reads a simple .xyz file and returns a Structure object.
-
-        read_custom(file_path):
-            Stub for reading a custom file format. Implement your own file
-            parser here.
-
-        read_poscar(file_path):
-            Reads a POSCAR file using pymatgen and returns a Structure object.
     """
+
+
     @staticmethod
     def read_xyz(file_path):
         """
@@ -296,3 +299,52 @@ class InputReader:
 
         # Return a Structure with the list of Atom objects and the scaled unit cell.
         return Structure(atoms=atoms, unit_cell=unit_cell)
+    
+    @staticmethod
+    def read_rs_clust(clust_file, input_file):
+        """
+        Reads a cluster file and an input file to create a Structure object.
+
+        Parameters:
+            clust_file (str): Path to the cluster file.
+            input_file (str): Path to the input.nml file containing the &atoms block.
+
+        Returns:
+            Structure: A Structure object built from the parsed cluster file and input file.
+        """
+        # Example of clust_file: first line gives number of atoms
+        # Followin lines contain atom positions and species for two atoms per row.
+        #   II =   8940
+        #  0.00000000    0.00000000    0.00000000   1   1    0.50000000    0.50000000    0.50000000   2   2
+        # -10.00000000    0.00000000    0.00000000   1   1   -9.00000000   -4.00000000   -1.00000000   1   1
+        #  -9.00000000   -4.00000000    0.00000000   1   1   -9.00000000   -4.00000000    1.00000000   1   1
+        # Parse input.nml for species labels
+        inp_nml = f90nml.read(input_file)
+        atoms_data = inp_nml.get('atoms', {})
+        species_lookup = atoms_data['label']
+
+        # Create Atom objects with species inferred from species_type
+        atoms = []
+        with open(clust_file, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+        _ = int(lines[0].strip().split('=')[1].strip())  # num_atoms is not used
+        for line in lines[1:]:
+            parts = line.split()
+            for i in range(0, len(parts), 10):
+                position1 = [float(parts[i]), float(parts[i+1]), float(parts[i+2])]
+                species_type1 = int(parts[i+3])
+                species1 = species_lookup[species_type1 - 1]
+                position2 = [float(parts[i+5]), float(parts[i+6]), float(parts[i+7])]
+                species_type2 = int(parts[i+8])
+                species2 = species_lookup[species_type2 - 1]
+                atoms.append(Atom(position=position1, species=species1, atom_type=species1))
+                atoms.append(Atom(position=position2, species=species2, atom_type=species2))
+        
+        # If the number of atoms is odd, remove the last element from atoms
+        if len(atoms) % 2 != 0:
+            atoms.pop()
+        # Determine the largest absolute distance in positions to create a cubic unit cell
+        max_distance = max(np.linalg.norm(atom.position) for atom in atoms)
+        unit_cell = np.eye(3) * (2 * max_distance)
+        # Create and return the Structure
+        return Structure(atoms=atoms, unit_cell=None)

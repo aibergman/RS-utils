@@ -153,16 +153,17 @@ class Structure:
 
         # Build a pymatgen structure from current unit cell and atoms.
         pg_struct = self._create_pymatgen_structure()
-        print("pg_struct"+'-'*50)
+        print("--Unit cell" + '-' * 39)
         print(pg_struct)
 
         # Use SpacegroupAnalyzer to get the conventional standard structure.
         sga = SpacegroupAnalyzer(pg_struct)
-        print("spacegroup_struct"+'-'*50)
-        print(sga.get_conventional_standard_structure())
-        print(sga.get_space_group_number())
-        print(sga.get_space_group_symbol())
         conv_struct = sga.get_conventional_standard_structure()
+        print("--Conventional cell" + '-' * 31)
+        print(conv_struct)
+        print('-' * 50)
+        print("Symmetry:", sga.get_space_group_number(), sga.get_space_group_symbol())
+        print('-' * 50)
 
         # Save the conventional cell lattice.
         self.conventional_cell = conv_struct.lattice.matrix
@@ -198,15 +199,15 @@ class Structure:
                 )
             )
 
-        # Compute bonds for the conventional cell.
-        self.bonds_cc = []
-        n = len(self.atoms_cc)
-        for i in range(n):
-            for j in range(i + 1, n):
-                pos_i = self.atoms_cc[i].position
-                pos_j = self.atoms_cc[j].position
-                if np.linalg.norm(pos_i - pos_j) <= self.bond_cutoff:
-                    self.bonds_cc.append(Bond(start=pos_i, end=pos_j))
+        # # Compute bonds for the conventional cell.
+        # self.bonds_cc = []
+        # n = len(self.atoms_cc)
+        # for i in range(n):
+        #     for j in range(i + 1, n):
+        #         pos_i = self.atoms_cc[i].position
+        #         pos_j = self.atoms_cc[j].position
+        #         if np.linalg.norm(pos_i - pos_j) <= self.bond_cutoff:
+        #             self.bonds_cc.append(Bond(start=pos_i, end=pos_j))
 
         # Create a default spin list (all spins with zero magnitude).
         self.spins_cc = []

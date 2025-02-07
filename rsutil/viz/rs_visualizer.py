@@ -23,21 +23,31 @@ from .visualizer import Visualizer
 # ----------------------------
 # 5. Example usage
 # ----------------------------
-def rs_visualizer(data_dir="."):
+def rs_visualizer(data_dir=".", clust=False):
     # Read a POSCAR file using pymatgen
     # structure = InputReader.read_poscar(
     #     "/Users/andersb/Jobb/RS_tools_python/POSCAR"
     # )
-    structure = InputReader.read_rs_lmto(
-        data_dir + "/lattice.nml",
-        data_dir + "/input.nml",
-    )
+
+    if clust:
+        print("Visualizing clust file")
+        structure = InputReader.read_rs_clust(
+            data_dir + "/clust",
+            data_dir + "/input.nml",
+        )
+    else:
+        print("Visualizing lattice file")
+        structure = InputReader.read_rs_lmto(
+            data_dir + "/lattice.nml",
+            data_dir + "/input.nml",
+        )
 
     # Optionally, compute the conventional cell using pymatgen's symmetry routines.
-    try:
-        structure.compute_conventional_cell()
-    except (ValueError, AttributeError) as e:
-        print("Conventional cell computation failed:", e)
+    if structure.unit_cell is not None:
+        try:
+            structure.compute_conventional_cell()
+        except (ValueError, AttributeError) as e:
+            print("Conventional cell computation failed:", e)
 
     # if structure.unit_cell is not None:
     #     print("Unit Cell:")

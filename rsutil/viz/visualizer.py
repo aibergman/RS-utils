@@ -29,12 +29,16 @@ class Visualizer:
         self.plotter.enable_anti_aliasing()
         self.plotter.set_background("white")
         self.plotter.enable_depth_peeling()
+        
+        self.use_conventional = False  # Default: unit cell
 
         # --- Default data selection ---
         # We assume your structure object provides two representations:
         # atoms_uc, bonds_uc, spins_uc for the unit cell and
         # atoms_cc, bonds_cc, spins_cc for the conventional cell.
-        self.use_conventional = True  # True: conventional; False: unit cell
+        if self.structure.unit_cell is not None:
+            self.use_conventional = True  # True: conventional; False: unit cell
+            
         self._change_representation()  # sets self.atoms, self.bonds, self.spins, self.cell
 
         # --- Toggle options (initial states) ---
@@ -65,6 +69,8 @@ class Visualizer:
         self._spin_actors = []
         self._periodic_actors = []
         self._extent_actor = None
+        
+        self._add_axis_glyph()  # Add a 3D axis glyph to the lower right corner
 
     def _add_icons(self):
         """
@@ -149,6 +155,14 @@ class Visualizer:
             color_off="red"
         )
         self.plotter.add_text("P", position=(450, 30), font_size=14, color="black", font="arial")
+        
+    def _add_axis_glyph(self):
+        """
+        Adds a 3D axis glyph to the lower right corner of the render window.
+        """
+        #axes = pv.Axes(show_actor=True, actor_scale=0.15)
+        #self.plotter.add_actor(axes.actor, reset_camera=False)
+        self.plotter.add_axes(interactive=True, line_width=2, viewport=[0.8, 0.0, 1.0, 0.2])
 
     def _clear_geo_actors(self):
         """
