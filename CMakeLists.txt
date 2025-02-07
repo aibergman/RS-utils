@@ -1,18 +1,17 @@
 cmake_minimum_required(VERSION 3.10)
-
-project(lattice_processing LANGUAGES Fortran)
+project(rs-util LANGUAGES Fortran)
 
 set(CMAKE_Fortran_STANDARD 2008)
 set(CMAKE_Fortran_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# Ensure module files are placed correctly
 set(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/modules)
-
-# Set source directory path
 set(SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/source)
 
-# Collect Fortran source files for the library
+# Enable/disable Python bindings
+option(PYTHON_BINDINGS "Enable Python bindings with f90wrap" OFF)
+
+# Collect Fortran source files for the static library
 set(LIB_SOURCES
     ${SOURCE_DIR}/rsutil_lib.f90
     ${SOURCE_DIR}/io/atom_io.f90
@@ -29,10 +28,9 @@ set(LIB_SOURCES
     ${SOURCE_DIR}/types/system_data.f90
 )
 
-# Create the static library for rsutil_lib
+# Create the static library named rsutil_lib
 add_library(rsutil_lib STATIC ${LIB_SOURCES})
 
-# Ensure correct module paths for the library
 target_include_directories(rsutil_lib PRIVATE ${CMAKE_Fortran_MODULE_DIRECTORY})
 
 # Collect Fortran source files for the executable
@@ -40,11 +38,35 @@ set(EXE_SOURCES
     ${SOURCE_DIR}/process_lattice.f90
 )
 
-# Create the executable and link with rsutil_lib
-add_executable(process_lattice.x ${EXE_SOURCES})
+# Create the Fortran binary named rsutil.x
+add_executable(rsutil.x ${EXE_SOURCES})
+target_link_libraries(rsutil.x PRIVATE rsutil_lib)
+target_include_directories(rsutil.x PRIVATE ${CMAKE_Fortran_MODULE_DIRECTORY})
 
-# Link the executable with rsutil_lib
-target_link_libraries(process_lattice.x PRIVATE rsutil_lib)
+# Python bindings (if enabled)
+if(PYTHON_BINDINGS)
+    find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
 
-# Ensure correct module paths for the executable
-target_include_directories(process_lattice.x PRIVATE ${CMAKE_Fortran_MODULE_DIRECTORY})
+    # Define the correct output filename from f90wrap
+    set(F90WRAP_OUTPUT ${CMAKE_BINARY_DIR}/f90wrap_rsutil_lib.f90)
+
+    # Run f90wrap on rsutil_lib.f90
+    add_custom_command(
+        OUTPUT ${F90WRAP_OUTPUT}
+        COMMAND ${Python3_EXECUTABLE} -m f90wrap ${SOURCE_DIR}/rsutil_lib.f90
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        COMMENT "Generating Fortran-Python bindings with f90wrap..."
+        VERBATIM
+    )
+
+    # Create a custom target to ensure f90wrap runs before building rsutil
+    add_custom_target(f90wrap_generate DEPENDS ${F90WRAP_OUTPUT})
+
+    # Generate a properly named shared library for Python
+    add_library(rsutil MODULE ${F90WRAP_OUTPUT})
+    set_target_properties(rsutil PROPERTIES PREFIX "" )
+    
+    add_dependencies(rsutil f90wrap_generate)
+    target_link_libraries(rsutil PRIVATE rsutil_lib)
+    target_include_directories(rsutil PRIVATE ${CMAKE_Fortran_MODULE_DIRECTORY})
+endif()
