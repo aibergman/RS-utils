@@ -2,10 +2,11 @@ name: Build wheels with cibuildwheel
 
 on:
   push:
-    branches:
-      - main
-      - pip
+    branches-ignore:
+      - '**'
   pull_request:
+    branches-ignore:
+      - '**'
 
 jobs:
   build_wheels:
