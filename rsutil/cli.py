@@ -8,13 +8,14 @@ def main():
     parser = argparse.ArgumentParser(description="RS Tools Command Line Interface")
     parser.add_argument('--lattice', action='store_true', default=False, help='Process lattice')
     parser.add_argument('--visualize', action='store_true', default=False, help='Run visualizer')
+    parser.add_argument('--data-dir', type=str, default='.', help='Directory for data files to be visualized')
 
     args = parser.parse_args()
 
     if args.lattice:
         process_lattice()
     elif args.visualize:
-        rs_visualizer()
+        rs_visualizer(args.data_dir)
     else:
         parser.print_help()
 

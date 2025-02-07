@@ -23,15 +23,15 @@ from .visualizer import Visualizer
 # ----------------------------
 # 5. Example usage
 # ----------------------------
-def rs_visualizer():
+def rs_visualizer(data_dir="."):
     # Read a POSCAR file using pymatgen
-    structure = InputReader.read_poscar(
-        "/Users/andersb/Jobb/RS_tools_python/POSCAR"
-    )
-    # structure = InputReader.read_rs_lmto(
-    #     "/Users/andersb/Jobb/RS_tools_python/examples/bccFe/lattice.nml",
-    #     "/Users/andersb/Jobb/RS_tools_python/examples/bccFe/input.nml",
+    # structure = InputReader.read_poscar(
+    #     "/Users/andersb/Jobb/RS_tools_python/POSCAR"
     # )
+    structure = InputReader.read_rs_lmto(
+        data_dir + "/lattice.nml",
+        data_dir + "/input.nml",
+    )
 
     # Optionally, compute the conventional cell using pymatgen's symmetry routines.
     try:
