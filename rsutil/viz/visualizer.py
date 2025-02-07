@@ -243,7 +243,7 @@ class Visualizer:
         for i in range(i_min, i_max + 1):
             for j in range(j_min, j_max + 1):
                 for k in range(k_min, k_max + 1):
-                    translation = np.dot(cell.T, [i, j, k])
+                    translation = np.dot(cell, [i, j, k])
                     for atom in self.atoms:
                         new_pos = atom.position + translation
                         atoms_expanded.append(

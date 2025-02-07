@@ -106,7 +106,7 @@ class InputReader:
         """
         alat = 1.0 # default lattice parameter
         # --- Parse lattice.nml ---
-        with open(lattice_file, 'r') as f:
+        with open(lattice_file, 'r', encoding='utf-8') as f:
             lines = f.readlines()
         # Remove comments (lines starting with "!") and blank lines.
         lines = [line.strip() for line in lines if line.strip() and not line.strip().startswith('!')]
@@ -245,8 +245,8 @@ class InputReader:
 
         # Build a 3x3 lattice matrix.
         # The file appears to list the vectors as columns, so we form an array and transpose.
-        lattice_array = np.array([a1, a2, a3])  # shape (3, 3)
-        unit_cell = lattice_array.T  # Now each row is a lattice vector.
+        lattice_array = np.array([a1, a2, a3]) # shape (3, 3)
+        unit_cell = lattice_array  # Now each row is a lattice vector. Note lack of transpose!
 
         # Get basis (atom) coordinates.
         try:
@@ -321,8 +321,8 @@ class InputReader:
         # Parse input.nml for species labels
         inp_nml = f90nml.read(input_file)
         atoms_data = inp_nml.get('atoms', {})
-        species_lookup = atoms_data['label']
-
+        # Remove hyphens and digits from species labels
+        species_lookup = [''.join(filter(str.isalpha, label)) for label in atoms_data['label']]
         # Create Atom objects with species inferred from species_type
         atoms = []
         with open(clust_file, 'r', encoding='utf-8') as f:

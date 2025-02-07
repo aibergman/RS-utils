@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "wheel", "cmake", "f90wrap>0.2.10", "numpy>1.19", "pyvista", "pymatgen"]
+requires = ["setuptools", "wheel", "cmake", "f90wrap>0.2.10", "numpy>1.19", "pyvista", "pymatgen", "f90nml"]
 
 [tool.cibuildwheel]
 skip = "pp* *-musllinux* cp36* cp37* cp38*"  # Skip PyPy and musl Linux builds
