@@ -173,7 +173,6 @@ class InputReader:
                             alat = float(parts[1].strip())
                         except ValueError as e:
                             raise ValueError(f"Error parsing 'alat' value in line: {line}\n{e}")
-                    print(f"Found alat: {alat}")
                     
             if line.lower().startswith("&atoms"):
                 in_atoms_block = True

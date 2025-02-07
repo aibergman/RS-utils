@@ -25,13 +25,13 @@ from visualizer import Visualizer
 # ----------------------------
 if __name__ == "__main__":
     # Read a POSCAR file using pymatgen
-    # structure = InputReader.read_poscar(
-    #     "/Users/andersb/Jobb/RS_tools_python/POSCAR"
+    structure = InputReader.read_poscar(
+        "/Users/andersb/Jobb/RS_tools_python/POSCAR"
+    )
+    # structure = InputReader.read_rs_lmto(
+    #     "/Users/andersb/Jobb/RS_tools_python/examples/bccFe/lattice.nml",
+    #     "/Users/andersb/Jobb/RS_tools_python/examples/bccFe/input.nml",
     # )
-    structure = InputReader.read_rs_lmto(
-        "/Users/andersb/Jobb/RS_tools_python/examples/FeCo/lattice.nml",
-        "/Users/andersb/Jobb/RS_tools_python/examples/FeCo/input.nml",
-    )  # <-- update with your file path
 
     # Optionally, compute the conventional cell using pymatgen's symmetry routines.
     try:
@@ -39,14 +39,14 @@ if __name__ == "__main__":
     except (ValueError, AttributeError) as e:
         print("Conventional cell computation failed:", e)
 
-    if structure.unit_cell is not None:
-        print("Unit Cell:")
-        print(structure.unit_cell)
-        print(len(structure.atoms_uc))
+    # if structure.unit_cell is not None:
+    #     print("Unit Cell:")
+    #     print(structure.unit_cell)
+    #     print(len(structure.atoms_uc))
 
-    if structure.conventional_cell is not None:
-        print("Conventional Cell:")
-        print(len(structure.atoms_cc))
+    # if structure.conventional_cell is not None:
+    #     print("Conventional Cell:")
+    #     print(len(structure.atoms_cc))
 
     # Create a Visualizer instance with the structure.
     viz = Visualizer(structure=structure)

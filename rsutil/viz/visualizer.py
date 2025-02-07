@@ -1,8 +1,7 @@
 import numpy as np
 import pyvista as pv
 from structure import Structure
-from glyphs import Atom, Bond, Spin  # assuming these are defined appropriately
-from itertools import product
+from glyphs import Atom  # assuming these are defined appropriately
 
 class Visualizer:
     """
@@ -290,7 +289,10 @@ class Visualizer:
             cylinders.append(cylinder)
 
         # Merge all cylinders into a single PolyData object
-        merged_cylinders = cylinders[0].merge(cylinders[1:])  # Merge all into one
+        if len(cylinders) > 1:
+            merged_cylinders = cylinders[0].merge(cylinders[1:])  # Merge all into one
+        else:
+            merged_cylinders = cylinders[0]
         
         # Add the merged cylinders to the plotter
         actor = self.plotter.add_mesh(merged_cylinders, color="red", smooth_shading=True)
@@ -317,11 +319,19 @@ class Visualizer:
         if cell is not None:
             origin = np.array([0, 0, 0])
             a, b, c = cell[0], cell[1], cell[2]
-            corners = np.array([origin, a, b, c, a + b, a + c, b + c, a + b + c])
-            xmin, ymin, zmin = corners.min(axis=0)
-            xmax, ymax, zmax = corners.max(axis=0)
-            box = pv.Box(bounds=(xmin, xmax, ymin, ymax, zmin, zmax))
-            self._extent_actor = self.plotter.add_mesh(box, style="wireframe", color="black")
+            corners = np.array([origin, a, a+b, b, c, a+c, a+b+c, b+c])
+            edges = [ (0, 1), (1, 2), (2, 3), (3, 0), (0, 4), (1, 5), (2, 6),
+                      (3, 7), (4, 5), (5, 6), (6, 7), (7, 4), ]
+            lines = pv.PolyData()
+            lines.points = np.array(corners)
+            lines.lines = np.hstack([[2, edge[0], edge[1]] for edge in edges])
+    
+            self._extent_actor = self.plotter.add_mesh(lines, color="black", line_width=3)
+            # corners = np.array([origin, a, b, c, a + b, a + c, b + c, a + b + c])
+            # xmin, ymin, zmin = corners.min(axis=0)
+            # xmax, ymax, zmax = corners.max(axis=0)
+            # box = pv.Box(bounds=(xmin, xmax, ymin, ymax, zmin, zmax))
+            # self._extent_actor = self.plotter.add_mesh(box, style="wireframe", color="black")
 
     def _render_periodic_images(self):
         grid_dims = (4, 4, 1) if self.periodicity == "2d" else (4, 4, 4)

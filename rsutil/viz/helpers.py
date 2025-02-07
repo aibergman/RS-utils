@@ -38,7 +38,6 @@ def get_element_color(element_symbol, cpk_colors):
     Returns:
         str: Hex color code (e.g., "#FFFFFF"), or default gray if not found.
     """
-    print('ColoR:', element_symbol, (element_symbol, cpk_colors.get(element_symbol)))
     return cpk_colors.get(element_symbol, "#A0A0A0")  # Default to gray
 
 def get_atomic_radius(element_symbol):
@@ -52,6 +51,6 @@ def get_atomic_radius(element_symbol):
         float: Atomic radius in Ångströms (or None if not available).
     """
     try:
-        return Element(element_symbol).atomic_radius*ANG_TO_BOHR
+        return Element(element_symbol).atomic_radius #*ANG_TO_BOHR
     except ValueError:
         return None  # Element not found
