@@ -9,4 +9,3 @@ before-build = "python -m pip install --upgrade numpy>1.19 ninja f90wrap scipy"
 
 [tool.cibuildwheel.linux]
 before-all = "yum clean packages && yum install -y python3-devel ninja-build"
-
