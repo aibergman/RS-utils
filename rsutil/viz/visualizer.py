@@ -56,8 +56,8 @@ class Visualizer:
         # Optionally, display instructions in text.
         instructions = ("C: Toggle Cell    M: Toggle Spins    E: Toggle Extents    "
                         "B: Toggle Bonds    2: 2d Periodicity    3: 3d Periodicity   "
-                        "P  Toggle Perspective")
-        self.plotter.add_text(instructions, position="upper_left", font_size=10, color="black")
+                        "P  Toggle Perspective    S: Save Screenshot")
+        self.plotter.add_text(instructions, position="upper_left", font_size=12, color="black")
 
         # --- Initialize lists for tracking geometry actors ---
         self._atom_actors = []

@@ -48,7 +48,7 @@ class CMakeBuild(build_ext):
 
 setup(
     name="rsutil",
-    version="0.9.0",
+    version="0.9.1",
     author="Anders Bergman",
     author_email="anders.bergman@physics.uu.se",
     description="Utilities for the RS-LMTO code",
