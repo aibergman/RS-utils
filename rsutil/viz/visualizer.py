@@ -1,7 +1,7 @@
 import numpy as np
 import pyvista as pv
-from structure import Structure
-from glyphs import Atom  # assuming these are defined appropriately
+from .structure import Structure
+from .glyphs import Atom  # assuming these are defined appropriately
 
 class Visualizer:
     """
@@ -13,6 +13,8 @@ class Visualizer:
       B  : Toggle bonds
       2  : Toggle 2d periodicity
       3  : Toggle 3d periodicity
+      P  : Toggle perspective
+      S  : Save screenshot
     Additionally, icon buttons appear along the bottom of the window.
     """
     def __init__(self, structure: Structure):
@@ -49,6 +51,7 @@ class Visualizer:
         self.plotter.add_key_event("2", lambda: self.toggle_periodicity("2d"))
         self.plotter.add_key_event("3", lambda: self.toggle_periodicity("3d"))
         self.plotter.add_key_event("P", self.toggle_perspective)
+        self.plotter.add_key_event("S", self.save_screenshot)
 
         # Optionally, display instructions in text.
         instructions = ("C: Toggle Cell    M: Toggle Spins    E: Toggle Extents    "
@@ -167,11 +170,19 @@ class Visualizer:
 
         for actor in self._periodic_actors:
             self.plotter.remove_actor(actor)
-            
+
         self._bond_actors.clear()
         self._atom_actors.clear()
         self._spin_actors.clear()
         self._periodic_actors.clear()
+
+    def save_screenshot(self, event=None):
+        """
+        Saves a screenshot of the current visualization.
+        """
+        filename = "screenshot.png"
+        self.plotter.screenshot(filename)
+        print(f"Screenshot saved as {filename}")
 
     def toggle_bonds(self, event=None):
         self.show_bonds = not self.show_bonds

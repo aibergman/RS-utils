@@ -1,5 +1,5 @@
 import numpy as np
-from helpers import get_element_color, get_atomic_radius, load_cpk_colors
+from .helpers import get_element_color, get_atomic_radius, load_cpk_colors
 
 
 # ----------------------------

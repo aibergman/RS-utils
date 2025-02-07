@@ -1,11 +1,10 @@
 import re
 import f90nml
-from glyphs import Atom
-from helpers import get_element_color, get_atomic_radius, load_cpk_colors
-from structure import Structure
 import numpy as np
 from pymatgen.io.vasp import Poscar
 
+from .glyphs import Atom
+from .structure import Structure
 
 # ----------------------------
 # 3. Input Reader Class

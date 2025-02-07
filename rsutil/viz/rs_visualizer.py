@@ -16,14 +16,14 @@ Functions:
     get_element_color(element): Returns a standard color for a given element
     symbol.
 """
-from inputreader import InputReader
-from visualizer import Visualizer
+from .inputreader import InputReader
+from .visualizer import Visualizer
 
 
 # ----------------------------
 # 5. Example usage
 # ----------------------------
-if __name__ == "__main__":
+def rs_visualizer():
     # Read a POSCAR file using pymatgen
     structure = InputReader.read_poscar(
         "/Users/andersb/Jobb/RS_tools_python/POSCAR"
@@ -53,3 +53,6 @@ if __name__ == "__main__":
     # Uncomment toggles as desired:
 
     viz.render()
+
+if __name__ == "__main__":
+    rs_visualizer()

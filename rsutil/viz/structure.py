@@ -2,8 +2,8 @@ from itertools import product
 import numpy as np
 from pymatgen.core import Structure as PymatgenStructure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
-from glyphs import Atom, Bond, Spin
-from helpers import get_element_color
+
+from .glyphs import Atom, Bond, Spin
 
 
 class Structure:
