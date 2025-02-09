@@ -1,5 +1,4 @@
 import os
-import sys
 import ctypes
 
 # Dynamically determine the correct shared library filename
