@@ -1,12 +1,11 @@
 import os
-import sys
 import ctypes
 
 # Dynamically determine the correct shared library filename
 lib_filename = None
-print('  --->   Directoru: ', os.path.dirname(__file__))
+# print('  --->   Directoru: ', os.path.dirname(__file__))
 for filename in os.listdir(os.path.dirname(__file__)):
-    print(' -> ', filename)
+    # print(' -> ', filename)
     if filename.startswith("rsutil") and filename.endswith(".so"):
         lib_filename = filename
         break
@@ -16,9 +15,9 @@ if lib_filename is None:
 
 # Load the shared library
 lib_path = os.path.join(os.path.dirname(__file__), lib_filename)
-print('  --->   Lib path: ', lib_path)
+# print('  --->   Lib path: ', lib_path)
 _rsutil = ctypes.CDLL(lib_path)
-print('  --->   Lib: ', _rsutil)
+# print('  --->   Lib: ', _rsutil)
 
 # Define process_lattice() signature
 _rsutil.process_lattice.argtypes = []  # Modify if needed

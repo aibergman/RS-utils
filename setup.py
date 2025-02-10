@@ -35,6 +35,7 @@ class CMakeBuild(build_ext):
 
         # Locate the built shared library
         shared_lib = os.path.join(extdir, "rsutil.so")
+        print('Attempting to copy shared library:', shared_lib)
 
         if not os.path.exists(shared_lib):
             raise FileNotFoundError(f"Expected shared library {shared_lib} not found!")
@@ -42,16 +43,12 @@ class CMakeBuild(build_ext):
         # Ensure the library is copied into the rsutil package directory
         package_dir = os.path.abspath(os.path.join(self.build_lib, "rsutil"))
         os.makedirs(package_dir, exist_ok=True)
-        self.copy_file(shared_lib, package_dir)
+        self.move_file(shared_lib, package_dir)
 
-        # Explicitly add rsutil.so to package_data to ensure it's inside the wheel
-        self.distribution.package_data = {
-            "rsutil": ["rsutil.so"]
-        }
 
 setup(
     name="rsutil",
-    version="0.9.0",
+    version="0.9.1",
     author="Anders Bergman",
     author_email="anders.bergman@physics.uu.se",
     description="Utilities for the RS-LMTO code",
@@ -61,7 +58,8 @@ setup(
     packages=setuptools.find_packages(),
     include_package_data=True,  # ✅ Ensures package_data is included in the wheel
     zip_safe=False,
-    package_data={"rsutil": ["rsutil.so"]},  # ✅ Explicitly include rsutil.so
+    package_data={"rsutil": ["rsutil/rsutil.so", "viz/cpk_colors.json"]},  # ✅ Explicitly include rsutil.so
+    # package_data={"rsutil": ["rsutil.so", "viz/cpk_colors.json"]},  # ✅ Explicitly include rsutil.so
     entry_points={
         "console_scripts": [
             "rsutil=rsutil.cli:main"

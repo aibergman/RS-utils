@@ -261,7 +261,16 @@ subroutine defmom(konfig, lafm, lfree, lmx, nclass, nl, nsp, pnu, qnu, z)
       &               .6D+00, 5.9D+00, 1.2D+00, 12.3D+00/
 
    if (lfree) then
+      !print *,'AB test', nclass, nl, nsp
       call fremom(lmx, nclass, nl, nsp, pnu, qnu, z)
+      ! Add spin polarization to d-electrons (20% of n_d)
+      do ic = 1, nclass
+         l = 2
+         qnuc = qnu(0, l, 1, ic)
+         dq0 = 0.20d0*qnuc
+         qnu(0, l, 1, ic) = qnuc - dq0
+         qnu(0, l, 2, ic) = qnuc + dq0
+      end do
       return
    end if
    call dinit(qnu, 3*nl*nsp*nclass)
@@ -271,26 +280,34 @@ subroutine defmom(konfig, lafm, lfree, lmx, nclass, nl, nsp, pnu, qnu, z)
       call atmoms(k0, q0, z(ic))
       do isp = 1, nsp
          do l = 0, nl - 1
+            ! print *,'>> zeroth',ic,l,q0(l),qnuat(l,iz), qnu(0, l, isp, ic)
             if (l .le. 3) then
                if (konfig(l, ic) .eq. konfdf(l)) then
+                  ! print *,' >> check',l, lmx(ic),qnu(0, l, isp, ic) , dble(qnuat(l, iz))/nsp
                   if (l .le. lmx(ic)) qnu(0, l, isp, ic) = dble(qnuat(l, iz))/nsp
                   pnu(l, isp, ic) = pnuat(l, iz)
                   !print *,'>> ',ic,l,q0(l),qnuat(l,iz)
+                  ! print *,'>> first',ic,l,q0(l),qnuat(l,iz), qnu(0, l, isp, ic)
                   ! ------------- special: partially filled core states
                   if (konfdf(l) .eq. k0(l) + 1 .and. q0(l) .ne. (4*l + 2)) then
+                     ! print *,'>> special',l, q0(l), qnuat(l, iz)
                      qnu(0, l, isp, ic) = dble(qnuat(l, iz) - q0(l))/nsp
                   elseif (int(pnu(l, isp, ic)) .ne. konfig(l, ic)) then
+                     ! print *,'Not here?',l, lmx(ic), konfig(l, ic), pnu(l, isp, ic)
                      write (messg, 400) iz, l, konfig(l, ic), pnu(l, isp, ic)
                      call errmsg(messg, 1)
                   end if
                elseif (konfig(l, ic) .eq. konfdf(l) + 1) then
                   pnu(l, isp, ic) = konfig(l, ic) + 0.5d0
+                  ! print *,'>> second',l, lmx(ic), konfig(l, ic), konfdf(l)
                   if (l .le. lmx(ic)) then
                      if (konfdf(l) .eq. k0(l)) then
                         ! ----------------- Example N 2s into core
+                        ! print *,'>> konfdf: ',ic,l,q0(l),qnuat(l,iz)
                         qnu(0, l, isp, ic) = dble(qnuat(l, iz) - q0(l))/nsp
                      elseif (konfdf(l) .eq. k0(l) - 1) then
                         ! ----------------- Example U 6p into core
+                        ! print *,'>> konfdf-1: ',ic,l,q0(l),qnuat(l,iz), 2*(l + l + 1)/nsp
                         qnu(0, l, isp, ic) = dble(qnuat(l, iz) - 2*(l + l + 1))/nsp
                      else
                         write (messg, 402) iz, l, konfig(l, ic)
@@ -300,12 +317,15 @@ subroutine defmom(konfig, lafm, lfree, lmx, nclass, nl, nsp, pnu, qnu, z)
                   write (messg, 401) iz, l
                   if (isp .eq. 1) call errmsg(messg, 0)
                elseif (konfig(l, ic) .eq. konfdf(l) - 1) then
+                  ! print *,'>> third',l, lmx(ic), konfig(l, ic), konfdf(l)
                   pnu(l, isp, ic) = konfig(l, ic) + 0.5d0
                   if (l .le. lmx(ic)) then
                      if (konfig(l, ic) .eq. k0(l) - 1) then
                         ! ----------------- Example Na 2p into valence
+                        ! print *,'>> konfig-1: ',ic,l,q0(l),qnuat(l,iz), 2*(l + l + 1)/nsp
                         qnu(0, l, isp, ic) = dble(qnuat(l, iz) + 2*(l + l + 1))/nsp
                      elseif (konfig(l, ic) .eq. k0(l)) then
+                        ! print *,'>> konfig: ',ic,l,q0(l),qnuat(l,iz)
                         ! ----------------- Example O 2s into valence
                         qnu(0, l, isp, ic) = dble(qnuat(l, iz) + q0(l))/nsp
                      else
@@ -323,12 +343,15 @@ subroutine defmom(konfig, lafm, lfree, lmx, nclass, nl, nsp, pnu, qnu, z)
                pnu(l, isp, ic) = l + 1.5d0
             end if
          end do
+         ! print *,'0 DEFMOM:',ic,isp,qnu(0,2,isp,ic)
          fac = dsum(nl, qnu(0, 0, isp, ic), 3)
-         if (fac .gt. tiny) then
-            fac = (dsum(nl, qnu(0, 0, isp, ic), 3) +                              &
-               &         dsum(4 - nl, qnuat(nl, iz), 1)/nsp)/fac
-            call dscal(nl, fac, qnu(0, 0, isp, ic), 3)
-         end if
+         ! AB deactivate filling f-core states
+         ! print *,' FAC:',fac, nl, dsum(4 - nl, qnuat(nl, iz), 1)/nsp
+         ! if (fac .gt. tiny) then
+         !    fac = (dsum(nl, qnu(0, 0, isp, ic), 3) +                              &
+         !       &         dsum(4 - nl, qnuat(nl, iz), 1)/nsp)/fac
+         !    call dscal(nl, fac, qnu(0, 0, isp, ic), 3)
+         ! end if
          !         qnu(0,0,isp,ic)=idnint(100*dsum(nl,qnu(0,0,isp,ic),3))
          !         do l=1,nl-1
          !           qnu(0,0,isp,ic)=qnu(0,0,isp,ic)-idnint(100*qnu(0,l,isp,ic))
@@ -336,42 +359,50 @@ subroutine defmom(konfig, lafm, lfree, lmx, nclass, nl, nsp, pnu, qnu, z)
          !         enddo
          !         qnu(0,0,isp,ic)=qnu(0,0,isp,ic)*0.01d0
          qnu(0, 0, isp, ic) = idnint(1000*dsum(nl, qnu(0, 0, isp, ic), 3))
-         !print *,'DEFMOM:',ic,isp,qnu(0,0,isp,ic)
+         ! print *,'A DEFMOM:',ic,isp,qnu(0,2,isp,ic)
          do l = 1, nl - 1
             qnu(0, 0, isp, ic) = qnu(0, 0, isp, ic) - idnint(1000*qnu(0, l, isp, ic))
             qnu(0, l, isp, ic) = idnint(1000*qnu(0, l, isp, ic))*0.001d0
          end do
          qnu(0, 0, isp, ic) = qnu(0, 0, isp, ic)*0.001d0
+         ! print *,'B DEFMOM:',ic,isp,qnu(0,2,isp,ic)
       end do
       ! ..AB. neutralize qnu if l<l_default is used
-      dq1 = sum(qnu(0, :, :, ic)) - sum(q0(:))
-      !print *,'0-->', ic,dq1
-      !nl-1
-      do l = 0, 0
-         do isp = 1, nsp
-            !/nl
-            qnu(0, l, isp, ic) = qnu(0, l, isp, ic) - dq1/nsp
-            !print *,'qnu:',ic,isp,l,qnu(0,l,isp,ic)
-         end do
-      end do
-      !dq1=sum(qnu(0,:,:,ic))-sum(q0(:))
-      !print *,'X-->', ic,dq1
+      !!! dq1 = sum(qnu(0, :, :, ic)) - sum(q0(:))
+      !!! !dq1 = 0.0d0
+      !!! !print *,'0-->', ic,dq1
+      !!! !nl-1
+      !!! do l = 0, 0
+      !!!    do isp = 1, nsp
+      !!!       !/nl
+      !!!       qnu(0, l, isp, ic) = qnu(0, l, isp, ic) - dq1/nsp
+      !!!       !print *,'qnu:',ic,isp,l,qnu(0,l,isp,ic)
+      !!!    end do
+      !!! end do
+      !!! !dq1=sum(qnu(0,:,:,ic))-sum(q0(:))
+      !!! !print *,'X-->', ic,dq1
       ! ----- for spin polarized calculation: different moments for spin up
       ! ----- and spin down
       if (nsp .eq. 2) then
          do l = 0, nl - 1
+            ! New approach : spin polarize d-band by 20%
             qnuc = qnu(0, l, 1, ic)
-            dq0 = 0.05d0
-            if (l >= 2 .and. qnuc > 3.0d0) dq0 = 0.50d0
-            !           dq0=0.05d0
-            if (lafm .and. ic + ic .gt. nclass) dq0 = -dq0
-            if (qnuc - dabs(dq0) .gt. 0.d0 .and.                             &
-               &          qnuc + dabs(dq0) .lt. dble(4*l + 2)) then
-               qnu(0, l, 1, ic) = qnuc - dq0
-               qnu(0, l, 2, ic) = qnuc + dq0
-            end if
+            dq0 = 0.1d0 * l * qnuc
+            qnu(0, l, 1, ic) = qnuc - dq0
+            qnu(0, l, 2, ic) = qnuc + dq0
+            ! qnuc = qnu(0, l, 1, ic)
+            ! dq0 = 0.05d0
+            ! if (l >= 2 .and. qnuc > 3.0d0) dq0 = 0.50d0
+            ! !           dq0=0.05d0
+            ! if (lafm .and. ic + ic .gt. nclass) dq0 = -dq0
+            ! if (qnuc - dabs(dq0) .gt. 0.d0 .and.                             &
+            !    &          qnuc + dabs(dq0) .lt. dble(4*l + 2)) then
+            !    qnu(0, l, 1, ic) = qnuc - dq0
+            !    qnu(0, l, 2, ic) = qnuc + dq0
+            ! end if
          end do
       end if
+      ! print *,'D DEFMOM:',ic,isp,qnu(0,2,isp,ic)
    end do
 
 400 format(' DEFMOM: Z=', i3, '   L=', i1, ',  mismatch between',         &
