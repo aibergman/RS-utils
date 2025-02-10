@@ -75,8 +75,10 @@ class Structure:
         """
         lattice = self.unit_cell.T
         species = [atom.species for atom in self.atoms_uc]
-        positions = [np.dot(np.linalg.inv(lattice).T, atom.position) for atom in self.atoms_uc]
-        
+        positions = [
+            np.dot(np.linalg.inv(lattice).T, atom.position) for atom in self.atoms_uc
+        ]
+
         return PymatgenStructure(lattice, species, positions)
 
     def get_atom_spin_objects(self, conventional=False):
@@ -154,21 +156,21 @@ class Structure:
 
         # Build a pymatgen structure from current unit cell and atoms.
         pg_struct = self._create_pymatgen_structure()
-        print("--Unit cell" + '-' * 39)
+        print("--Unit cell" + "-" * 39)
         print(pg_struct.lattice)
         print(pg_struct)
 
         # Use SpacegroupAnalyzer to get the conventional standard structure.
         sga = SpacegroupAnalyzer(pg_struct)
         conv_struct = sga.get_conventional_standard_structure()
-        print("--Conventional cell" + '-' * 31)
+        print("--Conventional cell" + "-" * 31)
         print(conv_struct.lattice)
         print(conv_struct.lattice.matrix)
         print(conv_struct.frac_coords)
         print(conv_struct)
-        print('-' * 50)
+        print("-" * 50)
         print("Symmetry:", sga.get_space_group_number(), sga.get_space_group_symbol())
-        print('-' * 50)
+        print("-" * 50)
 
         # Save the conventional cell lattice.
         self.conventional_cell = conv_struct.lattice.matrix.T

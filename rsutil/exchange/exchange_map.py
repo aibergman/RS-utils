@@ -321,7 +321,7 @@ def store_jij_namelist(input_nml, matching_indices, atom_index):
 # lattice_nml_list = [np.array(lattice_nml[key]) for key in lattice_nml]
 # atoms_list = [atom for atom in atoms]
 #
-def exchange_map(cutoff=1.0,verbose=False):
+def exchange_map(cutoff=1.0, verbose=False):
     """
     Main function to read namelists, create structure and analyzer,
     get neighbors, and symmetry reduced neighbors.

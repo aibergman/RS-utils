@@ -20,7 +20,7 @@ class Atom:
         """
         # Read colors from a JSON file
         self.cpk_colors = load_cpk_colors()
-        
+
         self.position = np.array(position)
         self.species = species
         self.atom_type = atom_type
