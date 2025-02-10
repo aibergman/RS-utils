@@ -102,11 +102,12 @@ contains
     real(kind=8), intent(inout) :: pnu(0:3-1, 2, 1)
     real(kind=8), intent(inout) :: qnu(0:2, 0:3-1, 2, 1)
     real(kind=8), intent(in) :: z(1)
-    logical, intent(in) :: lafm, lfree
+    logical, intent(inout) :: lafm, lfree
 
     call defcnf(konfig, lmx(1), z(1))
     lmx(1) = 2
-    ! print *, 'Calling defmom'
+    ! print *, 'Calling defmom', lfree
+    ! lfree = .true.
     call defmom(konfig, lafm, lfree, lmx, nclass, nl, nsp, pnu, qnu, z)
     ! Adding finite values to second order moments for stability:
     qnu(2, :, :, :) = qnu(0, :, :, :) * 0.005d0

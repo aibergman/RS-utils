@@ -27,7 +27,10 @@ contains
         real(kind=8) :: alat
         character(len=8) :: crystal_sym
         real(kind=8) :: wav
-        namelist /lattice/ rc, alat, crystal_sym, wav
+        logical :: pbc, b1, b2, b3
+        integer :: n1, n2, n3
+
+        namelist /lattice/ rc, alat, crystal_sym, wav, pbc, b1, b2, b3, n1, n2, n3
 
         !-------------------------------------------------------------------
         ! Temporary variables for reading the atoms namelist.

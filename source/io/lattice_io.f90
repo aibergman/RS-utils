@@ -367,6 +367,7 @@ contains
         ws(i) = lat_data%ws(i)
         ! Set a default ct scaling here. Actual scaling = 1.5*1.88 due to bohr vs Å
         ct(i) = sqrt(2.01d0) * lat_data%ws(i)
+        print *, "ct(", i, ") = ", ct(i)
       end do
 
       ! Calculate r2 as max(ct)^2
