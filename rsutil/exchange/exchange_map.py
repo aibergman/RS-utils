@@ -225,7 +225,32 @@ def get_neighbors_list(cluster, sites, cutoff=2.0, verbose=False):
 #                 print(f"  {neighbor}")
 #
 #     return symmetry_reduced_neighbors
+def get_fermi_energy(report_file="report.out"):
+    """
+    Extract the Fermi energy from the report file.
 
+    Parameters
+    ----------
+    report_file : str, optional
+        Path to the report file, by default "report.out".
+
+    Returns
+    -------
+    float
+        The Fermi energy value.
+    """
+    fermi_energy = None
+    with open(report_file, "r", encoding="utf-8") as file:
+        for line in file:
+            if "Fermi energy:" in line:
+                fermi_energy = float(line.split()[2])
+                print ("E_F: ", fermi_energy)
+                break
+
+    if fermi_energy is None:
+        raise ValueError("Fermi energy not found in the report file.")
+
+    return fermi_energy
 
 def find_matching_indices(cluster, neighbors):
     """
@@ -277,6 +302,10 @@ def store_jij_namelist(input_nml, matching_indices, atom_index):
         Updated input namelist.
     """
     new_input_nml = input_nml.copy()
+
+    # Update the fermi energy in the energy namelist
+    fermi_energy = get_fermi_energy()
+    new_input_nml["energy"]["fermi"] = fermi_energy
 
     # Edit and write input.nml
     new_input_nml["calculation"]["post_processing"] = "exchange"
