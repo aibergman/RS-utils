@@ -89,7 +89,7 @@ class InputReader:
             position = [float(x) for x in parts[1:4]]
             atoms.append(
                 Atom(
-                    position=np.array(position)),
+                    position=np.array(position),
                     species=species,
                     atom_type=species,
                 )
