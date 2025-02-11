@@ -6,7 +6,15 @@ from .helpers import get_element_color, get_atomic_radius, load_cpk_colors
 # 1. Atom, Bond and Spin Classes
 # ----------------------------
 class Atom:
-    def __init__(self, position, species, atom_type, radius=None, color=None, **kwargs):
+    def __init__(
+        self,
+        position: list | np.ndarray,
+        species: str,
+        atom_type: str,
+        radius: float = None,
+        color: str = None,
+        **kwargs,
+    ):
         """
         Represents an atom for visualization.
 
@@ -30,7 +38,14 @@ class Atom:
 
 
 class Bond:
-    def __init__(self, start, end, radius=0.2, color="grey", **kwargs):
+    def __init__(
+        self,
+        start: list | np.ndarray,
+        end: list | np.ndarray,
+        radius: float = 0.2,
+        color: str = "grey",
+        **kwargs,
+    ):
         """
         Represents a bond (rendered as a cylinder).
 
@@ -51,12 +66,12 @@ class Bond:
 class Spin:
     def __init__(
         self,
-        position,
-        direction=(0, 1, 0),
-        magnitude=0.0,
-        base_radius=0.1,
-        tip_radius=0.05,
-        color="red",
+        position: list | np.ndarray,
+        direction: tuple | np.ndarray = (0, 1, 0),
+        magnitude: float = 0.0,
+        base_radius: float = 0.1,
+        tip_radius: float = 0.05,
+        color: str = "red",
         **kwargs,
     ):
         """

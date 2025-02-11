@@ -1,7 +1,79 @@
+"""
+Visualizer Module
+=================
+
+This module provides the `Visualizer` class for interactive visualization of
+atomic structures using PyVista. The `Visualizer` class allows toggling various
+aspects of the visualization, such as cell representation, spins, bonds, and
+periodicity, through interactive key bindings and icon buttons.
+
+Classes
+Visualizer
+    structure.
+
+Methods
+__init__(self, structure: Structure)
+    Initializes the Visualizer with a given structure.
+
+_add_icons(self)
+
+_add_axis_glyph(self)
+
+_clear_geo_actors(self)
+    Removes only the geometry actors (atoms, bonds, spins, extents, and
+    periodic images) from the plotter.
+
+save_screenshot(self, event=None)
+
+toggle_bonds(self, event=None)
+    Toggles the visibility of bonds in the visualization.
+
+toggle_spins(self, event=None)
+    Toggles the visibility of spins in the visualization.
+
+toggle_cell(self, event=None)
+    Toggles the cell representation mode.
+
+toggle_extents(self, event=None)
+    Toggles the visibility of cell extents.
+
+toggle_periodicity(self, period="2d", event=None)
+    Toggles the periodicity of the visualizer.
+
+toggle_perspective(self, event=None)
+    Toggles the camera's perspective projection.
+
+get_cell(self)
+
+expand_structure(self, cell, grid_dims)
+    Expands the atomic structure based on grid dimensions.
+
+render(self)
+    Renders the molecular visualization.
+
+_render_atoms(self)
+    Renders atoms as spheres in the plotter.
+
+_render_bonds(self)
+    Renders bonds as cylinders and adds them to the plotter.
+
+_render_spins(self)
+    Renders spin arrows for each atom with a spin magnitude > 0.
+
+_render_extents(self)
+    Renders the extents of the cell.
+
+_render_periodic_images(self)
+    Renders periodic images of the atomic structure.
+
+_change_representation(self)
+    Updates the internal data from the structure based on the cell type.
+"""
 import numpy as np
 import pyvista as pv
 from .structure import Structure
 from .glyphs import Atom  # assuming these are defined appropriately
+
 
 class Visualizer:
     """
@@ -21,15 +93,16 @@ class Visualizer:
         """
         Initializes the Visualizer.
         """
-        self.structure = structure
-        self.plotter = pv.Plotter()
+        self.structure: Structure = structure
+        self.plotter: pv.Plotter = pv.Plotter()
         # --- Quality settings ---
-        self.plotter.add_light(pv.Light(position=(10, 10, 10), focal_point=(0, 0, 0), intensity=0.1))
+        self.plotter.add_light(pv.Light(position=(10, 10, 10),
+                                        focal_point=(0, 0, 0), intensity=0.1))
         self.plotter.enable_ssao()
         self.plotter.enable_anti_aliasing()
         self.plotter.set_background("white")
         self.plotter.enable_depth_peeling()
-        
+
         self.use_conventional = False  # Default: unit cell
 
         # --- Default data selection ---
@@ -38,7 +111,7 @@ class Visualizer:
         # atoms_cc, bonds_cc, spins_cc for the conventional cell.
         if self.structure.unit_cell is not None:
             self.use_conventional = True  # True: conventional; False: unit cell
-            
+
         self._change_representation()  # sets self.atoms, self.bonds, self.spins, self.cell
 
         # --- Toggle options (initial states) ---
@@ -64,12 +137,12 @@ class Visualizer:
         self.plotter.add_text(instructions, position="upper_left", font_size=12, color="black")
 
         # --- Initialize lists for tracking geometry actors ---
-        self._atom_actors = []
-        self._bond_actors = []
-        self._spin_actors = []
-        self._periodic_actors = []
-        self._extent_actor = None
-        
+        self._atom_actors: list = []
+        self._bond_actors: list = []
+        self._spin_actors: list = []
+        self._periodic_actors: list = []
+        self._extent_actor: pv.Actor = None
+
         self._add_axis_glyph()  # Add a 3D axis glyph to the lower right corner
 
     def _add_icons(self):
@@ -155,13 +228,13 @@ class Visualizer:
             color_off="red"
         )
         self.plotter.add_text("P", position=(450, 30), font_size=14, color="black", font="arial")
-        
+
     def _add_axis_glyph(self):
         """
         Adds a 3D axis glyph to the lower right corner of the render window.
         """
-        #axes = pv.Axes(show_actor=True, actor_scale=0.15)
-        #self.plotter.add_actor(axes.actor, reset_camera=False)
+        # axes = pv.Axes(show_actor=True, actor_scale=0.15)
+        # self.plotter.add_actor(axes.actor, reset_camera=False)
         self.plotter.add_axes(interactive=True, line_width=2, viewport=[0.8, 0.0, 1.0, 0.2])
 
     def _clear_geo_actors(self):
@@ -199,23 +272,65 @@ class Visualizer:
         print(f"Screenshot saved as {filename}")
 
     def toggle_bonds(self, event=None):
+        """
+        Toggle the visibility of bonds in the visualization.
+
+        Parameters
+        ----------
+        event : optional
+            Event that triggers the toggle, default is None.
+        """
         self.show_bonds = not self.show_bonds
         self.render()
 
     def toggle_spins(self, event=None):
+        """
+        Toggle the visibility of spins in the visualization.
+
+        Parameters
+        ----------
+        event : optional
+            Event that triggers the toggle action.
+        """
         self.show_spins = not self.show_spins
         self.render()
 
     def toggle_cell(self, event=None):
+        """
+        Toggle the cell representation mode.
+
+        Parameters
+        ----------
+        event : optional
+            Event that triggers the toggle. Default is None.
+        """
         self.use_conventional = not self.use_conventional
         self._change_representation()  # update internal data from structure
         self.render()
 
     def toggle_extents(self, event=None):
+        """
+        Toggle the visibility of extents and re-render.
+
+        Parameters
+        ----------
+        event : optional
+            Event triggering the toggle.
+        """
         self.show_extents = not self.show_extents
         self.render()
 
     def toggle_periodicity(self, period="2d", event=None):
+        """
+        Toggle the periodicity of the visualizer.
+
+        Parameters
+        ----------
+        period : str, optional
+            The period to toggle, by default "2d".
+        event : Any, optional
+            An event parameter, by default None.
+        """
         if self.periodicity == period:
             self.periodicity = None
         else:
@@ -223,6 +338,14 @@ class Visualizer:
         self.render()
 
     def toggle_perspective(self, event=None):
+        """
+        Toggle the camera's perspective projection.
+
+        Parameters
+        ----------
+        event : optional
+            Event that triggers the toggle.
+        """
         if self.plotter.camera.parallel_projection:
             self.plotter.camera.parallel_projection = False
         else:
@@ -230,16 +353,39 @@ class Visualizer:
         self.render()
 
     def get_cell(self):
+        """
+        Returns the cell attribute.
+
+        Returns
+        -------
+        cell : type
+            The cell attribute.
+        """
         return self.cell
 
     def expand_structure(self, cell, grid_dims):
+        """
+        Expand the atomic structure based on grid dimensions.
+
+        Parameters
+        ----------
+        cell : array_like
+            The cell matrix defining the periodic boundary conditions.
+        grid_dims : array_like
+            Dimensions of the grid to expand the structure.
+
+        Returns
+        -------
+        list
+            List of expanded atoms with new positions.
+        """
         atoms_expanded = []
         i_min, i_max = -grid_dims[0] // 2, grid_dims[0] // 2
         j_min, j_max = -grid_dims[1] // 2, grid_dims[1] // 2
         if grid_dims[2] == 1:
             k_min, k_max = 0, 0
         else:
-            k_min, k_max = -grid_dims[2] // 2, grid_dims[2] // 2 
+            k_min, k_max = -grid_dims[2] // 2, grid_dims[2] // 2
         for i in range(i_min, i_max + 1):
             for j in range(j_min, j_max + 1):
                 for k in range(k_min, k_max + 1):
@@ -258,6 +404,17 @@ class Visualizer:
         return atoms_expanded
 
     def render(self):
+        """
+        Render the molecular visualization.
+
+        This method clears previously rendered geometry, renders atoms, bonds,
+        spins, extents, and periodic images if applicable, and updates the
+        interactive window with icon buttons.
+
+        Returns
+        -------
+        None
+        """
         # Remove previously rendered geometry without clearing the whole scene.
         self._clear_geo_actors()
 
@@ -279,9 +436,25 @@ class Visualizer:
         self.plotter.show(auto_close=False)
 
     def _render_atoms(self):
+        """
+        Render atoms as spheres in the plotter.
+
+        This method creates a PolyData object from atom positions, assigns radii
+        and colors, and uses a glyph filter to create spheres at each atom's
+        position. The spheres are then colored and added to the plotter.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+        """
         points = np.array([atom.position for atom in self.atoms])
         radii = np.array([atom.radius for atom in self.atoms])
-        colors = np.array([pv.Color(atom.color).float_rgb for atom in self.atoms])  # Convert hex to RGB
+        colors = np.array([pv.Color(atom.color).float_rgb for atom
+                           in self.atoms])  # Convert hex to RGB
 
         # Create a PolyData object with points
         poly_data = pv.PolyData(points)
@@ -296,13 +469,24 @@ class Visualizer:
         glyphs = poly_data.glyph(scale="radii", geom=sphere)
 
         # **Reassign colors after glyph creation**
-        glyphs["colors"] = np.repeat(colors, sphere.n_points, axis=0)  # Expand colors for all points
+        glyphs["colors"] = np.repeat(colors, sphere.n_points, axis=0) 
 
         # Add the glyphs to the plotter with proper coloring
         actor = self.plotter.add_mesh(glyphs, scalars="colors", rgb=True, smooth_shading=True)
         self._atom_actors.append(actor)
 
     def _render_bonds(self):
+        """
+        Render bonds as cylinders and add them to the plotter.
+        This method creates cylindrical representations of bonds, merges them
+        into a single PolyData object, and adds them to the plotter.
+        Parameters
+        ----------
+        None
+        Returns
+        -------
+        None
+        """
         cylinders = []
         for bond in self.bonds:
             vector = bond.end - bond.start
@@ -318,12 +502,27 @@ class Visualizer:
             merged_cylinders = cylinders[0].merge(cylinders[1:])  # Merge all into one
         else:
             merged_cylinders = cylinders[0]
-        
+
         # Add the merged cylinders to the plotter
         actor = self.plotter.add_mesh(merged_cylinders, color="red", smooth_shading=True)
         self._bond_actors.append(actor)
 
     def _render_spins(self):
+        """
+        Render spin arrows for each atom with a spin magnitude > 0.
+
+        Iterates over the spins, creates arrow representations for each spin,
+        and adds them to the plotter. Merges arrows into a single actor if
+        multiple spins exist.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+        """
         for atom, spin in self.spins:
             if spin.magnitude > 0:
                 arrow = pv.Arrow(start=atom.position,
@@ -334,23 +533,35 @@ class Visualizer:
                                  scale=spin.magnitude)
                 self._spin_actors.append(arrow)
 
-        if self._spin_actors:
-            merged_arrows = self._spin_actors[0].merge(self._spin_actors[1:])
-            actor = self.plotter.add_mesh(merged_arrows, color=spin.color, smooth_shading=True)
-            self._spin_actors = [actor]
+            if self._spin_actors:
+                merged_arrows = self._spin_actors[0].merge(self._spin_actors[1:])
+                actor = self.plotter.add_mesh(merged_arrows, color=spin.color, smooth_shading=True)
+                self._spin_actors = [actor]
 
     def _render_extents(self):
+        """
+        Render the extents of the cell.
+        This method creates a wireframe representation of the cell extents
+        using the cell's corner points and edges. The extents are visualized
+        using a black line mesh.
+        Parameters
+        ----------
+        None
+        Returns
+        -------
+        None
+        """
         cell = self.cell
         if cell is not None:
             origin = np.array([0, 0, 0])
             a, b, c = cell[0], cell[1], cell[2]
-            corners = np.array([origin, a, a+b, b, c, a+c, a+b+c, b+c])
+            corners = np.array([origin, a, a + b, b, c, a + c, a + b + c, b + c])
             edges = [ (0, 1), (1, 2), (2, 3), (3, 0), (0, 4), (1, 5), (2, 6),
                       (3, 7), (4, 5), (5, 6), (6, 7), (7, 4), ]
             lines = pv.PolyData()
             lines.points = np.array(corners)
             lines.lines = np.hstack([[2, edge[0], edge[1]] for edge in edges])
-    
+
             self._extent_actor = self.plotter.add_mesh(lines, color="black", line_width=3)
             # corners = np.array([origin, a, b, c, a + b, a + c, b + c, a + b + c])
             # xmin, ymin, zmin = corners.min(axis=0)
@@ -358,32 +569,48 @@ class Visualizer:
             # box = pv.Box(bounds=(xmin, xmax, ymin, ymax, zmin, zmax))
             # self._extent_actor = self.plotter.add_mesh(box, style="wireframe", color="black")
 
-    def _render_periodic_images(self):
-        grid_dims = (4, 4, 1) if self.periodicity == "2d" else (4, 4, 4)
-        cell = self.cell
+    def _render_periodic_images(self) -> None:
+        """
+        Render periodic images of the atomic structure.
+
+        Expands the atomic structure based on periodicity, creates glyphs for
+        each atom, and adds them to the plotter with specified properties.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+        """
+        grid_dims: tuple = (4, 4, 1) if self.periodicity == "2d" else (4, 4, 4)
+        cell: np.ndarray = self.cell
         if cell is not None:
-            atoms_expanded = self.expand_structure(cell, grid_dims)
-            points = np.array([atom.position for atom in atoms_expanded])
-            radii = np.array([atom.radius for atom in atoms_expanded])
-            colors = np.array([pv.Color(atom.color).float_rgb for atom in atoms_expanded])
+            atoms_expanded: list = self.expand_structure(cell, grid_dims)
+            points: np.ndarray = np.array([atom.position for atom in atoms_expanded])
+            radii: np.ndarray = np.array([atom.radius for atom in atoms_expanded])
+            colors: np.ndarray = np.array([pv.Color(atom.color).float_rgb for atom
+                                           in atoms_expanded])
 
             # Create a PolyData object with points
-            poly_data = pv.PolyData(points)
+            poly_data: pv.PolyData = pv.PolyData(points)
 
             # Add radii as point data
             poly_data["radii"] = radii
 
             # Create a sphere glyph
-            sphere = pv.Sphere(theta_resolution=16, phi_resolution=16)
+            sphere: pv.Sphere = pv.Sphere(theta_resolution=16, phi_resolution=16)
 
             # Use glyph filter to create spheres at each point
-            glyphs = poly_data.glyph(scale="radii", geom=sphere)
+            glyphs: pv.PolyData = poly_data.glyph(scale="radii", geom=sphere)
 
             # **Reassign colors after glyph creation**
-            glyphs["colors"] = np.repeat(colors, sphere.n_points, axis=0)  # Expand colors for all points
+            glyphs["colors"] = np.repeat(colors, sphere.n_points, axis=0)
 
             # Add the glyphs to the plotter with opacity
-            actor = self.plotter.add_mesh(glyphs, scalars="colors", rgb=True, opacity=0.5, smooth_shading=True)
+            actor: pv.Actor = self.plotter.add_mesh(
+                glyphs, scalars="colors", rgb=True, opacity=0.5, smooth_shading=True)
             self._periodic_actors.append(actor)
 
     def _change_representation(self):
