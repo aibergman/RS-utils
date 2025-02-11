@@ -47,7 +47,7 @@ class Atom:
     """
     def __init__(
         self,
-        position: list | np.ndarray,
+        position: np.ndarray,
         species: str,
         atom_type: str,
         radius: float = None,
@@ -111,8 +111,8 @@ class Bond:
     """
     def __init__(
         self,
-        start: list | np.ndarray,
-        end: list | np.ndarray,
+        start: np.ndarray,
+        end: np.ndarray,
         radius: float = 0.2,
         color: str = "grey",
         **kwargs,

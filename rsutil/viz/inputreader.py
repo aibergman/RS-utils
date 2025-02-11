@@ -89,7 +89,7 @@ class InputReader:
             position = [float(x) for x in parts[1:4]]
             atoms.append(
                 Atom(
-                    position=position,
+                    position=np.array(position)),
                     species=species,
                     atom_type=species,
                 )
@@ -116,7 +116,7 @@ class InputReader:
             cart_coords = pg_struct.lattice.get_cartesian_coords(site.frac_coords)
             atoms.append(
                 Atom(
-                    position=cart_coords,
+                    position=np.array(cart_coords),
                     species=site.species_string,
                     atom_type=site.species_string,
                 )
@@ -277,7 +277,7 @@ class InputReader:
                 )
         atoms: list[Atom] = []
         for coord, sp in zip(basis_coords, species_labels):
-            atoms.append(Atom(position=coord, species=sp, atom_type=sp))
+            atoms.append(Atom(position=np.array(coord), species=sp, atom_type=sp))
 
         # --- Create and return the Structure ---
         return Structure(atoms=atoms, unit_cell=unit_cell)
@@ -382,7 +382,7 @@ class InputReader:
         # --- Create Atom objects ---
         atoms = []
         for coord, sp in zip(basis_coords, species_labels):
-            atoms.append(Atom(position=coord, species=sp, atom_type=sp))
+            atoms.append(Atom(position=np.array(coord), species=sp, atom_type=sp))
 
         # Return a Structure with the list of Atom objects and the scaled unit cell.
         return Structure(atoms=atoms, unit_cell=unit_cell)
@@ -432,10 +432,10 @@ class InputReader:
                 species_type2 = int(parts[i + 8])
                 species2 = species_lookup[species_type2 - 1]
                 atoms.append(
-                    Atom(position=position1, species=species1, atom_type=species1)
+                    Atom(position=np.array(position1), species=species1, atom_type=species1)
                 )
                 atoms.append(
-                    Atom(position=position2, species=species2, atom_type=species2)
+                    Atom(position=np.array(position2), species=species2, atom_type=species2)
                 )
 
         # If the number of atoms is odd, remove the last element from atoms

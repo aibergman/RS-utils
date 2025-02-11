@@ -142,7 +142,7 @@ class Structure:
                 (s for s in spins if np.allclose(s.position, atom.position)), None
             )
             if spin is None:
-                spin = Spin(position=atom.position, direction=(0, 0, 0), magnitude=0.0)
+                spin = Spin(position=atom.position, direction=np.array([0, 0, 0]), magnitude=0.0)
             atom_spin_list.append((atom, spin))
         return atom_spin_list
 
@@ -250,7 +250,7 @@ class Structure:
         for pos, symbol in zip(expanded_cart, expanded_symbols):
             self.atoms_cc.append(
                 Atom(
-                    position=pos,
+                    position=np.array(pos),
                     species=symbol,
                     atom_type=symbol,
                 )
@@ -270,5 +270,5 @@ class Structure:
         self.spins_cc: list[Spin] = []
         for atom in self.atoms_cc:
             self.spins_cc.append(
-                Spin(position=atom.position, direction=(0, 0, 0), magnitude=0.0)
+                Spin(position=np.array(atom.position), direction=np.array([0, 0, 0]), magnitude=0.0)
             )
