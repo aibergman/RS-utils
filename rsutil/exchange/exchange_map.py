@@ -38,7 +38,7 @@ from pymatgen.core import Lattice, Molecule, Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 
-def read_rs_clust(clust_file, input_file):
+def read_rs_clust(clust_file: str, input_file: str) -> Molecule:
     """
     Reads a cluster file and an input file to create a Structure object.
 
@@ -47,31 +47,30 @@ def read_rs_clust(clust_file, input_file):
         input_file (str): Path to the input.nml file containing the &atoms block.
 
     Returns:
-        Structure: A Structure object built from the parsed cluster file and input file.
+        Molecule: A Molecule object built from the parsed cluster file and input file.
     """
     # Parse input.nml for species labels
-    inp_nml = f90nml.read(input_file)
-    atoms_data = inp_nml.get("atoms", {})
+    inp_nml: dict = f90nml.read(input_file)
+    atoms_data: dict = inp_nml.get("atoms", {})
     # Remove hyphens and digits from species labels
-    species_lookup = [
+    species_lookup: list[str] = [
         "".join(filter(str.isalpha, label)) for label in atoms_data["label"]
     ]
     # Create Atom objects with species inferred from species_type
-    atoms = []
+    atoms: list[str] = []
     with open(clust_file, "r", encoding="utf-8") as f:
-        lines = f.readlines()
+        lines: list[str] = f.readlines()
     _ = int(lines[0].strip().split("=")[1].strip())  # num_atoms is not used
-    positions = []
-    atoms = []
+    positions: list[list[float]] = []
     for line in lines[1:]:
-        parts = line.split()
+        parts: list[str] = line.split()
         for i in range(0, len(parts), 10):
-            position1 = [float(parts[i]), float(parts[i + 1]), float(parts[i + 2])]
-            species_type1 = int(parts[i + 3])
-            species1 = species_lookup[species_type1 - 1]
-            position2 = [float(parts[i + 5]), float(parts[i + 6]), float(parts[i + 7])]
-            species_type2 = int(parts[i + 8])
-            species2 = species_lookup[species_type2 - 1]
+            position1: list[float] = [float(parts[i]), float(parts[i + 1]), float(parts[i + 2])]
+            species_type1: int = int(parts[i + 3])
+            species1: str = species_lookup[species_type1 - 1]
+            position2: list[float] = [float(parts[i + 5]), float(parts[i + 6]), float(parts[i + 7])]
+            species_type2: int = int(parts[i + 8])
+            species2: str = species_lookup[species_type2 - 1]
             positions.append(position1)
             positions.append(position2)
             atoms.append(species1)
@@ -80,13 +79,13 @@ def read_rs_clust(clust_file, input_file):
     # If the number of atoms is odd, remove the last element from atoms
     if len(atoms) % 2 != 0:
         atoms.pop()
-        # Create a pymatgen Molecule object
 
-    cluster = Molecule(atoms, positions)
+    # Create a pymatgen Molecule object
+    cluster: Molecule = Molecule(atoms, positions)
     return cluster
 
 
-def read_namelists(input_file: str, lattice_file: str, verbose=False) -> tuple:
+def read_namelists(input_file: str, lattice_file: str, verbose: bool = False) -> tuple[dict, dict]:
     """
     Read input and lattice namelist files.
 
@@ -104,8 +103,8 @@ def read_namelists(input_file: str, lattice_file: str, verbose=False) -> tuple:
     tuple
         A tuple containing the parsed input and lattice namelists.
     """
-    input_nml = f90nml.read(input_file)
-    lattice_nml = f90nml.read(lattice_file)
+    input_nml: dict = f90nml.read(input_file)
+    lattice_nml: dict = f90nml.read(lattice_file)
 
     if verbose:
         print("Input Namelist:", input_nml)
@@ -114,7 +113,9 @@ def read_namelists(input_file: str, lattice_file: str, verbose=False) -> tuple:
     return input_nml, lattice_nml
 
 
-def create_structure_and_analyzer(lattice_nml, input_nml):
+def create_structure_and_analyzer(
+    lattice_nml: dict, input_nml: dict
+) -> tuple[Structure, SpacegroupAnalyzer, list[int]]:
     """
     Create a Structure object and SpacegroupAnalyzer from lattice and input NML files.
 
@@ -142,7 +143,9 @@ def create_structure_and_analyzer(lattice_nml, input_nml):
     return structure, spacegroup_analyzer, rec_sites
 
 
-def get_neighbors_list(cluster, sites, cutoff=2.0, verbose=False):
+def get_neighbors_list(
+    cluster: Molecule, sites: list[int], cutoff: float = 2.0,
+        verbose: bool = False) -> dict[int, list]:
     """
     Get the neighbors list for each atom in the cluster.
 
@@ -162,7 +165,7 @@ def get_neighbors_list(cluster, sites, cutoff=2.0, verbose=False):
     dict
         Dictionary of neighbors for each atom, sorted by distance.
     """
-    neighbors = {}
+    neighbors: dict[int, list] = {}
     for iatom, _ in enumerate(sites):
         neighbors[iatom] = cluster.get_neighbors(cluster[iatom], cutoff)
         neighbors[iatom] = sorted(
@@ -225,7 +228,9 @@ def get_neighbors_list(cluster, sites, cutoff=2.0, verbose=False):
 #                 print(f"  {neighbor}")
 #
 #     return symmetry_reduced_neighbors
-def get_fermi_energy(report_file="report.out"):
+
+
+def get_fermi_energy(report_file: str = "report.out") -> float:
     """
     Extract the Fermi energy from the report file.
 
@@ -239,7 +244,7 @@ def get_fermi_energy(report_file="report.out"):
     float
         The Fermi energy value.
     """
-    fermi_energy = None
+    fermi_energy: float = None
     with open(report_file, "r", encoding="utf-8") as file:
         for line in file:
             if "Fermi energy:" in line:
@@ -252,7 +257,7 @@ def get_fermi_energy(report_file="report.out"):
     return fermi_energy
 
 
-def find_matching_indices(cluster, neighbors):
+def find_matching_indices(cluster: Molecule, neighbors: dict) -> dict:
     """
     Find the indices of the atoms in the cluster that match the neighbor list.
 
@@ -268,9 +273,9 @@ def find_matching_indices(cluster, neighbors):
     dict
         Dictionary of atom indices that match the neighbor list.
     """
-    matching_indices = {}
+    matching_indices: dict[int, list[int]] = {}
     for atom, neighbor_list in neighbors.items():
-        atom_indices = []
+        atom_indices: list[int] = []
         for neighbor in neighbor_list:
             for i, site in enumerate(cluster):
                 if site.species_string == neighbor.species_string and np.allclose(
@@ -280,10 +285,10 @@ def find_matching_indices(cluster, neighbors):
                     break
         matching_indices[atom] = atom_indices
 
-    return matching_indices
+        return matching_indices
 
 
-def store_jij_namelist(input_nml, matching_indices, atom_index):
+def store_jij_namelist(input_nml: dict, matching_indices: dict, atom_index: int) -> dict:
     """
     Update the input namelist with post-processing information and matching indices.
 
@@ -301,10 +306,10 @@ def store_jij_namelist(input_nml, matching_indices, atom_index):
     dict
         Updated input namelist.
     """
-    new_input_nml = input_nml.copy()
+    new_input_nml: dict = input_nml.copy()
 
     # Update the fermi energy in the energy namelist
-    fermi_energy = get_fermi_energy()
+    fermi_energy: float = get_fermi_energy()
     new_input_nml["energy"]["fermi"] = fermi_energy
 
     # Edit and write input.nml
@@ -315,18 +320,18 @@ def store_jij_namelist(input_nml, matching_indices, atom_index):
         pass
 
     # Update njij and ijpair
-    njij = len(matching_indices[atom_index - 1])
+    njij: int = len(matching_indices[atom_index - 1])
     new_input_nml["lattice"]["njij"] = njij
     new_input_nml["lattice"]["ijpair"] = matching_indices[atom_index - 1]
 
-    iij = [atom_index] * njij
-    jij = [i for i in matching_indices[atom_index - 1]]
-    ijpair = [iij, jij]
+    iij: list[int] = [atom_index] * njij
+    jij: list[int] = [i for i in matching_indices[atom_index - 1]]
+    ijpair: list[list[int]] = [iij, jij]
 
     new_input_nml["lattice"]["ijpair"] = ijpair
 
     # Create directory Atom_i
-    dir_name = f"Atom_{atom_index}"
+    dir_name: str = f"Atom_{atom_index}"
     if not os.path.exists(dir_name):
         os.makedirs(dir_name)
 
@@ -350,21 +355,20 @@ def store_jij_namelist(input_nml, matching_indices, atom_index):
 # lattice_nml_list = [np.array(lattice_nml[key]) for key in lattice_nml]
 # atoms_list = [atom for atom in atoms]
 #
-def exchange_map(cutoff=1.0, verbose=False):
+def exchange_map(cutoff: float = 1.0, verbose: bool = False) -> None:
     """
     Main function to read namelists, create structure and analyzer,
     get neighbors, and symmetry reduced neighbors.
 
     Parameters
     ----------
+    cutoff : float, optional
+        Cutoff distance to consider neighbors, by default 1.0.
     verbose : bool, optional
         Flag to control printouts, by default False.
     """
     input_nml, lattice_nml = read_namelists("input.nml", "lattice.nml", verbose=verbose)
     _, _, rec_sites = create_structure_and_analyzer(lattice_nml, input_nml)
-    # structure, spacegroup_analyzer, rec_sites = (
-    # create_structure_and_analyzer(lattice_nml, input_nml)
-    # )
 
     if verbose:
         print("Recursion sites:", rec_sites)

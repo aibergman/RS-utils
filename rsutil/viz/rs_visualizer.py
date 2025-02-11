@@ -23,11 +23,22 @@ from .visualizer import Visualizer
 # ----------------------------
 # 5. Example usage
 # ----------------------------
-def rs_visualizer(data_dir=".", clust=False):
-    # Read a POSCAR file using pymatgen
-    # structure = InputReader.read_poscar(
-    #     "/Users/andersb/Jobb/RS_tools_python/POSCAR"
-    # )
+def rs_visualizer(data_dir: str = ".", clust: bool = False) -> None:
+    """
+    Visualize a structure from RS_tools_python.
+
+    Parameters
+    ----------
+    data_dir : str, optional
+        Directory containing the input files (default is ".").
+    clust : bool, optional
+        If True, visualize the 'clust' file; otherwise, visualize the
+        'lattice' file (default is False).
+
+    Returns
+    -------
+    None
+    """
 
     if clust:
         print("Visualizing clust file")
@@ -63,6 +74,7 @@ def rs_visualizer(data_dir=".", clust=False):
     # Uncomment toggles as desired:
 
     viz.render()
+
 
 if __name__ == "__main__":
     rs_visualizer()
