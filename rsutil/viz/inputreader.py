@@ -1,3 +1,26 @@
+"""
+This module provides the `InputReader` class, a utility for reading various 
+file formats and converting them into `Structure` objects. The supported 
+formats include .xyz, POSCAR, RS-LMTO, and custom formats.
+Classes:
+    InputReader: A class with static methods to read different file formats 
+    and return `Structure` objects.
+Methods:
+    read_xyz(file_path: str) -> Structure:
+        Reads a simple .xyz file and returns a `Structure` object.
+    read_custom(file_path: str):
+        Stub for reading a custom file format. Implement your own parser.
+    read_poscar(file_path: str) -> Structure:
+        Reads a POSCAR file using pymatgen and returns a `Structure` object.
+    read_rs_lmto(lattice_file: str, input_file: str) -> Structure:
+        Reads RS-LMTO input from lattice.nml and input.nml files and returns 
+        a `Structure` object.
+    read_rs_lmto_nml(lattice_file: str, input_file: str) -> Structure:
+        Reads RS-LMTO input using f90nml and returns a `Structure` object.
+    read_rs_clust(clust_file: str, input_file: str) -> Structure:
+        Reads a cluster file and an input.nml file to create a `Structure` 
+        object.
+"""
 import re
 import f90nml
 import numpy as np
@@ -12,28 +35,47 @@ from .structure import Structure
 # ----------------------------
 class InputReader:
     """
+    A utility class for reading different file formats and converting them
+    into Structure objects.
+
+    Methods
+    -------
     read_rs_lmto(lattice_file, input_file):
         Parses lattice vectors and basis coordinates from lattice.nml.
         Parses species labels from input.nml.
-        Returns a Structure object with the list of Atom objects and the unit cell.
+        Returns a Structure object with the list of Atom objects and the 
+        unit cell.
+        
     read_rs_lmto_nml(lattice_file, input_file):
         Parses lattice vectors and basis coordinates from lattice.nml.
         Parses species labels and scaling factor from input.nml.
-        Returns a Structure object with the list of Atom objects and the scaled unit cell.
+        Returns a Structure object with the list of Atom objects and the 
+        scaled unit cell.
+        
     read_rs_clust(clust_file, input_file):
         Parses atom positions and species from the cluster file.
         Parses species labels from input.nml.
-        Returns a Structure object built from the parsed cluster file and input file.
-    A utility class for reading different file formats and converting them
-    into Structure objects.
+        Returns a Structure object built from the parsed cluster file and 
+        input file.
     """
 
     @staticmethod
     def read_xyz(file_path: str) -> Structure:
         """
         Reads a simple .xyz file and returns a Structure.
-        Assumes the first line is the number of atoms and the second line is a comment.
-        Each subsequent line: species x y z
+
+        Assumes the first line is the number of atoms and the second line is 
+        a comment. Each subsequent line contains: species x y z.
+
+        Parameters
+        ----------
+        file_path : str
+            Path to the .xyz file.
+
+        Returns
+        -------
+        Structure
+            A Structure object containing the atoms and their positions.
         """
         atoms: list[Atom] = []
         with open(file_path, "r", encoding="utf-8") as f:
@@ -101,7 +143,9 @@ class InputReader:
 
         Species labels are scrubbed (only alphabetic characters are kept).
 
-        Returns:
+        Returns
+        -------
+        Structure
             A Structure object with the list of Atom objects and the unit cell.
         """
         alat: float = 1.0  # default lattice parameter
@@ -243,12 +287,18 @@ class InputReader:
         """
         Reads RS-LMTO input using f90nml.
 
-        Parameters:
-            lattice_file (str): Path to the lattice.nml file.
-            input_file (str): Path to the input.nml file containing the &atoms and &lattice blocks.
+        Parameters
+        ----------
+        lattice_file : str
+            Path to the lattice.nml file.
+        input_file : str
+            Path to the input.nml file containing the &atoms and &lattice 
+            blocks.
 
-        Returns:
-            Structure: A Structure object built from the parsed namelists.
+        Returns
+        -------
+        Structure
+            A Structure object built from the parsed namelists.
         """
         # Read the namelist files.
         lat_nml: dict = f90nml.read(lattice_file)
@@ -342,12 +392,18 @@ class InputReader:
         """
         Reads a cluster file and an input file to create a Structure object.
 
-        Parameters:
-            clust_file (str): Path to the cluster file.
-            input_file (str): Path to the input.nml file containing the &atoms block.
+        Parameters
+        ----------
+        clust_file : str
+            Path to the cluster file.
+        input_file : str
+            Path to the input.nml file containing the &atoms block.
 
-        Returns:
-            Structure: A Structure object built from the parsed cluster file and input file.
+        Returns
+        -------
+        Structure
+            A Structure object built from the parsed cluster file and input 
+            file.
         """
         # Example of clust_file: first line gives number of atoms
         # Parse input.nml for species labels

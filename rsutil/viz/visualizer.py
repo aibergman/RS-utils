@@ -8,22 +8,26 @@ aspects of the visualization, such as cell representation, spins, bonds, and
 periodicity, through interactive key bindings and icon buttons.
 
 Classes
+-------
 Visualizer
-    structure.
+    Provides interactive visualization of atomic structures.
 
 Methods
+-------
 __init__(self, structure: Structure)
     Initializes the Visualizer with a given structure.
 
 _add_icons(self)
+    Adds checkbox button widgets at fixed positions in the render window.
 
 _add_axis_glyph(self)
+    Adds a 3D axis glyph to the lower right corner of the render window.
 
 _clear_geo_actors(self)
-    Removes only the geometry actors (atoms, bonds, spins, extents, and
-    periodic images) from the plotter.
+    Removes only the geometry actors from the plotter.
 
 save_screenshot(self, event=None)
+    Saves a screenshot of the current visualization.
 
 toggle_bonds(self, event=None)
     Toggles the visibility of bonds in the visualization.
@@ -44,6 +48,7 @@ toggle_perspective(self, event=None)
     Toggles the camera's perspective projection.
 
 get_cell(self)
+    Returns the cell attribute.
 
 expand_structure(self, cell, grid_dims)
     Expands the atomic structure based on grid dimensions.
@@ -77,9 +82,10 @@ from .glyphs import Atom  # assuming these are defined appropriately
 
 class Visualizer:
     """
-    Provides interactive toggles for visualizing different aspects of a
-    structure. Interactive key bindings:
-      C  : Toggle cell representation (Unit/Conventional)
+    Interactive toggles for visualizing structure aspects.
+
+    Key bindings:
+      C  : Toggle cell (Unit/Conventional)
       M  : Toggle spins
       E  : Toggle cell extents
       B  : Toggle bonds
@@ -87,7 +93,8 @@ class Visualizer:
       3  : Toggle 3d periodicity
       P  : Toggle perspective
       S  : Save screenshot
-    Additionally, icon buttons appear along the bottom of the window.
+
+    Icon buttons appear at the bottom.
     """
     def __init__(self, structure: Structure):
         """
@@ -469,7 +476,7 @@ class Visualizer:
         glyphs = poly_data.glyph(scale="radii", geom=sphere)
 
         # **Reassign colors after glyph creation**
-        glyphs["colors"] = np.repeat(colors, sphere.n_points, axis=0) 
+        glyphs["colors"] = np.repeat(colors, sphere.n_points, axis=0)
 
         # Add the glyphs to the plotter with proper coloring
         actor = self.plotter.add_mesh(glyphs, scalars="colors", rgb=True, smooth_shading=True)
@@ -556,8 +563,8 @@ class Visualizer:
             origin = np.array([0, 0, 0])
             a, b, c = cell[0], cell[1], cell[2]
             corners = np.array([origin, a, a + b, b, c, a + c, a + b + c, b + c])
-            edges = [ (0, 1), (1, 2), (2, 3), (3, 0), (0, 4), (1, 5), (2, 6),
-                      (3, 7), (4, 5), (5, 6), (6, 7), (7, 4), ]
+            edges = [(0, 1), (1, 2), (2, 3), (3, 0), (0, 4), (1, 5), (2, 6),
+                     (3, 7), (4, 5), (5, 6), (6, 7), (7, 4), ]
             lines = pv.PolyData()
             lines.points = np.array(corners)
             lines.lines = np.hstack([[2, edge[0], edge[1]] for edge in edges])

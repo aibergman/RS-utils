@@ -1,17 +1,19 @@
 """
-Module for representing and manipulating molecular structures with atoms, bonds,
-and spins. This module provides a `Structure` class that allows for the creation,
-manipulation, and analysis of molecular structures, including the computation of
-conventional cells using pymatgen's SpacegroupAnalyzer.
+Module for representing and manipulating molecular structures with atoms,
+bonds, and spins. This module provides a `Structure` class that allows for
+the creation, manipulation, and analysis of molecular structures, including
+the computation of conventional cells using pymatgen's SpacegroupAnalyzer.
 
 Classes:
     Structure: Represents a molecular structure with atoms, bonds, and spins.
 
+Attributes:
     atoms_uc (list): List of Atom objects in the unit cell.
     bonds_uc (list): List of Bond objects in the unit cell.
     spins_uc (list): List of Spin objects in the unit cell.
     conventional_cell (np.ndarray): Lattice vectors for the conventional cell.
 
+Methods:
     __init__(self, atoms, bonds=None, spins=None, unit_cell=None,
              conventional_cell=None, bond_cutoff=3.0):
         Initializes the Structure object with atoms, bonds, spins, and lattice
@@ -26,6 +28,8 @@ Classes:
         given atom, a default (zero magnitude) spin is created.
 
     get_bond_objects(self, conventional=False) -> list[Bond]:
+        Returns a list of Bond objects. If the bonds list is empty, generates
+        bonds based on the distance cutoff.
 
     compute_conventional_cell(self, tol=0.01) -> None:
         Computes the conventional cell of the structure using pymatgen's
@@ -45,28 +49,33 @@ class Structure:
     """
     Represents a molecular structure with atoms, bonds, and spins.
 
-    Attributes:
-        atomsc (list): List of Atom objects.
-        bonds (list): List of Bond objects.
-        spins (list): List of Spin objects.
-        atoms_cc (list): List of Atom objects in the conventional cell.
-        bonds_cc (list): List of Bond objects in the conventional cell.
-        spins_cc (list): List of Spin objects in the conventional cell.
-        unit_cell (np.ndarray): Lattice vectors for the unit cell.
-        conventional_cell (np.ndarray): Lattice vectors for the
-            conventional cell.
+    Attributes
+    ----------
+    atoms_uc : list
+        List of Atom objects in the unit cell.
+    bonds_uc : list
+        List of Bond objects in the unit cell.
+    spins_uc : list
+        List of Spin objects in the unit cell.
+    atoms_cc : list
+        List of Atom objects in the conventional cell.
+    bonds_cc : list
+        List of Bond objects in the conventional cell.
+    spins_cc : list
+        List of Spin objects in the conventional cell.
+    unit_cell : np.ndarray
+        Lattice vectors for the unit cell.
+    conventional_cell : np.ndarray
+        Lattice vectors for the conventional cell.
 
-    Methods:
-        get_atom_spin_objects():
-            Returns a list of tuples (Atom, Spin). If a spin is not
-            provided for a given atom, a default (zero magnitude) spin
-            is created.
-        get_bond_objects():
-            Returns a list of Bond objects. If the bonds list is empty,
-            automatically generates bonds based on the distance cutoff.
-        compute_conventional_cell(tol=0.01):
-            Compute the conventional cell of the structure using
-            pymatgen's SpacegroupAnalyzer.
+    Methods
+    -------
+    get_atom_spin_objects(conventional=False)
+        Returns a list of tuples (Atom, Spin).
+    get_bond_objects(conventional=False)
+        Returns a list of Bond objects.
+    compute_conventional_cell(tol=0.01)
+        Compute the conventional cell using SpacegroupAnalyzer.
     """
 
     def __init__(
@@ -79,14 +88,14 @@ class Structure:
         bond_cutoff: float = 3.0,
     ):
         """
-        Contains all the structural information.
+        Initialize the Structure object.
 
         Args:
             atoms (list): List of Atom objects.
-            bonds (list): List of Bond objects (can be empty; bonds may be generated).
-            spins (list): List of Spin objects (optional; default spin will be provided if missing).
-            unit_cell (3x3 array-like): Lattice vectors for the unit cell.
-            conventional_cell (3x3 array-like): Lattice vectors for the conventional cell.
+            bonds (list): List of Bond objects.
+            spins (list): List of Spin objects.
+            unit_cell (array-like): Lattice vectors for the unit cell.
+            conventional_cell (array-like): Lattice vectors for the conventional cell.
             bond_cutoff (float): Distance below which atoms are bonded.
         """
         self.atoms_uc: list = atoms
@@ -103,7 +112,7 @@ class Structure:
 
     def _create_pymatgen_structure(self) -> PymatgenStructure:
         """
-        Create a pymatgen Structure object from the current unit cell and atom list.
+        Create a pymatgen Structure from the current unit cell and atoms.
 
         Returns:
             PymatgenStructure: A pymatgen Structure object.
@@ -118,12 +127,10 @@ class Structure:
 
     def get_atom_spin_objects(self, conventional: bool = False) -> list[tuple[Atom, Spin]]:
         """
-        Returns a list of tuples (Atom, Spin). If a spin is not provided
-        for a given atom, a default (zero magnitude) spin is created.
+        Get list of (Atom, Spin) tuples. Create default spin if not provided.
 
         Args:
-            conventional (bool): If True, use atoms_cc and spins_cc;
-            otherwise, use atoms_uc and spins_uc.
+            conventional (bool): Use conventional cell if True.
         """
         atom_spin_list: list[tuple[Atom, Spin]] = []
         atoms: list[Atom] = self.atoms_cc if conventional else self.atoms_uc
@@ -141,11 +148,10 @@ class Structure:
 
     def get_bond_objects(self, conventional: bool = False) -> list[Bond]:
         """
-        Returns a list of Bond objects. If the bonds list is empty, automatically
-        generates bonds based on the distance cutoff.
+        Get list of Bond objects. Generate bonds if list is empty.
 
         Args:
-            conventional (bool): If True, use bonds_cc; otherwise, use bonds_uc.
+            conventional (bool): Use conventional cell if True.
         """
         if conventional:
             if not self.bonds_cc:
@@ -170,27 +176,33 @@ class Structure:
 
     def compute_conventional_cell(self, tol: float = 0.01) -> None:
         """
-        Compute the conventional cell of the structure using pymatgen's SpacegroupAnalyzer.
-        This method creates the following new attributes:
-          - self.conventional_cell : a 3x3 array representing the conventional cell lattice.
-          - self.atoms_cc     : a list of Atom objects for the conventional cell,
-                                including those at the boundaries.
-          - self.bonds_cc     : a list of Bond objects computed from atoms_cc
-                                based on self.bond_cutoff.
-          - self.spins_cc     : a list of Spin objects (default zero magnitude)
-                                corresponding to atoms_cc.
+        Compute the conventional cell of the structure using pymatgen's 
+        SpacegroupAnalyzer. This method creates the following new attributes:
+        
+        - self.conventional_cell : a 3x3 array representing the conventional 
+          cell lattice.
+        - self.atoms_cc : a list of Atom objects for the conventional cell, 
+          including those at the boundaries.
+        - self.bonds_cc : a list of Bond objects computed from atoms_cc based 
+          on self.bond_cutoff.
+        - self.spins_cc : a list of Spin objects (default zero magnitude) 
+          corresponding to atoms_cc.
 
         The procedure is as follows:
-          1. Build a pymatgen Structure from the current unit cell and atom list.
-          2. Use SpacegroupAnalyzer to get the conventional standard structure.
-          3. Retrieve the fractional coordinates and species from the conventional structure.
-          4. Expand the fractional positions using shifts in [-1, 0, 1]³ to capture boundary atoms.
-          5. Convert the expanded fractional coordinates into Cartesian coordinates
-             using the new lattice.
-          6. Create the new Atom, Bond, and Spin lists accordingly.
+        
+        1. Build a pymatgen Structure from the current unit cell and atom list.
+        2. Use SpacegroupAnalyzer to get the conventional standard structure.
+        3. Retrieve the fractional coordinates and species from the 
+           conventional structure.
+        4. Expand the fractional positions using shifts in [-1, 0, 1]³ to 
+           capture boundary atoms.
+        5. Convert the expanded fractional coordinates into Cartesian 
+           coordinates using the new lattice.
+        6. Create the new Atom, Bond, and Spin lists accordingly.
 
         Args:
-            tol (float): Tolerance for including atoms that lie on the boundaries (default 0.01).
+            tol (float): Tolerance for including atoms that lie on the 
+                 boundaries (default 0.01).
         """
 
         # Build a pymatgen structure from current unit cell and atoms.
