@@ -163,7 +163,7 @@ def get_neighbors_list(cluster, sites, cutoff=2.0, verbose=False):
         Dictionary of neighbors for each atom, sorted by distance.
     """
     neighbors = {}
-    for iatom, atom in enumerate(sites):
+    for iatom, _ in enumerate(sites):
         neighbors[iatom] = cluster.get_neighbors(cluster[iatom], cutoff)
         neighbors[iatom] = sorted(
             neighbors[iatom], key=lambda neighbor: neighbor.nn_distance
@@ -244,13 +244,13 @@ def get_fermi_energy(report_file="report.out"):
         for line in file:
             if "Fermi energy:" in line:
                 fermi_energy = float(line.split()[2])
-                print ("E_F: ", fermi_energy)
                 break
 
     if fermi_energy is None:
         raise ValueError("Fermi energy not found in the report file.")
 
     return fermi_energy
+
 
 def find_matching_indices(cluster, neighbors):
     """
