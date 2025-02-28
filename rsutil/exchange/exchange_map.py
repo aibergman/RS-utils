@@ -277,15 +277,16 @@ def find_matching_indices(cluster: Molecule, neighbors: dict) -> dict:
     for atom, neighbor_list in neighbors.items():
         atom_indices: list[int] = []
         for neighbor in neighbor_list:
-            for i, site in enumerate(cluster):
-                if site.species_string == neighbor.species_string and np.allclose(
-                    site.coords, neighbor.coords, atol=1e-5
-                ):
-                    atom_indices.append(i + 1)
-                    break
+            atom_indices.append(neighbor.index + 1)
+            # for i, site in enumerate(cluster):
+            #     if site.species_string == neighbor.species_string and np.allclose(
+            #         site.coords, neighbor.coords, atol=1e-5
+            #     ):
+            #         atom_indices.append(i + 1)
+            #         break
         matching_indices[atom] = atom_indices
 
-        return matching_indices
+    return matching_indices
 
 
 def store_jij_namelist(input_nml: dict, matching_indices: dict, atom_index: int) -> dict:

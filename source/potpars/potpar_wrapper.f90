@@ -21,8 +21,8 @@ contains
     
     do I = 1, lat_data%nbulk_bulk
       call process_one_atom(pot_data, atm_input, lat_data, lat_input, element, I)
-      ! write(*,*) atm_input%label(I)
-      ! write(*,*) element%symbol
+       write(*,*) atm_input%label(I)
+       write(*,*) element%symbol
       filename = trim(adjustl(atm_input%label(I))) // ".nml"
       call write_atom(filename, element, pot_data)
     end do
@@ -42,12 +42,12 @@ contains
     ! Local variables
     type(lmto_t) :: lm
 
-    ! print *,'-------------------------------------------------'
-    ! print *,'Processing atom', iatom
-    ! print *,'Atomic number:', atm_input%atomic_number(iatom)
-    ! print *,'Wigner-Seitz radius:', lat_data%ws(iatom)
-    ! print *,'Label:', atm_input%label(iatom)
-    ! print *,'-------------------------------------------------'
+    print *,'-------------------------------------------------'
+    print *,'Processing atom', iatom
+    print *,'Atomic number:', atm_input%atomic_number(iatom)
+    print *,'Wigner-Seitz radius:', lat_data%ws(iatom)
+    print *,'Label:', atm_input%label(iatom)
+    print *,'-------------------------------------------------'
 
     lm%z(1) = 1.0d0*atm_input%atomic_number(iatom)
     lm%wsr(1) = lat_data%ws(iatom)
@@ -190,8 +190,11 @@ contains
 
     element%symbol = atom%label(iatom)
     element%atomic_number = atom%atomic_number(iatom)
-    element%valence = sum(potential%ql(1,:,:))
+    element%valence = nint(1000.0d0*sum(potential%ql(1,:,:)))/1000.0d0
+    ! print *,'AB valence:', potential%ql(1,:,:)
+    ! print *,'AB sum valence:', sum(potential%ql(1,:,:))
     element%core = element%atomic_number - element%valence
+    !print *,'AB core:', element%atomic_number, element%valence
 
     element%num_quant_s = int(potential%pl(1,1))
     element%num_quant_p = int(potential%pl(2,1))

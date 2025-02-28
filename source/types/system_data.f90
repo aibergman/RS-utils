@@ -11,6 +11,7 @@ module system_data
   type :: lattice_t
     ! Declare integer variables
     integer :: nbulk_bulk
+    integer :: nbulk_org
     integer :: ntot
     integer :: ntype
     integer :: nbas
@@ -80,6 +81,8 @@ module system_data
     real(kind=8) :: alat             ! Lattice parameter
     character(len=8) :: crystal_sym  ! Crystal symmetry ('bcc', 'fcc', 'file', etc.)
     real(kind=8) :: wav              ! Average WS radius
+    logical*1 :: pbc                 ! Periodic BC
+    integer :: ndim                  ! Rough atom estimate
   end type lattice_inp
 
   !-------------------------------------------------------------------

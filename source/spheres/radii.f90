@@ -88,12 +88,12 @@ subroutine radii
         read (INI, *)
     end do
     read (INI, *) ISP1, ISP2
-    if (DB) print *,'ISP1, ISP2: ', ISP1, ISP2
+    if (DB) write(16, *) 'ISP1, ISP2: ', ISP1, ISP2
     read (INI, *)
     read (INI, *)
     read (INI, *)
     read (INI, *) ALAT
-    if (DB) print *,' ALAT:', ALAT
+    if (DB) write(16, *) 'ALAT:', ALAT
     read (INI, *)
     read (INI, *)
     read (INI, *)
@@ -102,7 +102,7 @@ subroutine radii
     read (INI, *)
     read (INI, *)
     read (INI, *) (AV(I), I=1, 3)
-    if (DB) print *, 'AV:',(AV(I), I=1, 3)
+    if (DB) write(16, *) 'AV:',(AV(I), I=1, 3)
     read (INI, *) (BV(I), I=1, 3)
     read (INI, *) (CV(I), I=1, 3)
     if (DB) print *, 'BV:',(BV(I), I=1, 3)
@@ -311,7 +311,7 @@ subroutine READRO(NSORT, RO, Z, R0, TXT, ROM, NRADMAX, NRAD1)
     do ISORT = 1, NSORT
         if (Z(ISORT) < 0) then
             IZNUC = -10
-            print *,'CALING QZZZZZZC'
+            write(16, *) 'CALING QZZZZZZC'
             call QZZC(TXT(ISORT), IZNUC, IZC)
             Z(ISORT) = IZNUC
         end if

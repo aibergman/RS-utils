@@ -561,7 +561,7 @@ class Visualizer:
         cell = self.cell
         if cell is not None:
             origin = np.array([0, 0, 0])
-            a, b, c = cell[0], cell[1], cell[2]
+            a, b, c = cell.T[0], cell.T[1], cell.T[2]
             corners = np.array([origin, a, a + b, b, c, a + c, a + b + c, b + c])
             edges = [(0, 1), (1, 2), (2, 3), (3, 0), (0, 4), (1, 5), (2, 6),
                      (3, 7), (4, 5), (5, 6), (6, 7), (7, 4), ]
@@ -569,7 +569,7 @@ class Visualizer:
             lines.points = np.array(corners)
             lines.lines = np.hstack([[2, edge[0], edge[1]] for edge in edges])
 
-            self._extent_actor = self.plotter.add_mesh(lines, color="black", line_width=3)
+            self._extent_actor = self.plotter.add_mesh(lines, color="black", line_width=4)
             # corners = np.array([origin, a, b, c, a + b, a + c, b + c, a + b + c])
             # xmin, ymin, zmin = corners.min(axis=0)
             # xmax, ymax, zmax = corners.max(axis=0)

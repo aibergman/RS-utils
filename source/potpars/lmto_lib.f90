@@ -270,6 +270,11 @@ subroutine defmom(konfig, lafm, lfree, lmx, nclass, nl, nsp, pnu, qnu, z)
          dq0 = 0.20d0*qnuc
          qnu(0, l, 1, ic) = qnuc - dq0
          qnu(0, l, 2, ic) = qnuc + dq0
+         ! Avoid more than 5.0 d-electrons in majority band
+         if (qnu(0, l, 2, ic) > 5.0d0) then
+            qnu(0, l, 1, ic) = qnu(0, l, 1, ic) + (qnu(0, l, 2, ic) - 5.0d0)
+            qnu(0, l, 2, ic) = 5.0d0
+         end if
       end do
       return
    end if
@@ -278,10 +283,14 @@ subroutine defmom(konfig, lafm, lfree, lmx, nclass, nl, nsp, pnu, qnu, z)
       iz = idnint(z(ic))
       call defcnf(konfdf, lmxc, z(ic))
       call atmoms(k0, q0, z(ic))
+      ! print '(a,4f12.6,f10.4)',' AB test: atmoms    ', (qnuat(:, iz)), sum(qnuat(:, iz))
+      ! print *,' AB test: konfig  ', konfig(:, ic)
+      ! print *,' AB test: konfdf  ', konfdf(:), lmx(ic)
       do isp = 1, nsp
          do l = 0, nl - 1
             ! print *,'>> zeroth',ic,l,q0(l),qnuat(l,iz), qnu(0, l, isp, ic)
             if (l .le. 3) then
+               ! AB common case
                if (konfig(l, ic) .eq. konfdf(l)) then
                   ! print *,' >> check',l, lmx(ic),qnu(0, l, isp, ic) , dble(qnuat(l, iz))/nsp
                   if (l .le. lmx(ic)) qnu(0, l, isp, ic) = dble(qnuat(l, iz))/nsp
@@ -290,51 +299,52 @@ subroutine defmom(konfig, lafm, lfree, lmx, nclass, nl, nsp, pnu, qnu, z)
                   ! print *,'>> first',ic,l,q0(l),qnuat(l,iz), qnu(0, l, isp, ic)
                   ! ------------- special: partially filled core states
                   if (konfdf(l) .eq. k0(l) + 1 .and. q0(l) .ne. (4*l + 2)) then
-                     ! print *,'>> special',l, q0(l), qnuat(l, iz)
+                     print *,'>> special',l, q0(l), qnuat(l, iz)
                      qnu(0, l, isp, ic) = dble(qnuat(l, iz) - q0(l))/nsp
                   elseif (int(pnu(l, isp, ic)) .ne. konfig(l, ic)) then
                      ! print *,'Not here?',l, lmx(ic), konfig(l, ic), pnu(l, isp, ic)
                      write (messg, 400) iz, l, konfig(l, ic), pnu(l, isp, ic)
                      call errmsg(messg, 1)
                   end if
-               elseif (konfig(l, ic) .eq. konfdf(l) + 1) then
-                  pnu(l, isp, ic) = konfig(l, ic) + 0.5d0
-                  ! print *,'>> second',l, lmx(ic), konfig(l, ic), konfdf(l)
-                  if (l .le. lmx(ic)) then
-                     if (konfdf(l) .eq. k0(l)) then
-                        ! ----------------- Example N 2s into core
-                        ! print *,'>> konfdf: ',ic,l,q0(l),qnuat(l,iz)
-                        qnu(0, l, isp, ic) = dble(qnuat(l, iz) - q0(l))/nsp
-                     elseif (konfdf(l) .eq. k0(l) - 1) then
-                        ! ----------------- Example U 6p into core
-                        ! print *,'>> konfdf-1: ',ic,l,q0(l),qnuat(l,iz), 2*(l + l + 1)/nsp
-                        qnu(0, l, isp, ic) = dble(qnuat(l, iz) - 2*(l + l + 1))/nsp
-                     else
-                        write (messg, 402) iz, l, konfig(l, ic)
-                        if (isp .eq. 1) call errmsg(messg, 4)
-                     end if
-                  end if
-                  write (messg, 401) iz, l
-                  if (isp .eq. 1) call errmsg(messg, 0)
-               elseif (konfig(l, ic) .eq. konfdf(l) - 1) then
-                  ! print *,'>> third',l, lmx(ic), konfig(l, ic), konfdf(l)
-                  pnu(l, isp, ic) = konfig(l, ic) + 0.5d0
-                  if (l .le. lmx(ic)) then
-                     if (konfig(l, ic) .eq. k0(l) - 1) then
-                        ! ----------------- Example Na 2p into valence
-                        ! print *,'>> konfig-1: ',ic,l,q0(l),qnuat(l,iz), 2*(l + l + 1)/nsp
-                        qnu(0, l, isp, ic) = dble(qnuat(l, iz) + 2*(l + l + 1))/nsp
-                     elseif (konfig(l, ic) .eq. k0(l)) then
-                        ! print *,'>> konfig: ',ic,l,q0(l),qnuat(l,iz)
-                        ! ----------------- Example O 2s into valence
-                        qnu(0, l, isp, ic) = dble(qnuat(l, iz) + q0(l))/nsp
-                     else
-                        write (messg, 402) iz, l, konfig(l, ic)
-                        if (isp .eq. 1) call errmsg(messg, 4)
-                     end if
-                  end if
-                  write (messg, 401) iz, l
-                  if (isp .eq. 1) call errmsg(messg, 0)
+                  
+               !! elseif (konfig(l, ic) .eq. konfdf(l) + 1) then
+               !!    pnu(l, isp, ic) = konfig(l, ic) + 0.5d0
+               !!    ! print *,'>> second',l, lmx(ic), konfig(l, ic), konfdf(l)
+               !!    if (l .le. lmx(ic)) then
+               !!       if (konfdf(l) .eq. k0(l)) then
+               !!          ! ----------------- Example N 2s into core
+               !!          ! print *,'>> konfdf: ',ic,l,q0(l),qnuat(l,iz)
+               !!          qnu(0, l, isp, ic) = dble(qnuat(l, iz) - q0(l))/nsp
+               !!       elseif (konfdf(l) .eq. k0(l) - 1) then
+               !!          ! ----------------- Example U 6p into core
+               !!          ! print *,'>> konfdf-1: ',ic,l,q0(l),qnuat(l,iz), 2*(l + l + 1)/nsp
+               !!          qnu(0, l, isp, ic) = dble(qnuat(l, iz) - 2*(l + l + 1))/nsp
+               !!       else
+               !!          write (messg, 402) iz, l, konfig(l, ic)
+               !!          if (isp .eq. 1) call errmsg(messg, 4)
+               !!       end if
+               !!    end if
+               !!    write (messg, 401) iz, l
+               !!    if (isp .eq. 1) call errmsg(messg, 0)
+               !! elseif (konfig(l, ic) .eq. konfdf(l) - 1) then
+               !!    ! print *,'>> third',l, lmx(ic), konfig(l, ic), konfdf(l)
+               !!    pnu(l, isp, ic) = konfig(l, ic) + 0.5d0
+               !!    if (l .le. lmx(ic)) then
+               !!       if (konfig(l, ic) .eq. k0(l) - 1) then
+               !!          ! ----------------- Example Na 2p into valence
+               !!          ! print *,'>> konfig-1: ',ic,l,q0(l),qnuat(l,iz), 2*(l + l + 1)/nsp
+               !!          qnu(0, l, isp, ic) = dble(qnuat(l, iz) + 2*(l + l + 1))/nsp
+               !!       elseif (konfig(l, ic) .eq. k0(l)) then
+               !!          ! print *,'>> konfig: ',ic,l,q0(l),qnuat(l,iz)
+               !!          ! ----------------- Example O 2s into valence
+               !!          qnu(0, l, isp, ic) = dble(qnuat(l, iz) + q0(l))/nsp
+               !!       else
+               !!          write (messg, 402) iz, l, konfig(l, ic)
+               !!          if (isp .eq. 1) call errmsg(messg, 4)
+               !!       end if
+               !!    end if
+               !!    write (messg, 401) iz, l
+               !!    if (isp .eq. 1) call errmsg(messg, 0)
                else
                   write (messg, 402) iz, l, konfig(l, ic)
                   if (isp .eq. 1) call errmsg(messg, 4)
@@ -344,8 +354,8 @@ subroutine defmom(konfig, lafm, lfree, lmx, nclass, nl, nsp, pnu, qnu, z)
             end if
          end do
          ! print *,'0 DEFMOM:',ic,isp,qnu(0,2,isp,ic)
-         fac = dsum(nl, qnu(0, 0, isp, ic), 3)
-         ! AB deactivate filling f-core states
+         ! fac = dsum(nl, qnu(0, 0, isp, ic), 3)
+         ! ! AB deactivate filling f-core states
          ! print *,' FAC:',fac, nl, dsum(4 - nl, qnuat(nl, iz), 1)/nsp
          ! if (fac .gt. tiny) then
          !    fac = (dsum(nl, qnu(0, 0, isp, ic), 3) +                              &
@@ -367,6 +377,15 @@ subroutine defmom(konfig, lafm, lfree, lmx, nclass, nl, nsp, pnu, qnu, z)
          qnu(0, 0, isp, ic) = qnu(0, 0, isp, ic)*0.001d0
          ! print *,'B DEFMOM:',ic,isp,qnu(0,2,isp,ic)
       end do
+      ! f-electron treatment
+      ! print *,'AB nelec:', qnuat(0:2, iz)
+      ! print *,'AB felec:', qnuat(3, iz)
+      fac = abs(qnuat(3, iz) - int(qnuat(3, iz)))
+      ! print *,'AB qnu : ', qnu(0, :, :, ic)
+      ! print *,'AB fac:', fac
+      if (fac .gt. tiny) then
+         qnu(0, 2, :, ic) = qnu(0, 2, :, ic) + 0.5d0 * fac
+      end if
       ! ..AB. neutralize qnu if l<l_default is used
       !!! dq1 = sum(qnu(0, :, :, ic)) - sum(q0(:))
       !!! !dq1 = 0.0d0
@@ -384,23 +403,26 @@ subroutine defmom(konfig, lafm, lfree, lmx, nclass, nl, nsp, pnu, qnu, z)
       ! ----- for spin polarized calculation: different moments for spin up
       ! ----- and spin down
       if (nsp .eq. 2) then
+         ! print *,' AB test: pre SPIN  ', qnu(0, 2, :, ic) 
+         ! print *,' AB test: pre SPIN  ', sum(qnu(0, :, :, ic) )
          do l = 0, nl - 1
-            ! New approach : spin polarize d-band by 20%
+            ! New approach : spin polarize spd-bands with 1%
             qnuc = qnu(0, l, 1, ic)
-            dq0 = 0.1d0 * l * qnuc
+            dq0 = 0.01d0 * l * qnuc
+
+            ! Override cases for expected magnetic materials Cr, Mn, Fe, Co, Ni
+            if (l==2) then
+               if (z(ic)>=24.0 .and. z(ic)<=28) then
+                  dq0 = sqrt(28.5d0-z(ic)) / 2.0d0
+               end if
+            end if
+
+            if (qnuc + dq0 > 5.0d0) dq0 = 0.0d0
+
             qnu(0, l, 1, ic) = qnuc - dq0
             qnu(0, l, 2, ic) = qnuc + dq0
-            ! qnuc = qnu(0, l, 1, ic)
-            ! dq0 = 0.05d0
-            ! if (l >= 2 .and. qnuc > 3.0d0) dq0 = 0.50d0
-            ! !           dq0=0.05d0
-            ! if (lafm .and. ic + ic .gt. nclass) dq0 = -dq0
-            ! if (qnuc - dabs(dq0) .gt. 0.d0 .and.                             &
-            !    &          qnuc + dabs(dq0) .lt. dble(4*l + 2)) then
-            !    qnu(0, l, 1, ic) = qnuc - dq0
-            !    qnu(0, l, 2, ic) = qnuc + dq0
-            ! end if
          end do
+         ! print *,' AB test: aft SPIN  ', qnu(0, 2, :, ic) 
       end if
       ! print *,'D DEFMOM:',ic,isp,qnu(0,2,isp,ic)
    end do

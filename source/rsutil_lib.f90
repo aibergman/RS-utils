@@ -54,7 +54,8 @@ subroutine process_lattice()  bind(c,name='process_lattice')
   ! This subroutine processes the lattice data to generate new basis,
   ! labels, and atomic numbers.
   !-----------------------------------------------------------------
-  call expand_and_fill_arrays(lat_data)
+  print *,'Lattice parameter:' , lat_input%alat
+  call expand_and_fill_arrays(lat_data, lat_input%alat)
 
   !-----------------------------------------------------------------
   ! Copy the updated data to the lattice_t type.

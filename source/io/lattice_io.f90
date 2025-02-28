@@ -6,6 +6,7 @@ module lattice_io
 
     ! Declare integer variables
     integer :: nbulk_bulk
+    integer :: nbulk_org
     integer :: ntot
     integer :: ntype
     integer :: nbas
@@ -84,6 +85,9 @@ contains
     ! Close the file
     close(10)
 
+    ! Store original no. atoms
+    nbulk_org = nbulk_bulk
+
     print *, "Namelist read successfully."
 
     call copy_to_lattice_t(lattice_struct)
@@ -119,7 +123,7 @@ contains
     write(20, '(A, I4)') "ntype = ", ntype
     write(20, '(A, I4)') "nbas = ", nbas
     write(20, '(A, I4)') "nrec = ", nrec
-  
+
     ! Write the matrix `a`
     call write_array_2d(20, a, 3, 3, 'a')
   
@@ -203,6 +207,7 @@ contains
   subroutine copy_to_lattice_t(lattice_struct)
     implicit none
     type(lattice_t), intent(out) :: lattice_struct
+    integer :: i, j
 
     lattice_struct%nbulk_bulk = nbulk_bulk
     lattice_struct%ntot = ntot
@@ -211,6 +216,11 @@ contains
     lattice_struct%nrec = nrec
 
     allocate(lattice_struct%a(size(a, 1), size(a, 2)))
+    ! do i = 1, size(a,1)
+    !    do j = 1, size(a,2)
+    !       lattice_struct%a(j,i) = a(j,i)
+    !    end do
+    ! end do
     lattice_struct%a = a
 
     allocate(lattice_struct%crd(size(crd, 1), size(crd, 2)))
@@ -320,12 +330,14 @@ contains
     end subroutine initialize_arrays_to_nbulk
 
     ! Declare allocatable real arrays and variables
-    subroutine expand_and_fill_arrays(lat_data)
+    subroutine expand_and_fill_arrays(lat_data, lat_param)
       implicit none
 
       type(lattice_t), intent(in) :: lat_data
+      real*8, intent(in) :: lat_param
 
       integer :: i, old_size
+      real*8 :: vol, arad
 
       ! Store the old size
       old_size = size(izp)
@@ -357,6 +369,14 @@ contains
       call expand_array(ws, lat_data%nbulk_bulk)
 
       ! Fill the new entries with running numbers
+      call  calculate_cell_volume(lat_data%a, vol)
+      print *, 'Volume: ', vol
+      print *, 'Nbulk_org: ', nbulk_org, acos(-1.0d0)
+      vol = vol * lat_param**3
+      vol = vol / nbulk_org
+      print *, 'Volume per atom: ', vol
+      arad = (3.0d0/(4.0d0*acos(-1.0d0))*vol)**0.333333333d0
+      print *,'Average radius:', arad
       do i = 1, lat_data%nbulk_bulk
         izp(i) = i
         no(i) = i
@@ -366,8 +386,8 @@ contains
         ! Copy ws even if not included in namelist
         ws(i) = lat_data%ws(i)
         ! Set a default ct scaling here. Actual scaling = 1.5*1.88 due to bohr vs Å
-        ct(i) = sqrt(2.01d0) * lat_data%ws(i)
-        print *, "ct(", i, ") = ", ct(i)
+        ct(i) = 3.01d0 * arad
+        !ct(i) = sqrt(2.01d0) * lat_data%ws(i)
       end do
 
       ! Calculate r2 as max(ct)^2
@@ -415,5 +435,26 @@ contains
       ! Deallocate temporary array
       deallocate(temp)
     end subroutine expand_array_real
+
+   subroutine calculate_cell_volume(a, volume)
+       implicit none
+       real(8), dimension(3,3) :: a  ! Lattice vectors (3x3 matrix)
+       real(8) :: volume              ! Volume of the unit cell
+       real(8) :: cross_product(3)    ! Cross product of a2 and a3
+       real(8) :: dot_product         ! Dot product of a1 and cross_product
+   
+       ! Calculate the cross product of a2 and a3
+       cross_product(1) = a(2,2) * a(3,3) - a(2,3) * a(3,2)
+       cross_product(2) = a(2,3) * a(3,1) - a(2,1) * a(3,3)
+       cross_product(3) = a(2,1) * a(3,2) - a(2,2) * a(3,1)
+   
+       ! Calculate the dot product of a1 with the cross product
+       dot_product = a(1,1) * cross_product(1) + a(1,2) * cross_product(2) + a(1,3) * cross_product(3)
+   
+       ! The volume is the absolute value of the dot product
+       volume = abs(dot_product)
+   
+   end subroutine calculate_cell_volume
+
 
 end module lattice_io

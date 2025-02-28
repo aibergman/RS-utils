@@ -23,14 +23,14 @@ contains
         ! Temporary variables for reading the lattice namelist.
         ! The names here must match the variable names in the input file.
         !-------------------------------------------------------------------
-        integer :: rc
+        integer :: rc, ndim=10000
         real(kind=8) :: alat
         character(len=8) :: crystal_sym
         real(kind=8) :: wav
-        logical :: pbc, b1, b2, b3
-        integer :: n1, n2, n3
+        logical :: pbc=.true., b1, b2, b3
+        integer :: n1, n2, n3, i, pos, j
 
-        namelist /lattice/ rc, alat, crystal_sym, wav, pbc, b1, b2, b3, n1, n2, n3
+        namelist /lattice/ rc, alat, crystal_sym, wav, pbc, b1, b2, b3, n1, n2, n3, ndim
 
         !-------------------------------------------------------------------
         ! Temporary variables for reading the atoms namelist.
@@ -62,8 +62,26 @@ contains
         lat%alat = alat
         lat%crystal_sym = crystal_sym
         lat%wav = wav
+        lat%pbc = pbc
+        lat%ndim = ndim
 
         atm%database = database
+         ! Strip any digits from the label
+         do i = 1, ntype
+             label(i) = adjustl(label(i))
+             label(i) = trim(adjustl(label(i)))
+             !      ! Loop to find the position where the number starts
+             !  do j = len_trim(label(i)), 1, -1
+             !     if (ichar(label(i)(j:j)) < ichar('0') .or. ichar(label(i)(j:j)) > ichar('9')) then
+             !        pos = j
+             !        exit
+             !     end if
+             !  end do
+             ! if (pos > 0) then
+             !    label(i) = label(i)(1:pos)  ! Take the substring before the digit
+             ! end if
+             print *,'Label:', label(i)
+         end do
         atm%label = label
         atm%atomic_number = get_atomic_numbers(label, ntype)
 
@@ -95,6 +113,8 @@ contains
           write(unit, '(A, F12.6)') "alat = ", lat%alat
           write(unit, '(A, A)') "crystal_sym = ", "'" // trim(lat%crystal_sym) // "'"
           write(unit, '(A, F12.10)') "wav = ", lat%wav
+          write(unit, '(A, L)') "pbc = ", lat%pbc
+          write(unit, '(A, I0)') "ndim = ", lat%ndim
           write(unit, '(A)') "/"
         end subroutine write_lattice_block
       
@@ -229,7 +249,7 @@ contains
       character(len=*), intent(in) :: labels(:)
       integer, intent(in) :: ntype
       integer :: atomic_numbers(ntype)
-      integer :: i, j
+      integer :: i, j, pos
       character(len=2) :: sym
 
       ! Define a lookup table of element symbols (all two characters).
@@ -265,9 +285,10 @@ contains
       do i = 1, ntype
          ! Extract the first two characters from the label.
          sym = adjustl(labels(i)(1:2))
-         ! If the first character is a digit, take only the first character.
-         if (index('0123456789', sym(1:1)) > 0) then
-            sym = adjustl(labels(i)(1:1))
+         ! Remove digits from label
+         pos = scan(sym, '0123456789') 
+         if ( pos > 1) then
+            sym = sym(1:pos-1)
          endif
          ! Trim and pad the symbol to length 2.
          sym = trim(sym)

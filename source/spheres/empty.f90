@@ -54,7 +54,7 @@ subroutine EMPTYSPHERES(AVC, BVC, CVC, BAS, IS, ALAT, NATOM, &
             end do
         end if
         call VEC(VC(1, IGC), BAS(1, IQA(IGC)), VV, GEN(1, 1, IGC))
-        !        print*,Igc,ig,(vc(i,igc),i=1,3)
+                print*,Igc,ig,(vc(i,igc),i=1,3)
     end do
     !
     do I = 1, NG
@@ -81,6 +81,7 @@ subroutine EMPTYSPHERES(AVC, BVC, CVC, BAS, IS, ALAT, NATOM, &
     do I = 1, NSORTES
         write (16, '(3f21.15)') (TAUES(J, I), J=1, 3)
     end do
+    write (16, *) 'Spheres done!'
     !      stop
 end subroutine EMPTYSPHERES
 !*==empty.f    processed by SPAG 7.10RU at 07:46 on 26 Mar 2020
@@ -421,13 +422,12 @@ subroutine EMPTY(IER, AVC, BVC, CVC, BAS, IS, ALAT, NATOM, NSORT, &
     SVOLE = 0.D0
     do ISORT = 1, NSORTES
         SVOLE = SVOLE + NHSORTES(ISORT) * PI43 * SES(ISORT)**3
-        !        print*,'SES::',ses(isort),isort
     end do
     CVOL = TRNT(AVC, BVC, CVC) * ALAT**3
     CS = CVOL / (SVOLA + SVOLE)
     SVOLA = SVOLA * CS
     SVOLE = SVOLE * CS
-    CS = CS**(1.D0 / 3.D0)
+    CS = abs(CS)**(1.D0 / 3.D0)
     do ISORT = 1, NSORT
         S(ISORT) = CS * S(ISORT)
     end do

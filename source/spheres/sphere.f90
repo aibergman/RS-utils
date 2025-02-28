@@ -47,6 +47,7 @@ contains
         NRADMAX = NRMAX - 1
         DPAS = 0.05D0
         NDNEV = 14
+        ! DB = .true.
         DB = .false.
         N1ES = 24
         N2ES = 24
@@ -71,7 +72,7 @@ contains
         integer :: ISP1, ISP2, I, J, IDUM, INI
 
         NEED_ES = 0
-        RMINES = 1.5
+        RMINES = 1.2
         RMAXES = 2.5
 
         ALAT = lat_inp%alat*ANGSTROM_TO_BOHR
@@ -166,7 +167,7 @@ contains
         AMTC = 9999D0
         RHOSITE(:, :) = 9999D0
 
-        write(16, *) "TXTT:", TXTT
+        write(16, *) "TXTT:", TXTT(1:NT)
         call READRO(NT, AMTC, Z, R0, TXTT, RHOSITE, NRADMAX, NRAD1)
 
         do IT = 1, NT
@@ -187,7 +188,7 @@ contains
             ISORT = IMQ(IMT(ITYPE))
             ZN = Z(ITYPE)
             call DEFWSR(WS, ZN)
-            if (DB) print*, 'type:', ITYPE, ' Z=', ZN, ' Rad=', WS, ' conc=', CONC(ITYPE)
+            if (DB) write(16,*) 'type:', ITYPE, ' Z=', ZN, ' Rad=', WS, ' conc=', CONC(ITYPE)
             WSREST(ISORT) = WSREST(ISORT) + WS * CONC(ITYPE)
             ZZ(ISORT) = ZZ(ISORT) + ZN * CONC(ITYPE)
             do IPNT = 1, NRAD1
@@ -227,6 +228,13 @@ contains
 
         NATOMNEW = NATOM
         if (NEED_ES == 0) then
+            call EMPTYSPHERES(AV, BV, CV, BAS, IMQ, ALAT, NATOM, NSORT, RWS, NSORTES, TAUES, SES, MAX2SORT, ITOP, IQA, NG, &
+               ISNEW, BASNEW, NATOMNEW)
+            do I = NATOM+1, NATOMNEW
+                RWS(I) = SES(ISNEW(I)-NM)
+            end do
+            NATOMNEW = NATOM
+
             call EMPTYSPHERES(AV, BV, CV, BAS, IMQ, ALAT, NATOM, NSORT, RWS, NSORTES, TAUES, SES, MAX2SORT, ITOP, IQA, NG, &
                ISNEW, BASNEW, NATOMNEW)
             do I = NATOM+1, NATOMNEW
@@ -365,6 +373,7 @@ contains
                 lat_data%ws(I) = RWS(I)
             end do
 
+            print *,' Test label :',atm_input%label(temp_nbulk_bulk)
             ! Fill arrays with new data
             do I = temp_nbulk_bulk + 1, NATOMNEW
                 lat_data%crd(:, I) = BASNEW(:, I)
@@ -373,6 +382,7 @@ contains
                 lat_data%ws(I) = RWS(I)
             end do
             lat_data%nbulk_bulk = NATOMNEW
+         
         !else
         !    ! No new atoms: Update RWS only
         !    do I = 1, lat_data%nbulk_bulk
