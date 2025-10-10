@@ -10,11 +10,11 @@ contains
     ! Opens the file, reads the namelist groups &lattice and &atoms,
     ! and then assigns the values to the derived type variables.
     !-------------------------------------------------------------------
-    subroutine read_input_namelists(filename, lat, atm, ntype)
+    subroutine read_input_namelists(filename, lat, atm, lat_lat)
         character(len=*), intent(in)  :: filename
         type(lattice_inp), intent(out) :: lat
         type(atoms_inp), intent(out) :: atm
-        integer, intent(in) :: ntype
+        type(lattice_t), intent(in)   :: lat_lat
 
         ! Local variables
         integer :: unit, ioerr
@@ -29,8 +29,13 @@ contains
         real(kind=8) :: wav
         logical :: pbc=.true., b1, b2, b3
         integer :: n1, n2, n3, i, pos, j
+        ! Additions from previous lattice.nml entries
+        integer :: ntype = 0
+        real(rp), allocatable :: ct(:)
+        real(rp) :: r2
 
-        namelist /lattice/ rc, alat, crystal_sym, wav, pbc, b1, b2, b3, n1, n2, n3, ndim
+        namelist /lattice/ rc, alat, crystal_sym, wav, pbc, b1, b2, b3, n1, n2, n3, ndim, &
+            ntype, ct, r2
 
         !-------------------------------------------------------------------
         ! Temporary variables for reading the atoms namelist.
@@ -39,6 +44,9 @@ contains
         character(len=8), allocatable :: label(:)
         namelist /atoms/ database, label
 
+        ! Local variables
+        integer :: read_status
+
         ! Open the file for reading.
         open(newunit=unit, file=filename, status='old', action='read', iostat=ioerr)
         if (ioerr /= 0) then
@@ -46,13 +54,43 @@ contains
             stop 1
         end if
 
+        ! Set ntype to zero to track if it was read from the file.
+        ntype = lat_lat%ntype
+        r2 = lat_lat%r2
+
+        ! Read the &lattice namelist.
+        read(unit, nml=lattice,  iostat=read_status)
+        ! If reading files, allocate ct array with ntype elements.
+        if (read_status /= 0) then
+
+           ! Allocate ct if needed
+           if (.not. allocated(ct)) allocate(ct(ntype))
+
+           ! Re-read the namelist after allocating arrays
+           rewind(unit)  ! Rewind the file for a fresh read
+           read(unit, nml=lattice)
+        end if
+
+        ! Catch if ct was not defined in input.nml
+        if (.not. allocated(ct)) then
+            allocate(ct(ntype))
+            if(allocated(lat_lat%ct)) then
+               ct = lat_lat%ct
+            else
+               ct = alat * 0.8_rp
+            end if
+        end if
+
+        ! Check if r2 makes sense
+         if (r2 == 0.0_rp) then
+            r2 = (1.005d0*maxval(ct))**2
+         end if
+
         ! Re-allocate atom label array
         allocate(atm%label(ntype))
         allocate(atm%atomic_number(ntype))
         allocate(label(ntype))
 
-        ! Read the &lattice namelist.
-        read(unit, nml=lattice)
         ! Read the &atoms namelist.
         read(unit, nml=atoms)
         close(unit)
@@ -64,6 +102,10 @@ contains
         lat%wav = wav
         lat%pbc = pbc
         lat%ndim = ndim
+        lat%ntype = ntype
+        lat%r2 = r2
+        allocate(lat%ct(lat%ntype))
+        lat%ct = ct
 
         atm%database = database
          ! Strip any digits from the label
@@ -108,13 +150,24 @@ contains
           implicit none
           integer, intent(in) :: unit
           type(lattice_inp), intent(in) :: lat
+          integer :: itype
+
           write(unit, '(A)') "&lattice"
+          write(unit, '(A, I0)') "ntype = ", lat%ntype
           write(unit, '(A, I0)') "rc = ", lat%rc
           write(unit, '(A, F12.6)') "alat = ", lat%alat
           write(unit, '(A, A)') "crystal_sym = ", "'" // trim(lat%crystal_sym) // "'"
           write(unit, '(A, F12.10)') "wav = ", lat%wav
           write(unit, '(A, L)') "pbc = ", lat%pbc
           write(unit, '(A, I0)') "ndim = ", lat%ndim
+          if (all(lat%ct == lat%ct(1))) then
+           write(unit, '(A, F10.4)') "ct(:) = ", lat%ct(1)
+          else
+           do itype = 1, lat%ntype
+             write(unit, '(A,I0,A, F10.4)') "ct(", itype, ") = ", lat%ct(itype)
+           end do
+          end if
+          write(unit, '(A, F12.6)') "r2 = ", lat%r2
           write(unit, '(A)') "/"
         end subroutine write_lattice_block
       

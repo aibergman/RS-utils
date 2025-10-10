@@ -33,7 +33,7 @@ subroutine process_lattice()  bind(c,name='process_lattice')
   ! This subroutine reads the &lattice and &atoms groups and sets
   ! the ntype variable.
   !-----------------------------------------------------------------
-  call read_input_namelists("input.nml", lat_input, atm_input, ntype)
+  call read_input_namelists("input.nml", lat_input, atm_input, lat_data)
 
   !-----------------------------------------------------------------
   ! Initialize the spheres module.

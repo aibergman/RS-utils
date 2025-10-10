@@ -21,8 +21,8 @@ contains
     
     do I = 1, lat_data%nbulk_bulk
       call process_one_atom(pot_data, atm_input, lat_data, lat_input, element, I)
-       write(*,*) atm_input%label(I)
-       write(*,*) element%symbol
+      !  write(*,*) atm_input%label(I)
+      !  write(*,*) element%symbol
       filename = trim(adjustl(atm_input%label(I))) // ".nml"
       call write_atom(filename, element, pot_data)
     end do

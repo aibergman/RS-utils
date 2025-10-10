@@ -51,6 +51,10 @@ contains
     integer :: read_status
 
 
+    ! Set variables to zero to track if it is set in the namelist
+    ntype = 0
+    r2 = 0.0_rp
+
     ! Attempt to read namelist without allocating arrays
     open(unit=10, file=filename, status='old', action='read')
     read(10, nml=lattice, iostat=read_status)
@@ -62,7 +66,8 @@ contains
        if (nrec > 0) then
           allocate(a(3, 3), crd(3, nbulk_bulk))
           allocate(izp(nrec), no(nrec), irec(nrec))
-          allocate (ib(ntot), iu(ntot), ct(ntype))
+          allocate (ib(ntot), iu(ntot))
+          if (ntype > 0) allocate(ct(ntype))
           allocate (ws(ntot))
           ! Sett WS to two since it is not read
           ws = 2.0d0
@@ -120,7 +125,7 @@ contains
     write(20, '(A)') "&lattice"
     write(20, '(A, I4)') "nbulk_bulk = ", nbulk_bulk
     write(20, '(A, I4)') "ntot = ", ntot
-    write(20, '(A, I4)') "ntype = ", ntype
+    !!! write(20, '(A, I4)') "ntype = ", ntype
     write(20, '(A, I4)') "nbas = ", nbas
     write(20, '(A, I4)') "nrec = ", nrec
 
@@ -145,14 +150,12 @@ contains
     ! Write the array `irec`
     call write_array(20, irec, nrec, "irec")
   
-    ! Write the array `ct`
-    call write_array(20, ct, ntype, "ct")
+    !!! ! Write the array `ct`
+    !!! call write_array(20, ct, ntype, "ct")
   
-    ! Write the scalar `r2`
-    write(20, '(A, F10.4)') "r2 =", r2
+    !!! ! Write the scalar `r2`
+    !!! write(20, '(A, F10.4)') "r2 =", r2
   
-    ! End the namelist
-    write(20, '(A)') "/"
     ! End the namelist
     write(20, '(A)') "/"
   
@@ -244,8 +247,10 @@ contains
     allocate(lattice_struct%irec(size(irec)))
     lattice_struct%irec = irec
 
-    allocate(lattice_struct%ct(size(ct)))
-    lattice_struct%ct = ct
+    if (allocated(ct)) then
+      allocate(lattice_struct%ct(size(ct)))
+      lattice_struct%ct = ct
+    end if
 
     lattice_struct%r2 = r2
   end subroutine copy_to_lattice_t
@@ -292,9 +297,11 @@ contains
     allocate(irec(size(lattice_struct%irec)))
     irec = lattice_struct%irec
 
-    if (allocated(ct)) deallocate(ct)
-    allocate(ct(size(lattice_struct%ct)))
-    ct = lattice_struct%ct
+    if (allocated(lattice_struct%ct)) then
+      if (allocated(ct)) deallocate(ct)
+      allocate(ct(size(lattice_struct%ct)))
+      ct = lattice_struct%ct
+    end if
 
     r2 = lattice_struct%r2
   end subroutine copy_from_lattice_t
@@ -316,7 +323,7 @@ contains
       if (allocated(ib)) deallocate(ib)
       if (allocated(irec)) deallocate(irec)
       if (allocated(irec)) deallocate(ct)
-      allocate(izp(nbulk_bulk), no(nbulk_bulk), iu(nbulk_bulk), ib(nbulk_bulk), irec(nbulk_bulk), ct(nbulk_bulk))
+      allocate(izp(nbulk_bulk), no(nbulk_bulk), iu(nbulk_bulk), ib(nbulk_bulk), irec(nbulk_bulk))
 
       ! Fill arrays with running numbers
       do i = 1, nbulk_bulk
@@ -325,7 +332,7 @@ contains
         iu(i) = i
         ib(i) = i
         irec(i) = i
-        ct(i) = 4.0d0
+        ! ct(i) = 4.0d0
       end do
     end subroutine initialize_arrays_to_nbulk
 
@@ -365,10 +372,11 @@ contains
       call expand_array(iu, lat_data%nbulk_bulk)
       call expand_array(ib, lat_data%nbulk_bulk)
       call expand_array(irec, lat_data%nbulk_bulk)
-      call expand_array(ct, lat_data%nbulk_bulk)
+      if (allocated(ct)) call expand_array(ct, lat_data%nbulk_bulk)
       call expand_array(ws, lat_data%nbulk_bulk)
 
       ! Fill the new entries with running numbers
+      print *, '-------------------------------------------------'
       call  calculate_cell_volume(lat_data%a, vol)
       print *, 'Volume: ', vol
       print *, 'Nbulk_org: ', nbulk_org, acos(-1.0d0)
@@ -377,6 +385,7 @@ contains
       print *, 'Volume per atom: ', vol
       arad = (3.0d0/(4.0d0*acos(-1.0d0))*vol)**0.333333333d0
       print *,'Average radius:', arad
+      print *, '-------------------------------------------------'
       do i = 1, lat_data%nbulk_bulk
         izp(i) = i
         no(i) = i
@@ -385,13 +394,14 @@ contains
         irec(i) = i
         ! Copy ws even if not included in namelist
         ws(i) = lat_data%ws(i)
-        ! Set a default ct scaling here. Actual scaling = 1.5*1.88 due to bohr vs Å
-        ct(i) = 3.01d0 * arad
-        !ct(i) = sqrt(2.01d0) * lat_data%ws(i)
+        !!! ! Set a default ct scaling here. Actual scaling = 1.5*1.88 due to bohr vs Å
+        !!! ct(i) = 3.01d0 * arad
+        !!! !ct(i) = sqrt(2.01d0) * lat_data%ws(i)
       end do
 
       ! Calculate r2 as max(ct)^2
-      r2 = (1.01d0*maxval(ct))**2
+      r2 = 0.0_rp
+      !!! r2 = (1.01d0*maxval(ct))**2
     end subroutine expand_and_fill_arrays
 
     subroutine expand_array_int(array, new_size)

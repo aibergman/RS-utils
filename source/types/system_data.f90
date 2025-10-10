@@ -77,12 +77,15 @@ module system_data
   ! Derived type for the &lattice namelist in input.nml
   !-------------------------------------------------------------------
   type :: lattice_inp
+    integer :: ntype                 ! Number of types
     integer :: rc                    ! Radius cut
     real(kind=8) :: alat             ! Lattice parameter
     character(len=8) :: crystal_sym  ! Crystal symmetry ('bcc', 'fcc', 'file', etc.)
     real(kind=8) :: wav              ! Average WS radius
     logical*1 :: pbc                 ! Periodic BC
     integer :: ndim                  ! Rough atom estimate
+    real(rp), allocatable :: ct(:)   ! Cutoff radius per site
+    real(rp) :: r2                   ! Max cutoff radius (squared)
   end type lattice_inp
 
   !-------------------------------------------------------------------

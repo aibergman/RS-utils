@@ -373,7 +373,7 @@ contains
                 lat_data%ws(I) = RWS(I)
             end do
 
-            print *,' Test label :',atm_input%label(temp_nbulk_bulk)
+            ! print *,' Test label :',atm_input%label(temp_nbulk_bulk)
             ! Fill arrays with new data
             do I = temp_nbulk_bulk + 1, NATOMNEW
                 lat_data%crd(:, I) = BASNEW(:, I)

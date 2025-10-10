@@ -54,7 +54,7 @@ subroutine EMPTYSPHERES(AVC, BVC, CVC, BAS, IS, ALAT, NATOM, &
             end do
         end if
         call VEC(VC(1, IGC), BAS(1, IQA(IGC)), VV, GEN(1, 1, IGC))
-                print*,Igc,ig,(vc(i,igc),i=1,3)
+        !       print*,Igc,ig,(vc(i,igc),i=1,3)
     end do
     !
     do I = 1, NG
