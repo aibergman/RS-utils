@@ -114,7 +114,7 @@ def read_namelists(input_file: str, lattice_file: str, verbose: bool = False) ->
 
 
 def create_structure_and_analyzer(
-    lattice_nml: dict, input_nml: dict
+    lattice_nml: dict, input_nml: dict, cartesian: bool = True
 ) -> tuple[Structure, SpacegroupAnalyzer, list[int]]:
     """
     Create a Structure object and SpacegroupAnalyzer from lattice and input NML files.
@@ -125,6 +125,9 @@ def create_structure_and_analyzer(
         Parsed lattice NML file.
     input_nml : dict
         Parsed input NML file.
+    cartesian : bool, optional
+        If True (default), treat basis vectors as Cartesian coordinates and convert
+        to fractional. If False, treat as fractional coordinates.
 
     Returns
     -------
@@ -136,7 +139,15 @@ def create_structure_and_analyzer(
     atoms = input_nml["atoms"]["label"]
 
     lattice_matrix = Lattice(lattice)
-    structure = Structure(lattice_matrix, atoms, basis)
+    
+    if cartesian:
+        # Convert Cartesian coordinates to fractional
+        basis_fractional = lattice_matrix.get_fractional_coords(basis)
+        structure = Structure(lattice_matrix, atoms, basis_fractional)
+    else:
+        # Use fractional coordinates as-is
+        structure = Structure(lattice_matrix, atoms, basis)
+    
     spacegroup_analyzer = SpacegroupAnalyzer(structure)
 
     rec_sites = [int(site) for site in lattice_nml["lattice"]["irec"]]
@@ -183,6 +194,110 @@ def get_neighbors_list(
                 )
 
     return neighbors
+
+
+def get_unique_neighbors_per_shell(
+    cluster: Molecule, sites: list[int], cutoff: float = 2.0,
+        shell_width: float = 0.1, verbose: bool = False, spacegroup_analyzer: SpacegroupAnalyzer = None) -> dict[int, list]:
+    """
+    Get unique neighbors per shell for each atom in the cluster.
+    
+    For each neighbor shell (defined by distance), this function returns only one 
+    representative neighbor per unique (species, symmetry-equivalent vector) combination.
+    Symmetry-equivalent vectors (e.g., [1,2,2] and [-1,-2,-2]) are grouped together.
+    This is useful for identifying structurally distinct neighbor environments.
+
+    Parameters
+    ----------
+    cluster : Molecule
+        The cluster object containing atomic sites.
+    sites : list
+        List of atom labels.
+    cutoff : float, optional
+        Cutoff distance to consider neighbors, by default 2.0.
+    shell_width : float, optional
+        Width of each shell to define neighbor groups, by default 0.1.
+    verbose : bool, optional
+        Flag to control printouts, by default False.
+    spacegroup_analyzer : SpacegroupAnalyzer, optional
+        The spacegroup analyzer for applying symmetry operations, by default None.
+
+    Returns
+    -------
+    dict
+        Dictionary of unique neighbors per shell for each atom.
+    """
+    unique_neighbors: dict[int, list] = {}
+    
+    def are_vectors_symmetry_equivalent(v1: np.ndarray, v2: np.ndarray, 
+                                       symm_ops, tolerance: float = 1e-4) -> bool:
+        """Check if two vectors are related by a symmetry operation."""
+        for symm_op in symm_ops:
+            rotated = symm_op.rotation_matrix @ v1
+            if np.allclose(rotated, v2, atol=tolerance):
+                return True
+        return False
+    
+    for iatom, _ in enumerate(sites):
+        center = cluster[iatom]
+        all_neighbors = cluster.get_neighbors(center, cutoff)
+        
+        # Group neighbors by distance shells
+        shell_neighbors = {}
+        for neighbor in all_neighbors:
+            distance = neighbor.nn_distance
+            # Find which shell this neighbor belongs to
+            shell_idx = round(distance / shell_width)
+            shell_distance = shell_idx * shell_width
+            
+            if shell_distance not in shell_neighbors:
+                shell_neighbors[shell_distance] = []
+            shell_neighbors[shell_distance].append(neighbor)
+        
+        # For each shell, keep only one representative per (species, symmetry-equivalent vector) combination
+        unique_list = []
+        seen_combinations = []  # List of (species, representative_vector) tuples
+        symm_ops = spacegroup_analyzer.get_symmetry_operations() if spacegroup_analyzer else []
+        
+        for shell_distance in sorted(shell_neighbors.keys()):
+            for neighbor in shell_neighbors[shell_distance]:
+                vector = neighbor.coords - center.coords
+                species = neighbor.species_string
+                
+                # Check if this (species, vector) is symmetry-equivalent to any seen combination
+                is_new = True
+                if spacegroup_analyzer is not None:
+                    for seen_species, seen_vector in seen_combinations:
+                        if seen_species == species:
+                            if are_vectors_symmetry_equivalent(vector, seen_vector, symm_ops):
+                                is_new = False
+                                break
+                else:
+                    # Fallback without symmetry: exact vector match
+                    for seen_species, seen_vector in seen_combinations:
+                        if seen_species == species and np.allclose(vector, seen_vector, atol=1e-5):
+                            is_new = False
+                            break
+                
+                if is_new:
+                    seen_combinations.append((species, vector))
+                    unique_list.append(neighbor)
+        
+        # Sort by distance
+        unique_neighbors[iatom] = sorted(
+            unique_list, key=lambda neighbor: neighbor.nn_distance
+        )
+        
+        if verbose:
+            print(f"Unique neighbors for atom {iatom}:")
+            for neighbor in unique_neighbors[iatom]:
+                vector = neighbor.coords - center.coords
+                print(
+                    f"  {neighbor.species_string} at {neighbor.coords} "
+                    f"(vector: {vector}), distance: {neighbor.nn_distance:.4f}"
+                )
+    
+    return unique_neighbors
 
 
 # Not working yet
@@ -376,7 +491,8 @@ def store_jij_namelist(input_nml: dict, matching_indices: dict, atom_index: int)
 # lattice_nml_list = [np.array(lattice_nml[key]) for key in lattice_nml]
 # atoms_list = [atom for atom in atoms]
 #
-def exchange_map(cutoff: float = 1.0, verbose: bool = False) -> None:
+def exchange_map(cutoff: float = 1.0, verbose: bool = False, unique: bool = False, 
+                  shell_width: float = 0.1) -> None:
     """
     Main function to read namelists, create structure and analyzer,
     get neighbors, and symmetry reduced neighbors.
@@ -387,16 +503,32 @@ def exchange_map(cutoff: float = 1.0, verbose: bool = False) -> None:
         Cutoff distance to consider neighbors, by default 1.0.
     verbose : bool, optional
         Flag to control printouts, by default False.
+    unique : bool, optional
+        If True, find only unique neighbors per shell (one representative per 
+        unique species-vector combination). Symmetry-equivalent vectors are grouped.
+        by default False.
+    shell_width : float, optional
+        Width of shells for grouping neighbors (used with unique=True), 
+        by default 0.1.
     """
     input_nml, lattice_nml = read_namelists("input.nml", "lattice.nml", verbose=verbose)
-    _, _, rec_sites = create_structure_and_analyzer(lattice_nml, input_nml)
+    structure, spacegroup_analyzer, rec_sites = create_structure_and_analyzer(lattice_nml, input_nml)
 
     if verbose:
         print("Recursion sites:", rec_sites)
+        print(f"Detected spacegroup: {spacegroup_analyzer.get_space_group_symbol()} "
+              f"(#{spacegroup_analyzer.get_space_group_number()})")
+        print(f"Number of symmetry operations: {len(spacegroup_analyzer.get_symmetry_operations())}")
 
     cluster = read_rs_clust("clust", "input.nml")
 
-    neighbors = get_neighbors_list(cluster, rec_sites, cutoff=cutoff, verbose=verbose)
+    if unique:
+        neighbors = get_unique_neighbors_per_shell(
+            cluster, rec_sites, cutoff=cutoff, shell_width=shell_width, 
+            verbose=verbose, spacegroup_analyzer=spacegroup_analyzer
+        )
+    else:
+        neighbors = get_neighbors_list(cluster, rec_sites, cutoff=cutoff, verbose=verbose)
 
     if verbose:
         print(neighbors)
@@ -411,4 +543,39 @@ def exchange_map(cutoff: float = 1.0, verbose: bool = False) -> None:
 
 
 if __name__ == "__main__":
-    exchange_map()
+    import argparse
+    
+    parser = argparse.ArgumentParser(
+        description="Generate exchange interaction mapping from cluster files."
+    )
+    parser.add_argument(
+        "--cutoff",
+        type=float,
+        default=1.0,
+        help="Cutoff distance to consider neighbors (default: 1.0)"
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Enable verbose output"
+    )
+    parser.add_argument(
+        "--unique",
+        action="store_true",
+        help="Find only unique neighbors per shell (one representative per unique species-vector combination)"
+    )
+    parser.add_argument(
+        "--shell-width",
+        type=float,
+        default=0.1,
+        help="Width of shells for grouping neighbors when using --unique (default: 0.1)"
+    )
+    
+    args = parser.parse_args()
+    
+    exchange_map(
+        cutoff=args.cutoff,
+        verbose=args.verbose,
+        unique=args.unique,
+        shell_width=args.shell_width
+    )
