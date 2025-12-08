@@ -320,16 +320,36 @@ def store_jij_namelist(input_nml: dict, matching_indices: dict, atom_index: int)
     except KeyError:
         pass
 
-    # Update njij and ijpair
-    njij: int = len(matching_indices[atom_index - 1])
-    new_input_nml["lattice"]["njij"] = njij
-    new_input_nml["lattice"]["ijpair"] = matching_indices[atom_index - 1]
+    # Store all lattice entries and rebuild to control order
+    lattice_section = new_input_nml["lattice"]
+    ct_value = lattice_section.get("ct", None)
+    r2_value = lattice_section.get("r2", None)
 
+    # Build a new lattice section with controlled ordering
+    new_lattice = f90nml.Namelist()
+    
+    # Copy all existing entries except njij, ijpair, ct, and r2
+    for key, value in lattice_section.items():
+        if key not in ["njij", "ijpair", "ct", "r2"]:
+            new_lattice[key] = value
+    
+    # Add njij and ijpair in the desired position
+    njij: int = len(matching_indices[atom_index - 1])
+    new_lattice["njij"] = njij
+    
     iij: list[int] = [atom_index] * njij
     jij: list[int] = [i for i in matching_indices[atom_index - 1]]
     ijpair: list[list[int]] = [iij, jij]
-
-    new_input_nml["lattice"]["ijpair"] = ijpair
+    new_lattice["ijpair"] = ijpair
+    
+    # Add ct and r2 after njij and ijpair
+    if ct_value is not None:
+        new_lattice["ct"] = ct_value
+    if r2_value is not None:
+        new_lattice["r2"] = r2_value
+    
+    # Replace the lattice section
+    new_input_nml["lattice"] = new_lattice
 
     # Create directory Atom_i
     dir_name: str = f"Atom_{atom_index}"
