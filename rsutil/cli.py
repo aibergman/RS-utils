@@ -34,6 +34,8 @@ import argparse
 from . import process_lattice
 from .viz.rs_visualizer import rs_visualizer
 from .exchange.exchange_map import exchange_map
+from .export.uppasd import export_from_files
+import os
 
 
 def main():
@@ -78,6 +80,22 @@ def main():
         '--cutoff', type=float, default='1.0',
         help='Cutoff for exchange interactions, in lattice units'
     )
+    parser.add_argument(
+        '--export', '-E', action='store_true', default=False,
+        help='Export RS-LMTO inputs to UppASD format'
+    )
+    parser.add_argument(
+        '--jij', type=str, default=None,
+        help='Path to jijso.out file to include in export'
+    )
+    parser.add_argument(
+        '--dmi', type=str, default=None,
+        help='Path to dijso.out / dmi file to include in export (DM vectors)'
+    )
+    parser.add_argument(
+        '--out', type=str, default='uppasd_out',
+        help='Output directory for exported UppASD files (relative to --data)'
+    )
 
     args = parser.parse_args()
 
@@ -90,6 +108,13 @@ def main():
     # Create exchange input files if --exchange flag is provided
     elif args.exchange:
         exchange_map(cutoff=args.cutoff)
+    # Export to UppASD if requested
+    elif args.export:
+        # default lattice path in data dir
+        lattice_path = os.path.join(args.data, 'lattice.nml')
+        out_dir = os.path.join(args.data, args.out) if args.data else args.out
+        export_from_files(lattice_nml=lattice_path, input_nml=None, clust=None,
+                          out_dir=out_dir, jij_file=args.jij, dij_file=args.dmi)
     # Print help message if no valid flag is provided
     else:
         parser.print_help()
