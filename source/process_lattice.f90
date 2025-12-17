@@ -2,6 +2,6 @@ program process_lattice_main
   use rsutil_lib
   implicit none
 
-  call process_lattice()
+  call process_lattice("periodic")
 
 end program process_lattice_main

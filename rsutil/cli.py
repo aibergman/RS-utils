@@ -96,12 +96,16 @@ def main():
         '--out', type=str, default='uppasd_out',
         help='Output directory for exported UppASD files (relative to --data)'
     )
+    parser.add_argument(
+        '--cluster', type=str, default='periodic', choices=['periodic', 'free'],
+        help='Cluster type: periodic (default) or free'
+    )
 
     args = parser.parse_args()
 
     # Process lattice if --setup flag is provided
     if args.setup:
-        process_lattice()
+        process_lattice(cluster_type=args.cluster)
     # Run visualizer for lattice or clust file if --lattice or --clust flag is provided
     elif args.lattice or args.clust:
         rs_visualizer(args.data, clust=args.clust)

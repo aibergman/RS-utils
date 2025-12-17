@@ -21,8 +21,38 @@
   integer :: i
 
   contains 
-subroutine process_lattice()  bind(c,name='process_lattice')
+subroutine process_lattice(cluster_type_str) bind(c,name='process_lattice')
    use iso_c_binding
+   implicit none
+   character(kind=c_char), intent(in) :: cluster_type_str(*)
+   character(len=20) :: cluster_type
+   integer :: i, slen
+
+   ! Convert C string to Fortran string
+   i = 1
+   do while (cluster_type_str(i) /= c_null_char .and. i < 20)
+      cluster_type(i:i) = cluster_type_str(i)
+      i = i + 1
+   end do
+   slen = i - 1
+   cluster_type = cluster_type(1:slen)
+
+   ! Set pbc based on cluster_type
+   if (trim(cluster_type) == "free") then
+      print *, "Setting cluster type to FREE (pbc = .false.)"
+   else
+      ! Default to periodic
+      print *, "Setting cluster type to PERIODIC (pbc = .true.)"
+   end if
+
+   ! Call the main processing routine
+   call process_lattice_impl(trim(cluster_type))
+
+end subroutine process_lattice
+
+subroutine process_lattice_impl(cluster_type)
+   implicit none
+   character(len=*), intent(in) :: cluster_type
   !-----------------------------------------------------------------
   ! Read the lattice namelist from lattice.nml using lattice_io.
   !-----------------------------------------------------------------
@@ -34,6 +64,15 @@ subroutine process_lattice()  bind(c,name='process_lattice')
   ! the ntype variable.
   !-----------------------------------------------------------------
   call read_input_namelists("input.nml", lat_input, atm_input, lat_data)
+
+  !-----------------------------------------------------------------
+  ! Set PBC based on cluster type
+  !-----------------------------------------------------------------
+  if (trim(cluster_type) == "free") then
+     lat_input%pbc = .false.
+  else
+     lat_input%pbc = .true.
+  end if
 
   !-----------------------------------------------------------------
   ! Initialize the spheres module.
@@ -78,8 +117,8 @@ subroutine process_lattice()  bind(c,name='process_lattice')
   !-----------------------------------------------------------------
   call update_namelists("input.nml", "input_new.nml", lat_input, atm_input)
 
-
   call update_atoms(pot_data, atm_input, lat_data, lat_input)
 
-end subroutine process_lattice
+end subroutine process_lattice_impl
+
 end module rsutil_lib
