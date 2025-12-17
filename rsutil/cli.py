@@ -100,12 +100,25 @@ def main():
         '--cluster', type=str, default='periodic', choices=['periodic', 'free'],
         help='Cluster type: periodic (default) or free'
     )
+    parser.add_argument(
+        '--empty_spheres', action='store_true', default=False,
+        help='Enable empty sphere calculations'
+    )
+    parser.add_argument(
+        '--min_empty_radius', type=float, default=1.2,
+        help='Minimum empty sphere radius (default: 1.2)'
+    )
+    parser.add_argument(
+        '--max_empty_radius', type=float, default=2.5,
+        help='Maximum empty sphere radius (default: 2.5)'
+    )
 
     args = parser.parse_args()
 
     # Process lattice if --setup flag is provided
     if args.setup:
-        process_lattice(cluster_type=args.cluster)
+        process_lattice(cluster_type=args.cluster, empty_spheres=args.empty_spheres, 
+                       min_empty_radius=args.min_empty_radius, max_empty_radius=args.max_empty_radius)
     # Run visualizer for lattice or clust file if --lattice or --clust flag is provided
     elif args.lattice or args.clust:
         rs_visualizer(args.data, clust=args.clust)

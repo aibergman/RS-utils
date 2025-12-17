@@ -177,13 +177,7 @@ contains
             write(unit, '(A, I0)') "ndim = ", lat%ndim
           end if
           write(unit, '(A, I0)') "ntype = ", lat%ntype
-          if (all(lat%ct == lat%ct(1))) then
-           write(unit, '(A, F10.4)') "ct(:) = ", lat%ct(1)
-          else
-           do itype = 1, lat%ntype
-             write(unit, '(A,I0,A, F10.4)') "ct(", itype, ") = ", lat%ct(itype)
-           end do
-          end if
+          write(unit, '(A, F10.4)') "ct(:) = ", lat%ct(1)
           write(unit, '(A, F12.6)') "r2 = ", lat%r2
           write(unit, '(A)') "/"
         end subroutine write_lattice_block
