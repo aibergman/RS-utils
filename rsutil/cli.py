@@ -89,6 +89,10 @@ def main():
         help='Width of shells for grouping neighbors when using --unique (default: 0.1)'
     )
     parser.add_argument(
+        '--soc', action='store_true', default=False,
+        help='Account for spin-orbit coupling in symmetry considerations'
+    )
+    parser.add_argument(
         '--export', '-E', action='store_true', default=False,
         help='Export RS-LMTO inputs to UppASD format'
     )
@@ -115,7 +119,7 @@ def main():
         rs_visualizer(args.data, clust=args.clust)
     # Create exchange input files if --exchange flag is provided
     elif args.exchange:
-        exchange_map(cutoff=args.cutoff, unique=args.unique, shell_width=args.shell_width)
+        exchange_map(cutoff=args.cutoff, unique=args.unique, shell_width=args.shell_width, soc=args.soc)
     # Export to UppASD if requested
     elif args.export:
         # default lattice path in data dir

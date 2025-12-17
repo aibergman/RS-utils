@@ -114,7 +114,7 @@ def read_namelists(input_file: str, lattice_file: str, verbose: bool = False) ->
 
 
 def create_structure_and_analyzer(
-    lattice_nml: dict, input_nml: dict, cartesian: bool = True
+    lattice_nml: dict, input_nml: dict, cartesian: bool = True, soc: bool = False
 ) -> tuple[Structure, SpacegroupAnalyzer, list[int]]:
     """
     Create a Structure object and SpacegroupAnalyzer from lattice and input NML files.
@@ -128,6 +128,9 @@ def create_structure_and_analyzer(
     cartesian : bool, optional
         If True (default), treat basis vectors as Cartesian coordinates and convert
         to fractional. If False, treat as fractional coordinates.
+    soc : bool, optional
+        If True, account for spin-orbit coupling in symmetry considerations.
+        SOC breaks time-reversal symmetry, reducing the spacegroup. Default False.
 
     Returns
     -------
@@ -149,6 +152,45 @@ def create_structure_and_analyzer(
         structure = Structure(lattice_matrix, atoms, basis)
     
     spacegroup_analyzer = SpacegroupAnalyzer(structure)
+    
+    # With SOC, we need to remove the horizontal mirror plane (z-inversion)
+    # If a symmetry operation exists with [xrow; yrow; 0 0 z], remove its counterpart
+    # with [xrow; yrow; 0 0 -z] (z-mirror operation)
+    if soc:
+        symm_ops = spacegroup_analyzer.get_symmetry_operations()
+        filtered_ops = []
+        seen_xy_planes = set()
+        
+        # First pass: identify which xy-plane operations we have
+        for op in symm_ops:
+            rot = op.rotation_matrix
+            # Check if this is a z-preserving operation (z-component unchanged)
+            # i.e., [a b 0; c d 0; 0 0 ±1]
+            if np.allclose(rot[0:2, 2], 0) and np.allclose(rot[2, 0:2], 0):
+                # Get the xy-plane part and z-component
+                xy_part = tuple(np.round(rot[0:2, 0:2], 5).flatten())
+                z_component = np.sign(rot[2, 2])
+                key = (xy_part, z_component)
+                seen_xy_planes.add(key)
+        
+        # Second pass: keep operations, but remove z-mirrors where z-preserving exists
+        for op in symm_ops:
+            rot = op.rotation_matrix
+            # Check if this is a z-mirroring operation
+            if np.allclose(rot[0:2, 2], 0) and np.allclose(rot[2, 0:2], 0):
+                xy_part = tuple(np.round(rot[0:2, 0:2], 5).flatten())
+                z_component = np.sign(rot[2, 2])
+                
+                # Keep this operation if:
+                # - z_component is +1 (z-preserving), OR
+                # - z_component is -1 (z-mirror) AND there's no +1 counterpart
+                if z_component > 0 or (xy_part, 1) not in seen_xy_planes:
+                    filtered_ops.append(op)
+            else:
+                # Non-z-operations: keep all
+                filtered_ops.append(op)
+        
+        spacegroup_analyzer._symmetry_operations = filtered_ops
 
     rec_sites = [int(site) for site in lattice_nml["lattice"]["irec"]]
     return structure, spacegroup_analyzer, rec_sites
@@ -492,7 +534,7 @@ def store_jij_namelist(input_nml: dict, matching_indices: dict, atom_index: int)
 # atoms_list = [atom for atom in atoms]
 #
 def exchange_map(cutoff: float = 1.0, verbose: bool = False, unique: bool = False, 
-                  shell_width: float = 0.1) -> None:
+                  shell_width: float = 0.1, soc: bool = False) -> None:
     """
     Main function to read namelists, create structure and analyzer,
     get neighbors, and symmetry reduced neighbors.
@@ -510,15 +552,24 @@ def exchange_map(cutoff: float = 1.0, verbose: bool = False, unique: bool = Fals
     shell_width : float, optional
         Width of shells for grouping neighbors (used with unique=True), 
         by default 0.1.
+    soc : bool, optional
+        If True, account for spin-orbit coupling in symmetry considerations.
+        SOC breaks time-reversal symmetry, reducing effective symmetry. Default False.
     """
     input_nml, lattice_nml = read_namelists("input.nml", "lattice.nml", verbose=verbose)
-    structure, spacegroup_analyzer, rec_sites = create_structure_and_analyzer(lattice_nml, input_nml)
+    structure, spacegroup_analyzer, rec_sites = create_structure_and_analyzer(
+        lattice_nml, input_nml, soc=soc
+    )
 
     if verbose:
         print("Recursion sites:", rec_sites)
         print(f"Detected spacegroup: {spacegroup_analyzer.get_space_group_symbol()} "
               f"(#{spacegroup_analyzer.get_space_group_number()})")
-        print(f"Number of symmetry operations: {len(spacegroup_analyzer.get_symmetry_operations())}")
+        symm_ops = spacegroup_analyzer.get_symmetry_operations()
+        n_ops = len(symm_ops) if hasattr(symm_ops, '__len__') else len(list(symm_ops))
+        print(f"Number of symmetry operations: {n_ops}")
+        if soc:
+            print("Spin-orbit coupling enabled: only proper rotations included")
 
     cluster = read_rs_clust("clust", "input.nml")
 
@@ -570,6 +621,12 @@ if __name__ == "__main__":
         default=0.1,
         help="Width of shells for grouping neighbors when using --unique (default: 0.1)"
     )
+    parser.add_argument(
+        "--soc",
+        action="store_true",
+        default=False,
+        help="Account for spin-orbit coupling in symmetry considerations (breaks time-reversal symmetry)"
+    )
     
     args = parser.parse_args()
     
@@ -577,5 +634,6 @@ if __name__ == "__main__":
         cutoff=args.cutoff,
         verbose=args.verbose,
         unique=args.unique,
-        shell_width=args.shell_width
+        shell_width=args.shell_width,
+        soc=args.soc
     )
