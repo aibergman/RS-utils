@@ -13,7 +13,11 @@ option(PYTHON_BINDINGS "Enable Python bindings with f90wrap" OFF)
 
 # Collect Fortran source files for the static library
 set(LIB_SOURCES
+    ${SOURCE_DIR}/types/system_data.f90
+    ${SOURCE_DIR}/types/rsutil_config.f90
+    ${SOURCE_DIR}/types/element_info.f90
     ${SOURCE_DIR}/rsutil_lib.f90
+    ${SOURCE_DIR}/rsutil_c_interface.f90
     ${SOURCE_DIR}/io/atom_io.f90
     ${SOURCE_DIR}/io/input_io.f90
     ${SOURCE_DIR}/io/lattice_io.f90
@@ -24,8 +28,6 @@ set(LIB_SOURCES
     ${SOURCE_DIR}/spheres/radii.f90
     ${SOURCE_DIR}/spheres/sphere.f90
     ${SOURCE_DIR}/spheres/utils.f90
-    ${SOURCE_DIR}/types/element_info.f90
-    ${SOURCE_DIR}/types/system_data.f90
 )
 
 # Create the static library named rsutil_lib
@@ -63,7 +65,8 @@ if(PYTHON_BINDINGS)
     add_custom_target(f90wrap_generate DEPENDS ${F90WRAP_OUTPUT})
 
     # Generate a properly named shared library for Python
-    add_library(rsutil MODULE ${F90WRAP_OUTPUT})
+    # Include rsutil_c_interface.f90 explicitly to ensure process_lattice is exported
+    add_library(rsutil MODULE ${F90WRAP_OUTPUT} ${SOURCE_DIR}/rsutil_c_interface.f90)
     set_target_properties(rsutil PROPERTIES PREFIX "" )
     
     add_dependencies(rsutil f90wrap_generate)

@@ -1,6 +1,7 @@
   module rsutil_lib
     
   use system_data
+  use rsutil_config
   use input_io
   use lattice_io
   use spheres
@@ -21,8 +22,8 @@
   integer :: i
 
   contains 
-subroutine process_lattice()  bind(c,name='process_lattice')
-   use iso_c_binding
+subroutine process_lattice_impl()
+   implicit none
   !-----------------------------------------------------------------
   ! Read the lattice namelist from lattice.nml using lattice_io.
   !-----------------------------------------------------------------
@@ -34,6 +35,15 @@ subroutine process_lattice()  bind(c,name='process_lattice')
   ! the ntype variable.
   !-----------------------------------------------------------------
   call read_input_namelists("input.nml", lat_input, atm_input, lat_data)
+
+  !-----------------------------------------------------------------
+  ! Set PBC based on cluster type from config
+  !-----------------------------------------------------------------
+  if (trim(cluster_type) == "free") then
+     lat_input%pbc = .false.
+  else
+     lat_input%pbc = .true.
+  end if
 
   !-----------------------------------------------------------------
   ! Initialize the spheres module.
@@ -78,8 +88,8 @@ subroutine process_lattice()  bind(c,name='process_lattice')
   !-----------------------------------------------------------------
   call update_namelists("input.nml", "input_new.nml", lat_input, atm_input)
 
-
   call update_atoms(pot_data, atm_input, lat_data, lat_input)
 
-end subroutine process_lattice
+end subroutine process_lattice_impl
+
 end module rsutil_lib

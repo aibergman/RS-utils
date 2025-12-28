@@ -83,6 +83,12 @@ module system_data
     character(len=8) :: crystal_sym  ! Crystal symmetry ('bcc', 'fcc', 'file', etc.)
     real(kind=8) :: wav              ! Average WS radius
     logical*1 :: pbc                 ! Periodic BC
+    logical*1 :: b1                  ! Boundary condition 1
+    logical*1 :: b2                  ! Boundary condition 2
+    logical*1 :: b3                  ! Boundary condition 3
+    integer :: n1                    ! Grid points 1
+    integer :: n2                    ! Grid points 2
+    integer :: n3                    ! Grid points 3
     integer :: ndim                  ! Rough atom estimate
     real(rp), allocatable :: ct(:)   ! Cutoff radius per site
     real(rp) :: r2                   ! Max cutoff radius (squared)

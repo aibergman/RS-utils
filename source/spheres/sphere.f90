@@ -57,6 +57,7 @@ contains
 
 
     subroutine parse_structure(lat_inp, at_inp, lat_data)
+        use rsutil_config, only: enable_empty_spheres, min_empty_sphere_radius, max_empty_sphere_radius
         implicit none
 
         ! Arguments
@@ -71,9 +72,17 @@ contains
         ! Local variables
         integer :: ISP1, ISP2, I, J, IDUM, INI
 
-        NEED_ES = 0
-        RMINES = 1.2
-        RMAXES = 2.5
+        ! Set NEED_ES based on enable_empty_spheres flag
+        ! NEED_ES = 0 means calculate empty spheres, NEED_ES = 1 means skip them
+        if (enable_empty_spheres) then
+            NEED_ES = 0
+        else
+            NEED_ES = 1
+        end if
+        
+        ! Old defaults: RMINES=1.2D0, RMAXES=2.5D0
+        RMINES = min_empty_sphere_radius
+        RMAXES = max_empty_sphere_radius
 
         ALAT = lat_inp%alat*ANGSTROM_TO_BOHR
         if (DB) print *, ' ALAT:', ALAT
@@ -142,6 +151,7 @@ contains
 
 
     subroutine perform_calculations()
+        use rsutil_config, only: enable_empty_spheres
         implicit none
 
         ! Local variables
@@ -227,7 +237,8 @@ contains
         call DEFMTR(W, NRAD1, AV, BV, CV, IMQ, BAS, RHOSITE, R0SITE, DPAS, ALAT, NATOM, NSORT, ZZ, RWS, NEED_ES, NRAD1, WSREST)
 
         NATOMNEW = NATOM
-        if (NEED_ES == 0) then
+        
+        if (NEED_ES == 0 .and. enable_empty_spheres) then
             call EMPTYSPHERES(AV, BV, CV, BAS, IMQ, ALAT, NATOM, NSORT, RWS, NSORTES, TAUES, SES, MAX2SORT, ITOP, IQA, NG, &
                ISNEW, BASNEW, NATOMNEW)
             do I = NATOM+1, NATOMNEW
@@ -315,6 +326,7 @@ contains
 
         ! Update structure
         call parse_structure(lat_input, atm_input, lat_data)
+
         call perform_calculations()
 
         call transfer_to_struct(lat_input, atm_input, lat_data)
@@ -390,6 +402,7 @@ contains
         !    end do
         !end if
 
+        lat_input%ntype = NATOMNEW
         lat_input%wav = sum(lat_data%ws(1:NATOMNEW)) / NATOMNEW / ANGSTROM_TO_BOHR
 
     end subroutine transfer_to_struct

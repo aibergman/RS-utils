@@ -35,11 +35,36 @@ if lib_filename is None:
 lib_path: str = os.path.join(os.path.dirname(__file__), lib_filename)
 _rsutil: ctypes.CDLL = ctypes.CDLL(lib_path)
 
-# Define process_lattice() signature
-_rsutil.process_lattice.argtypes = []  # Modify if needed
-_rsutil.process_lattice.restype = None  # Modify if needed
+# Define process_lattice() signature with multiple arguments
+_rsutil.process_lattice.argtypes = [ctypes.c_char_p, ctypes.c_int, ctypes.c_double, ctypes.c_double]
+_rsutil.process_lattice.restype = None
 
 
-def process_lattice() -> None:
-    """Python wrapper for the process_lattice() Fortran routine."""
-    _rsutil.process_lattice()
+def process_lattice(cluster_type: str = "periodic", empty_spheres: bool = False, 
+                   min_empty_radius: float = 1.2, max_empty_radius: float = 2.5) -> None:
+    """
+    Python wrapper for the process_lattice() Fortran routine.
+    
+    Parameters
+    ----------
+    cluster_type : str, optional
+        Type of cluster: 'periodic' (default) or 'free'.
+        If 'periodic', sets pbc to .true.
+        If 'free', sets pbc to .false.
+    empty_spheres : bool, optional
+        Enable empty sphere calculations (default: False).
+    min_empty_radius : float, optional
+        Minimum empty sphere radius (default: 1.2).
+    max_empty_radius : float, optional
+        Maximum empty sphere radius (default: 2.5).
+    """
+    if cluster_type not in ["periodic", "free"]:
+        raise ValueError(f"cluster_type must be 'periodic' or 'free', got '{cluster_type}'")
+    
+    # Convert empty_spheres boolean to integer (0 or 1)
+    empty_spheres_int = ctypes.c_int(1 if empty_spheres else 0)
+    min_radius_dbl = ctypes.c_double(min_empty_radius)
+    max_radius_dbl = ctypes.c_double(max_empty_radius)
+    
+    # Call the Fortran routine with separate arguments
+    _rsutil.process_lattice(cluster_type.encode('utf-8'), empty_spheres_int, min_radius_dbl, max_radius_dbl)

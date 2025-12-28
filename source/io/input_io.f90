@@ -27,10 +27,10 @@ contains
         real(kind=8) :: alat
         character(len=8) :: crystal_sym
         real(kind=8) :: wav
-        logical :: pbc=.true., b1, b2, b3
-        integer :: n1, n2, n3, i, pos, j
+        logical :: pbc=.true., b1=.true., b2=.true., b3=.true.
+        integer :: n1=10, n2=10, n3=10, i, pos, j
         ! Additions from previous lattice.nml entries
-        integer :: ntype = 0
+        integer :: ntype = 1
         real(rp), allocatable :: ct(:)
         real(rp) :: r2
 
@@ -101,8 +101,14 @@ contains
         lat%crystal_sym = crystal_sym
         lat%wav = wav
         lat%pbc = pbc
-        lat%ndim = ndim
+        lat%b1 = b1
+        lat%b2 = b2
+        lat%b3 = b3
+        lat%n1 = n1
+        lat%n2 = n2
+        lat%n3 = n3
         lat%ntype = ntype
+        lat%ndim = ndim
         lat%r2 = r2
         allocate(lat%ct(lat%ntype))
         lat%ct = ct
@@ -150,23 +156,28 @@ contains
           implicit none
           integer, intent(in) :: unit
           type(lattice_inp), intent(in) :: lat
-          integer :: itype
+          integer :: itype, ndim
 
           write(unit, '(A)') "&lattice"
-          write(unit, '(A, I0)') "ntype = ", lat%ntype
           write(unit, '(A, I0)') "rc = ", lat%rc
           write(unit, '(A, F12.6)') "alat = ", lat%alat
           write(unit, '(A, A)') "crystal_sym = ", "'" // trim(lat%crystal_sym) // "'"
           write(unit, '(A, F12.10)') "wav = ", lat%wav
           write(unit, '(A, L)') "pbc = ", lat%pbc
-          write(unit, '(A, I0)') "ndim = ", lat%ndim
-          if (all(lat%ct == lat%ct(1))) then
-           write(unit, '(A, F10.4)') "ct(:) = ", lat%ct(1)
+          if (lat%pbc) then
+            write(unit, '(A, L)') "b1 = ", lat%b1
+            write(unit, '(A, L)') "b2 = ", lat%b2
+            write(unit, '(A, L)') "b3 = ", lat%b3
+            write(unit, '(A, I0)') "n1 = ", lat%n1
+            write(unit, '(A, I0)') "n2 = ", lat%n2
+            write(unit, '(A, I0)') "n3 = ", lat%n3
+            ndim = lat%n1 * lat%n2 * lat%n3 * lat%ntype
+            write(unit, '(A, I0)') "ndim = ", ndim
           else
-           do itype = 1, lat%ntype
-             write(unit, '(A,I0,A, F10.4)') "ct(", itype, ") = ", lat%ct(itype)
-           end do
+            write(unit, '(A, I0)') "ndim = ", lat%ndim
           end if
+          write(unit, '(A, I0)') "ntype = ", lat%ntype
+          write(unit, '(A, F10.4)') "ct(:) = ", lat%ct(1)
           write(unit, '(A, F12.6)') "r2 = ", lat%r2
           write(unit, '(A)') "/"
         end subroutine write_lattice_block
