@@ -1,37 +1,77 @@
-.. _vis_submodule:
+.. _viz_submodule:
 
 The `viz` submodule
 -------------------
-The **`viz`** submodule contains all the visualization-related functionality. It helps to visualize atomic structures, spins, bonds, and other scientific data in a clear and intuitive way. The `viz` module uses libraries like PyVista to provide interactive 3D visualizations.
+
+The **`viz`** submodule contains all visualization-related functionality for RS-utils. It provides interactive 3D visualization of atomic structures, magnetic properties, and crystal lattices using PyVista for advanced rendering.
+
+Key Features
+~~~~~~~~~~~~
+
+- Interactive 3D visualization of crystal structures
+- Magnetic moment (spin) vectors and glyphs
+- Bond visualization with adjustable styling
+- Periodic lattice rendering and cluster views
+- RS-LMTO input support: ``lattice.nml``, ``input.nml``, and ``clust`` files
+- CPK color schemes for element visualization
 
 .. automodule:: rsutil.viz
    :members:
 
-Classes in `viz`
-----------------
-This section documents the individual classes within the `viz` submodule, which are used to represent atoms, bonds, spins, and other visual components.
-
-- **`Atom`**: Represents an atom in a structure, storing its position and properties for visualization.
-- **`Bond`**: Represents a bond between two atoms, including its visual attributes like radius.
-- **`Spin`**: Represents a magnetic moment or spin, visualized as an arrow or vector.
-- **`InputReader`**: A utility for reading input files and parsing structure data.
-- **`Structure`**: Represents a structure consisting of atoms and bonds, and provides methods to manipulate and visualize the structure.
-- **`Visualizer`**: The main class for creating interactive visualizations of atomic structures and their properties.
+Core Classes
+~~~~~~~~~~~~
 
 .. autoclass:: rsutil.viz.glyphs.Atom
    :members:
+   :undoc-members:
 
 .. autoclass:: rsutil.viz.glyphs.Bond
    :members:
+   :undoc-members:
 
 .. autoclass:: rsutil.viz.glyphs.Spin
    :members:
+   :undoc-members:
+
+Input and Structure
+~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: rsutil.viz.inputreader.InputReader
    :members:
+   :undoc-members:
 
 .. autoclass:: rsutil.viz.structure.Structure
    :members:
+   :undoc-members:
+
+Main Visualizer
+~~~~~~~~~~~~~~~
 
 .. autoclass:: rsutil.viz.visualizer.Visualizer
    :members:
+   :undoc-members:
+
+Usage Examples
+~~~~~~~~~~~~~~
+
+From the command line:
+
+.. code-block:: bash
+
+    # Visualize lattice structure
+    rsutil --lattice --data /path/to/data
+
+    # Visualize cluster definition
+    rsutil --clust --data /path/to/data
+
+From Python code:
+
+.. code-block:: python
+
+    from rsutil.viz.rs_visualizer import rs_visualizer
+
+    # Launch interactive visualizer for lattice
+    rs_visualizer(data_dir='/path/to/data', clust=False)
+
+    # Launch visualizer for clust file
+    rs_visualizer(data_dir='/path/to/data', clust=True)
