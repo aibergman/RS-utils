@@ -5,11 +5,23 @@ Enhanced TB-LMTO Band Structure Calculator with Orbital and Site Projections
 This module extends the basic band structure calculator to include:
 - Orbital projected band structure (s, p, d contributions)
 - Site projected band structure (atom-specific contributions)
-- Spin projections for non-collinear systems
+- Spin projections with 4 visualization modes (expectation, weight_up/down, polarization)
 
 The Hamiltonian structure is 18×18 per site:
 - 9 orbitals per spin channel (s, px, py, pz, dxy, dyz, dxz, dx2-y2, dz2)
 - Non-collinear spin structure: [H0+Hz, Hx+iHy; Hx-iHy, H0-Hz]
+
+Spin Projection Modes
+---------------------
+When projecting spin character, 4 modes are available:
+- "expectation": Direct spin expectation value <S_z> in [-0.5, +0.5]
+- "weight_up": Spin-up probability = 0.5 + <S_z> in [0, 1]
+- "weight_down": Spin-down probability = 0.5 - <S_z> in [0, 1]
+- "polarization": Signed polarization = 2.0 * <S_z> in [-1, +1]
+
+All four modes are mathematically equivalent but offer different visual interpretations.
+The "expectation" mode is most intuitive for understanding spin orientation.
+The "polarization" mode matches standard solid-state physics definitions.
 """
 
 import numpy as np
@@ -17,15 +29,61 @@ import matplotlib.pyplot as plt
 from scipy.linalg import eigh
 from .band_structure import BandStructureCalculator
 from .readers import LatticeReader, HamiltonianReader
-from typing import Dict, List, Tuple
+from .projection_utils import compute_quantity_from_sexp, get_projection_vrange
+from typing import Dict, List, Tuple, Literal
 import matplotlib.colors as mcolors
+import warnings
 
 
 class ProjectedBandCalculator(BandStructureCalculator):
-    """Extended band calculator with orbital and site projections"""
+    """Extended band calculator with orbital and site projections
     
-    def __init__(self, lattice_reader: LatticeReader, hamiltonian_reader: HamiltonianReader):
+    Attributes
+    ----------
+    orbital_names : list of str
+        Names of 9 orbitals per spin channel
+    orbital_indices : dict
+        Mapping of orbital names to their indices
+    orbital_groups : dict
+        Groupings of orbitals (s, p, d)
+    spin_channels : list of str
+        Available spin channels ['up', 'down']
+    spin_projection_modes : list of str
+        Available spin projection modes for coloring:
+        'expectation', 'weight_up', 'weight_down', 'polarization'
+    """
+    
+    # Valid spin projection modes
+    SPIN_PROJECTION_MODES = ("expectation", "weight_up", "weight_down", "polarization")
+    
+    def __init__(self, lattice_reader: LatticeReader, hamiltonian_reader: HamiltonianReader,
+                 spin_projection_mode: Literal["expectation", "weight_up", "weight_down", 
+                                                "polarization"] = "expectation"):
+        """
+        Initialize projected band calculator
+        
+        Parameters
+        ----------
+        lattice_reader : LatticeReader
+            Reader for lattice structure
+        hamiltonian_reader : HamiltonianReader
+            Reader for Hamiltonian data
+        spin_projection_mode : str, optional
+            Mode for spin projection visualization. Must be one of:
+            - "expectation": Direct <S_z> in [-0.5, +0.5] (default)
+            - "weight_up": Spin-up probability in [0, 1]
+            - "weight_down": Spin-down probability in [0, 1]
+            - "polarization": Signed polarization in [-1, +1]
+        """
         super().__init__(lattice_reader, hamiltonian_reader)
+        
+        # Validate spin projection mode
+        if spin_projection_mode not in self.SPIN_PROJECTION_MODES:
+            raise ValueError(
+                f"Invalid spin_projection_mode '{spin_projection_mode}'. "
+                f"Must be one of {self.SPIN_PROJECTION_MODES}"
+            )
+        self.spin_projection_mode = spin_projection_mode
         
         # Define orbital names and indices
         self.orbital_names = ['s', 'px', 'py', 'pz', 'dxy', 'dyz', 'dxz', 'dx2-y2', 'dz2']
@@ -70,15 +128,32 @@ class ProjectedBandCalculator(BandStructureCalculator):
         return band_energies, projections
     
     def _calculate_projections(self, eigenvectors: np.ndarray) -> Dict:
-        """Calculate orbital and site projections from eigenvectors"""
+        """Calculate orbital and site projections from eigenvectors
         
+        Stores raw spin expectation values that can be converted to different modes
+        (expectation, weight_up/down, polarization) for visualization.
+        
+        Parameters
+        ----------
+        eigenvectors : np.ndarray
+            Eigenvector matrix (nk, nbands, nbands)
+        
+        Returns
+        -------
+        dict
+            Projection data with keys:
+            - 'orbital': Orbital group projections
+            - 'site': Site projections
+            - 'spin_expectation': Raw spin expectation values (not mode-dependent)
+            - 'orbital_site': Combined orbital-site projections
+        """
         num_kpoints, total_orbitals, _ = eigenvectors.shape
         num_sites = self.lattice.nbas
         
         projections = {
             'orbital': {},
             'site': {},
-            'spin': {},
+            'spin_expectation': np.zeros((num_kpoints, total_orbitals)),  # Raw expectation
             'orbital_site': {}
         }
         
@@ -88,9 +163,6 @@ class ProjectedBandCalculator(BandStructureCalculator):
         
         for site in range(num_sites):
             projections['site'][site] = np.zeros((num_kpoints, total_orbitals))
-        
-        for spin in self.spin_channels:
-            projections['spin'][spin] = np.zeros((num_kpoints, total_orbitals))
         
         # Calculate projections for each k-point and band
         for k_idx in range(num_kpoints):
@@ -114,21 +186,28 @@ class ProjectedBandCalculator(BandStructureCalculator):
                     spin_up_weight = np.sum(np.abs(spin_up_coeffs)**2)
                     spin_down_weight = np.sum(np.abs(spin_down_coeffs)**2)
                     
-                    # Add to total spin projections
-                    projections['spin']['up'][k_idx, band_idx] += spin_up_weight
-                    projections['spin']['down'][k_idx, band_idx] += spin_down_weight
+                    # Compute spin expectation: weight_up - weight_down = 2*<S_z> in standard units
+                    # For spin-1/2, expectation ranges from -0.5 to +0.5
+                    # Normalize by total weight on this site
+                    total_weight = spin_up_weight + spin_down_weight
+                    if total_weight > 1e-14:
+                        spin_expectation = (spin_up_weight - spin_down_weight) / 2.0
+                    else:
+                        spin_expectation = 0.0
+                    
+                    projections['spin_expectation'][k_idx, band_idx] += spin_expectation
                     
                     # Orbital projections for each spin channel
-                    for spin_name, coeffs in [('up', spin_up_coeffs), ('down', spin_down_coeffs)]:
-                        for orbital_group, orbital_indices in self.orbital_groups.items():
-                            orbital_weight = np.sum(np.abs(coeffs[orbital_indices])**2)
-                            projections['orbital'][orbital_group][k_idx, band_idx] += orbital_weight
-                            
-                            # Store orbital-site specific projections
-                            key = f"{orbital_group}_{site}_{spin_name}"
-                            if key not in projections['orbital_site']:
-                                projections['orbital_site'][key] = np.zeros((num_kpoints, total_orbitals))
-                            projections['orbital_site'][key][k_idx, band_idx] = orbital_weight
+                    for orbital_group, orbital_indices in self.orbital_groups.items():
+                        orbital_weight = np.sum(np.abs(spin_up_coeffs[orbital_indices])**2)
+                        orbital_weight += np.sum(np.abs(spin_down_coeffs[orbital_indices])**2)
+                        projections['orbital'][orbital_group][k_idx, band_idx] += orbital_weight
+                        
+                        # Store orbital-site specific projections
+                        key = f"{orbital_group}_site{site}"
+                        if key not in projections['orbital_site']:
+                            projections['orbital_site'][key] = np.zeros((num_kpoints, total_orbitals))
+                        projections['orbital_site'][key][k_idx, band_idx] = orbital_weight
         
         return projections
     
@@ -214,19 +293,39 @@ class ProjectedBandCalculator(BandStructureCalculator):
     
     def _plot_spin_projected(self, kdistances: np.ndarray, band_energies: np.ndarray,
                            projections: Dict, klabels: List[str]):
-        """Plot spin projected bands"""
+        """Plot spin projected bands using configured projection mode
         
-        colors = {'up': 'red', 'down': 'blue'}
+        The spin expectation is converted to the selected visualization mode:
+        - "expectation": Direct <S_z> in [-0.5, +0.5]
+        - "weight_up": Spin-up probability in [0, 1]
+        - "weight_down": Spin-down probability in [0, 1]
+        - "polarization": Signed polarization in [-1, +1]
+        """
+        # Get raw spin expectation values
+        spin_expectation = projections['spin_expectation']
         
+        # Convert to desired visualization mode
+        colors_data = compute_quantity_from_sexp(spin_expectation, self.spin_projection_mode)
+        
+        # Get appropriate colorbar range
+        vmin, vmax = get_projection_vrange(self.spin_projection_mode)
+        
+        # Create scatter plot for all points
         for band in range(band_energies.shape[1]):
-            for spin, color in colors.items():
-                weights = projections['spin'][spin][:, band]
-                
-                # Create scatter plot with point sizes proportional to weights
-                sizes = weights * 50
-                plt.scatter(kdistances, band_energies[:, band], 
-                          s=sizes, c=color, alpha=0.6,
-                          label=f'Spin {spin}' if band == 0 else "")
+            X = kdistances
+            Y = band_energies[:, band]
+            C = colors_data[:, band]
+            
+            # Size scaling
+            sizes = np.ones_like(X) * 20
+            
+            scatter = plt.scatter(X, Y, s=sizes, c=C, cmap='coolwarm', 
+                                vmin=vmin, vmax=vmax, alpha=0.8,
+                                edgecolors='none')
+        
+        # Add colorbar
+        cbar = plt.colorbar(scatter, pad=0.02)
+        cbar.set_label(f'Spin {self.spin_projection_mode.capitalize()} $\\langle S_z \\rangle$')
     
     def _plot_combined_projected(self, kdistances: np.ndarray, band_energies: np.ndarray,
                                projections: Dict, klabels: List[str]):

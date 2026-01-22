@@ -53,6 +53,15 @@ from .dos_moments import DOSMomentsCalculator
 from .projections import ProjectedBandCalculator
 from .spin_analysis import SpinAnalyzer
 from .band_analysis import BandAnalyzer
+from .projection_utils import (
+    guess_basis_order,
+    degeneracy_groups,
+    gauge_fix_evecs,
+    atom_orbital_indices,
+    parse_atom_selection,
+    get_projection_vrange,
+    compute_quantity_from_sexp,
+)
 
 __version__ = "1.0.0"
 
@@ -75,5 +84,13 @@ __all__ = [
     "ProjectedBandCalculator",
     "SpinAnalyzer",
     "BandAnalyzer",
+    # Projection utilities
+    "guess_basis_order",
+    "degeneracy_groups",
+    "gauge_fix_evecs",
+    "atom_orbital_indices",
+    "parse_atom_selection",
+    "get_projection_vrange",
+    "compute_quantity_from_sexp",
 ]
 

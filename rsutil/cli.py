@@ -78,7 +78,11 @@ def run_bands_subcommand(args):
         from .bands.projections import ProjectedBandCalculator
         
         print("Setting up projected band structure calculator...")
-        proj_calc = ProjectedBandCalculator(lattice, hamiltonian)
+        # Create calculator with specified spin projection mode
+        proj_calc = ProjectedBandCalculator(
+            lattice, hamiltonian,
+            spin_projection_mode=getattr(args, 'projections_mode', 'expectation')
+        )
         
         print(f"Generating k-path with {args.nk} points...")
         kpoints, klabels, kdistances = proj_calc.setup_kpath(args.nk)
@@ -88,7 +92,7 @@ def run_bands_subcommand(args):
         
         projection_type = args.projection
         output_file = f"{args.output_prefix}_{projection_type}.png"
-        print(f"Plotting {projection_type} projections to {output_file}...")
+        print(f"Plotting {projection_type} projections (mode: {proj_calc.spin_projection_mode}) to {output_file}...")
         proj_calc.plot_projected_bands(kdistances, band_energies, projections, 
                                        klabels, projection_type, output_file)
         
@@ -236,6 +240,14 @@ def create_bands_parser(subparsers):
                        help='Calculate projected bands instead of total bands')
     parser.add_argument('--projection', choices=['orbital', 'site', 'spin', 'all'],
                        default='all', help='Type of projection (default: all)')
+    parser.add_argument('--projections-mode', 
+                       choices=['expectation', 'weight_up', 'weight_down', 'polarization'],
+                       default='expectation',
+                       help=('Spin projection visualization mode (for --projections --projection spin): '
+                            'expectation: <S_z> in [-0.5,+0.5]; '
+                            'weight_up: P_up in [0,1]; '
+                            'weight_down: P_down in [0,1]; '
+                            'polarization: signed in [-1,+1] (default: expectation)'))
     parser.add_argument('--output-prefix', default='projected',
                        help='Output file prefix for projections (default: projected)')
     parser.set_defaults(func=run_bands_subcommand)
