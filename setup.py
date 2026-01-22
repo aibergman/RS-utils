@@ -48,18 +48,30 @@ class CMakeBuild(build_ext):
 
 setup(
     name="rsutil",
-    version="0.9.1",
+    version="0.10.0",  # Bump version for new band/DOS features
     author="Anders Bergman",
     author_email="anders.bergman@physics.uu.se",
-    description="Utilities for the RS-LMTO code",
-    long_description="Utilities for the RS-LMTO code",
+    description="Utilities for the RS-LMTO code including band structure and DOS analysis",
+    long_description="Utilities for the RS-LMTO code including lattice processing, visualization, exchange mapping, UppASD export, band structure calculations, and density of states analysis",
     ext_modules=[CMakeExtension("rsutil")],
     cmdclass={"build_ext": CMakeBuild},
     packages=setuptools.find_packages(),
     include_package_data=True,  # ✅ Ensures package_data is included in the wheel
     zip_safe=False,
     package_data={"rsutil": ["rsutil/rsutil.so", "viz/cpk_colors.json"]},  # ✅ Explicitly include rsutil.so
-    # package_data={"rsutil": ["rsutil.so", "viz/cpk_colors.json"]},  # ✅ Explicitly include rsutil.so
+    install_requires=[
+        "numpy>=1.20.0",
+        "pyvista",
+        "pymatgen",
+        "f90nml",
+        "matplotlib>=3.5.0",  # NEW - for band/DOS plotting
+        "scipy>=1.7.0",        # NEW - for interpolation and tetrahedron method
+        "spglib>=2.0.0",       # NEW - for symmetry operations
+    ],
+    extras_require={
+        "full": ["pymatgen>=2022.0.0"],
+        "dev": ["pytest>=6.0.0", "black", "flake8"],
+    },
     entry_points={
         "console_scripts": [
             "rsutil=rsutil.cli:main"
