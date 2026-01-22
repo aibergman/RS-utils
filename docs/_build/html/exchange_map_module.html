@@ -14,7 +14,7 @@
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="_static/documentation_options.js?v=5929fcd5"></script>
-      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/doctools.js?v=9a2dae69"></script>
       <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
@@ -42,20 +42,83 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
-<ul class="current">
+              <p class="caption" role="heading"><span class="caption-text">Command-Line Interface:</span></p>
+<ul>
 <li class="toctree-l1"><a class="reference internal" href="cli_section.html">Command-Line Interface (CLI)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="cli_section.html#band-and-dos-python-no-fortran-required">Band and DOS (Python, no Fortran required)</a></li>
 <li class="toctree-l2"><a class="reference internal" href="cli_section.html#lattice-processing">Lattice Processing</a></li>
-<li class="toctree-l2"><a class="reference internal" href="cli_section.html#visualization">Visualization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli_section.html#visualization">Visualization</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cli_section.html#visualizer-controls">Visualizer Controls</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli_section.html#data-conventions">Data Conventions</a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="cli_section.html#exchange-interactions">Exchange Interactions</a></li>
 <li class="toctree-l2"><a class="reference internal" href="cli_section.html#export-to-uppasd">Export to UppASD</a></li>
 <li class="toctree-l2"><a class="reference internal" href="cli_section.html#quick-reference">Quick Reference</a></li>
 </ul>
 </li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Modules:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="bands_submodule.html">The <cite>bands</cite> submodule</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="bands_submodule.html#key-capabilities">Key capabilities</a></li>
+<li class="toctree-l2"><a class="reference internal" href="bands_submodule.html#core-classes">Core classes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="bands_submodule.html#rsutil.bands.LatticeReader"><code class="docutils literal notranslate"><span class="pre">LatticeReader</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.LatticeReader.get_structure_info"><code class="docutils literal notranslate"><span class="pre">LatticeReader.get_structure_info()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.LatticeReader.parse_lattice_file"><code class="docutils literal notranslate"><span class="pre">LatticeReader.parse_lattice_file()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="bands_submodule.html#rsutil.bands.HamiltonianReader"><code class="docutils literal notranslate"><span class="pre">HamiltonianReader</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.HamiltonianReader.organize_hamiltonian_data"><code class="docutils literal notranslate"><span class="pre">HamiltonianReader.organize_hamiltonian_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.HamiltonianReader.parse_hamiltonian_file"><code class="docutils literal notranslate"><span class="pre">HamiltonianReader.parse_hamiltonian_file()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="bands_submodule.html#rsutil.bands.BandStructureCalculator"><code class="docutils literal notranslate"><span class="pre">BandStructureCalculator</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.BandStructureCalculator.calculate_bands"><code class="docutils literal notranslate"><span class="pre">BandStructureCalculator.calculate_bands()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.BandStructureCalculator.dump_hamiltonian_at_custom_points"><code class="docutils literal notranslate"><span class="pre">BandStructureCalculator.dump_hamiltonian_at_custom_points()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.BandStructureCalculator.dump_hamiltonian_at_points"><code class="docutils literal notranslate"><span class="pre">BandStructureCalculator.dump_hamiltonian_at_points()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.BandStructureCalculator.fourier_transform_hamiltonian"><code class="docutils literal notranslate"><span class="pre">BandStructureCalculator.fourier_transform_hamiltonian()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.BandStructureCalculator.plot_bands"><code class="docutils literal notranslate"><span class="pre">BandStructureCalculator.plot_bands()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.BandStructureCalculator.setup_kpath"><code class="docutils literal notranslate"><span class="pre">BandStructureCalculator.setup_kpath()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="bands_submodule.html#rsutil.bands.ProjectedBandCalculator"><code class="docutils literal notranslate"><span class="pre">ProjectedBandCalculator</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.ProjectedBandCalculator.calculate_projected_bands"><code class="docutils literal notranslate"><span class="pre">ProjectedBandCalculator.calculate_projected_bands()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.ProjectedBandCalculator.plot_projected_bands"><code class="docutils literal notranslate"><span class="pre">ProjectedBandCalculator.plot_projected_bands()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.ProjectedBandCalculator.plot_projection_analysis"><code class="docutils literal notranslate"><span class="pre">ProjectedBandCalculator.plot_projection_analysis()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="bands_submodule.html#rsutil.bands.FullBZCalculator"><code class="docutils literal notranslate"><span class="pre">FullBZCalculator</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.FullBZCalculator.calculate_full_bz_bands"><code class="docutils literal notranslate"><span class="pre">FullBZCalculator.calculate_full_bz_bands()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.FullBZCalculator.generate_kpoint_mesh"><code class="docutils literal notranslate"><span class="pre">FullBZCalculator.generate_kpoint_mesh()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="bands_submodule.html#rsutil.bands.DOSCalculator"><code class="docutils literal notranslate"><span class="pre">DOSCalculator</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.DOSCalculator.calculate_dos"><code class="docutils literal notranslate"><span class="pre">DOSCalculator.calculate_dos()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.DOSCalculator.calculate_dos_with_moments"><code class="docutils literal notranslate"><span class="pre">DOSCalculator.calculate_dos_with_moments()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.DOSCalculator.plot_dos"><code class="docutils literal notranslate"><span class="pre">DOSCalculator.plot_dos()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="bands_submodule.html#rsutil.bands.DOSMomentsCalculator"><code class="docutils literal notranslate"><span class="pre">DOSMomentsCalculator</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.DOSMomentsCalculator.calculate_moments"><code class="docutils literal notranslate"><span class="pre">DOSMomentsCalculator.calculate_moments()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.DOSMomentsCalculator.fermi_dirac"><code class="docutils literal notranslate"><span class="pre">DOSMomentsCalculator.fermi_dirac()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.DOSMomentsCalculator.find_fermi_level"><code class="docutils literal notranslate"><span class="pre">DOSMomentsCalculator.find_fermi_level()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.DOSMomentsCalculator.print_summary"><code class="docutils literal notranslate"><span class="pre">DOSMomentsCalculator.print_summary()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.DOSMomentsCalculator.save_moments"><code class="docutils literal notranslate"><span class="pre">DOSMomentsCalculator.save_moments()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="bands_submodule.html#cli-examples">CLI examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="bands_submodule.html#programmatic-examples">Programmatic examples</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="rsutil_module.html">The <cite>rsutil</cite> module</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="rsutil_module.html#module-rsutil">Core Functions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="rsutil_module.html#modules">Modules</a></li>
 <li class="toctree-l3"><a class="reference internal" href="rsutil_module.html#attributes">Attributes</a></li>
 <li class="toctree-l3"><a class="reference internal" href="rsutil_module.html#functions">Functions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="rsutil_module.html#examples">Examples</a></li>
 <li class="toctree-l3"><a class="reference internal" href="rsutil_module.html#rsutil.process_lattice"><code class="docutils literal notranslate"><span class="pre">process_lattice()</span></code></a></li>
 </ul>
 </li>
@@ -115,6 +178,7 @@
 <li class="toctree-l2"><a class="reference internal" href="#rsutil.exchange.exchange_map.find_matching_indices"><code class="docutils literal notranslate"><span class="pre">find_matching_indices()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#rsutil.exchange.exchange_map.get_fermi_energy"><code class="docutils literal notranslate"><span class="pre">get_fermi_energy()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#rsutil.exchange.exchange_map.get_neighbors_list"><code class="docutils literal notranslate"><span class="pre">get_neighbors_list()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#rsutil.exchange.exchange_map.get_unique_neighbors_per_shell"><code class="docutils literal notranslate"><span class="pre">get_unique_neighbors_per_shell()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#rsutil.exchange.exchange_map.read_namelists"><code class="docutils literal notranslate"><span class="pre">read_namelists()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#rsutil.exchange.exchange_map.read_rs_clust"><code class="docutils literal notranslate"><span class="pre">read_rs_clust()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#rsutil.exchange.exchange_map.store_jij_namelist"><code class="docutils literal notranslate"><span class="pre">store_jij_namelist()</span></code></a></li>
@@ -198,7 +262,7 @@ neighbors, and symmetry reduced neighbors.</p>
 </section>
 <dl class="py function">
 <dt class="sig sig-object py" id="rsutil.exchange.exchange_map.create_structure_and_analyzer">
-<span class="sig-prename descclassname"><span class="pre">rsutil.exchange.exchange_map.</span></span><span class="sig-name descname"><span class="pre">create_structure_and_analyzer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lattice_nml</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">input_nml</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Structure</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">SpacegroupAnalyzer</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#rsutil.exchange.exchange_map.create_structure_and_analyzer" title="Link to this definition"></a></dt>
+<span class="sig-prename descclassname"><span class="pre">rsutil.exchange.exchange_map.</span></span><span class="sig-name descname"><span class="pre">create_structure_and_analyzer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lattice_nml</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">input_nml</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cartesian</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">soc</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Structure</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">SpacegroupAnalyzer</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#rsutil.exchange.exchange_map.create_structure_and_analyzer" title="Link to this definition"></a></dt>
 <dd><p>Create a Structure object and SpacegroupAnalyzer from lattice and input NML files.</p>
 <section id="parameters">
 <h2>Parameters<a class="headerlink" href="#parameters" title="Link to this heading"></a></h2>
@@ -206,6 +270,12 @@ neighbors, and symmetry reduced neighbors.</p>
 <dt>lattice_nml<span class="classifier">dict</span></dt><dd><p>Parsed lattice NML file.</p>
 </dd>
 <dt>input_nml<span class="classifier">dict</span></dt><dd><p>Parsed input NML file.</p>
+</dd>
+<dt>cartesian<span class="classifier">bool, optional</span></dt><dd><p>If True (default), treat basis vectors as Cartesian coordinates and convert
+to fractional. If False, treat as fractional coordinates.</p>
+</dd>
+<dt>soc<span class="classifier">bool, optional</span></dt><dd><p>If True, account for spin-orbit coupling in symmetry considerations.
+SOC breaks time-reversal symmetry, reducing the spacegroup. Default False.</p>
 </dd>
 </dl>
 </section>
@@ -220,7 +290,7 @@ neighbors, and symmetry reduced neighbors.</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="rsutil.exchange.exchange_map.exchange_map">
-<span class="sig-prename descclassname"><span class="pre">rsutil.exchange.exchange_map.</span></span><span class="sig-name descname"><span class="pre">exchange_map</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cutoff</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#rsutil.exchange.exchange_map.exchange_map" title="Link to this definition"></a></dt>
+<span class="sig-prename descclassname"><span class="pre">rsutil.exchange.exchange_map.</span></span><span class="sig-name descname"><span class="pre">exchange_map</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cutoff</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unique</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shell_width</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">soc</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#rsutil.exchange.exchange_map.exchange_map" title="Link to this definition"></a></dt>
 <dd><p>Main function to read namelists, create structure and analyzer,
 get neighbors, and symmetry reduced neighbors.</p>
 <section id="id1">
@@ -229,6 +299,16 @@ get neighbors, and symmetry reduced neighbors.</p>
 <dt>cutoff<span class="classifier">float, optional</span></dt><dd><p>Cutoff distance to consider neighbors, by default 1.0.</p>
 </dd>
 <dt>verbose<span class="classifier">bool, optional</span></dt><dd><p>Flag to control printouts, by default False.</p>
+</dd>
+<dt>unique<span class="classifier">bool, optional</span></dt><dd><p>If True, find only unique neighbors per shell (one representative per 
+unique species-vector combination). Symmetry-equivalent vectors are grouped.
+by default False.</p>
+</dd>
+<dt>shell_width<span class="classifier">float, optional</span></dt><dd><p>Width of shells for grouping neighbors (used with unique=True), 
+by default 0.1.</p>
+</dd>
+<dt>soc<span class="classifier">bool, optional</span></dt><dd><p>If True, account for spin-orbit coupling in symmetry considerations.
+SOC breaks time-reversal symmetry, reducing effective symmetry. Default False.</p>
 </dd>
 </dl>
 </section>
@@ -303,11 +383,45 @@ get neighbors, and symmetry reduced neighbors.</p>
 </dd></dl>
 
 <dl class="py function">
+<dt class="sig sig-object py" id="rsutil.exchange.exchange_map.get_unique_neighbors_per_shell">
+<span class="sig-prename descclassname"><span class="pre">rsutil.exchange.exchange_map.</span></span><span class="sig-name descname"><span class="pre">get_unique_neighbors_per_shell</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cluster</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Molecule</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sites</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cutoff</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">2.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shell_width</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">spacegroup_analyzer</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">SpacegroupAnalyzer</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#rsutil.exchange.exchange_map.get_unique_neighbors_per_shell" title="Link to this definition"></a></dt>
+<dd><p>Get unique neighbors per shell for each atom in the cluster.</p>
+<p>For each neighbor shell (defined by distance), this function returns only one 
+representative neighbor per unique (species, symmetry-equivalent vector) combination.
+Symmetry-equivalent vectors (e.g., [1,2,2] and [-1,-2,-2]) are grouped together.
+This is useful for identifying structurally distinct neighbor environments.</p>
+<section id="id8">
+<h2>Parameters<a class="headerlink" href="#id8" title="Link to this heading"></a></h2>
+<dl class="simple">
+<dt>cluster<span class="classifier">Molecule</span></dt><dd><p>The cluster object containing atomic sites.</p>
+</dd>
+<dt>sites<span class="classifier">list</span></dt><dd><p>List of atom labels.</p>
+</dd>
+<dt>cutoff<span class="classifier">float, optional</span></dt><dd><p>Cutoff distance to consider neighbors, by default 2.0.</p>
+</dd>
+<dt>shell_width<span class="classifier">float, optional</span></dt><dd><p>Width of each shell to define neighbor groups, by default 0.1.</p>
+</dd>
+<dt>verbose<span class="classifier">bool, optional</span></dt><dd><p>Flag to control printouts, by default False.</p>
+</dd>
+<dt>spacegroup_analyzer<span class="classifier">SpacegroupAnalyzer, optional</span></dt><dd><p>The spacegroup analyzer for applying symmetry operations, by default None.</p>
+</dd>
+</dl>
+</section>
+<section id="id9">
+<h2>Returns<a class="headerlink" href="#id9" title="Link to this heading"></a></h2>
+<dl class="simple">
+<dt>dict</dt><dd><p>Dictionary of unique neighbors per shell for each atom.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py function">
 <dt class="sig sig-object py" id="rsutil.exchange.exchange_map.read_namelists">
 <span class="sig-prename descclassname"><span class="pre">rsutil.exchange.exchange_map.</span></span><span class="sig-name descname"><span class="pre">read_namelists</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lattice_file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">dict</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#rsutil.exchange.exchange_map.read_namelists" title="Link to this definition"></a></dt>
 <dd><p>Read input and lattice namelist files.</p>
-<section id="id8">
-<h2>Parameters<a class="headerlink" href="#id8" title="Link to this heading"></a></h2>
+<section id="id10">
+<h2>Parameters<a class="headerlink" href="#id10" title="Link to this heading"></a></h2>
 <dl class="simple">
 <dt>input_file<span class="classifier">str</span></dt><dd><p>Path to the input namelist file.</p>
 </dd>
@@ -317,8 +431,8 @@ get neighbors, and symmetry reduced neighbors.</p>
 </dd>
 </dl>
 </section>
-<section id="id9">
-<h2>Returns<a class="headerlink" href="#id9" title="Link to this heading"></a></h2>
+<section id="id11">
+<h2>Returns<a class="headerlink" href="#id11" title="Link to this heading"></a></h2>
 <dl class="simple">
 <dt>tuple</dt><dd><p>A tuple containing the parsed input and lattice namelists.</p>
 </dd>
@@ -343,8 +457,8 @@ input_file (str): Path to the input.nml file containing the &amp;atoms block.</p
 <dt class="sig sig-object py" id="rsutil.exchange.exchange_map.store_jij_namelist">
 <span class="sig-prename descclassname"><span class="pre">rsutil.exchange.exchange_map.</span></span><span class="sig-name descname"><span class="pre">store_jij_namelist</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_nml</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">matching_indices</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">atom_index</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="headerlink" href="#rsutil.exchange.exchange_map.store_jij_namelist" title="Link to this definition"></a></dt>
 <dd><p>Update the input namelist with post-processing information and matching indices.</p>
-<section id="id10">
-<h2>Parameters<a class="headerlink" href="#id10" title="Link to this heading"></a></h2>
+<section id="id12">
+<h2>Parameters<a class="headerlink" href="#id12" title="Link to this heading"></a></h2>
 <dl class="simple">
 <dt>input_nml<span class="classifier">dict</span></dt><dd><p>Parsed input namelist.</p>
 </dd>
@@ -354,8 +468,8 @@ input_file (str): Path to the input.nml file containing the &amp;atoms block.</p
 </dd>
 </dl>
 </section>
-<section id="id11">
-<h2>Returns<a class="headerlink" href="#id11" title="Link to this heading"></a></h2>
+<section id="id13">
+<h2>Returns<a class="headerlink" href="#id13" title="Link to this heading"></a></h2>
 <dl class="simple">
 <dt>dict</dt><dd><p>Updated input namelist.</p>
 </dd>

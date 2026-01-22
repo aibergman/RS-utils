@@ -56,18 +56,22 @@ def _make_common_parser():
     p = argparse.ArgumentParser(add_help=False)
     p.add_argument('--lattice', default='lattice.nml', help='Lattice file (default: lattice.nml)')
     p.add_argument('--hamiltonian', default='rs2txt.dat', help='Hamiltonian file (default: rs2txt.dat)')
+    p.add_argument('--lattice-format', choices=['rs-lmto', 'paoflow', 'kite'], 
+                   default=None, help='Lattice file format (auto-detect if not specified)')
+    p.add_argument('--hamiltonian-format', choices=['rs-lmto', 'paoflow', 'kite'],
+                   default=None, help='Hamiltonian file format (auto-detect if not specified)')
     return p
 
 
 def run_bands_subcommand(args):
     """Run band structure calculation or projections"""
-    from .bands import LatticeReader, HamiltonianReader, BandStructureCalculator
+    from .bands import load_lattice, load_hamiltonian, BandStructureCalculator
     
     print(f"Reading lattice from {args.lattice}...")
-    lattice = LatticeReader(args.lattice)
+    lattice = load_lattice(args.lattice, format=args.lattice_format)
     
     print(f"Reading Hamiltonian from {args.hamiltonian}...")
-    hamiltonian = HamiltonianReader(args.hamiltonian)
+    hamiltonian = load_hamiltonian(args.hamiltonian, format=args.hamiltonian_format)
     
     if args.projections:
         # Run projected bands
@@ -108,14 +112,14 @@ def run_bands_subcommand(args):
 
 def run_dos_subcommand(args):
     """Run DOS calculation or DOS moments analysis"""
-    from .bands import LatticeReader, HamiltonianReader, FullBZCalculator, DOSCalculator
+    from .bands import load_lattice, load_hamiltonian, FullBZCalculator, DOSCalculator
     
     if args.moments:
         # Run DOS moments analysis
         from .bands.dos_moments import DOSMomentsCalculator
         
-        lattice = LatticeReader(args.lattice)
-        hamiltonian = HamiltonianReader(args.hamiltonian)
+        lattice = load_lattice(args.lattice, format=args.lattice_format)
+        hamiltonian = load_hamiltonian(args.hamiltonian, format=args.hamiltonian_format)
         bz_calc = FullBZCalculator(lattice, hamiltonian)
         dos_calc = DOSCalculator(bz_calc)
         
@@ -171,8 +175,8 @@ def run_dos_subcommand(args):
         print("Done!")
     else:
         # Run regular DOS calculation
-        lattice = LatticeReader(args.lattice)
-        hamiltonian = HamiltonianReader(args.hamiltonian)
+        lattice = load_lattice(args.lattice, format=args.lattice_format)
+        hamiltonian = load_hamiltonian(args.hamiltonian, format=args.hamiltonian_format)
         bz_calc = FullBZCalculator(lattice, hamiltonian)
         dos_calc = DOSCalculator(bz_calc)
         

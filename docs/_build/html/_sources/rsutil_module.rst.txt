@@ -21,6 +21,7 @@ Submodules
 
 The package is organized into several submodules:
 
+- **``rsutil.bands``**: Band structure, DOS, projections, DOS moments
 - **``rsutil.viz``**: Visualization tools for structures and simulations
 - **``rsutil.exchange``**: Exchange interaction calculation and mapping
 - **``rsutil.export``**: Export functionality for other simulation formats

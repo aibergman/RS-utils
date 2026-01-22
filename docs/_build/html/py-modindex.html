@@ -13,7 +13,7 @@
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="_static/documentation_options.js?v=5929fcd5"></script>
-      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/doctools.js?v=9a2dae69"></script>
       <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
@@ -45,6 +45,7 @@
               <p class="caption" role="heading"><span class="caption-text">Command-Line Interface:</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="cli_section.html">Command-Line Interface (CLI)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="cli_section.html#band-and-dos">Band and DOS</a></li>
 <li class="toctree-l2"><a class="reference internal" href="cli_section.html#lattice-processing">Lattice Processing</a></li>
 <li class="toctree-l2"><a class="reference internal" href="cli_section.html#visualization">Visualization</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="cli_section.html#visualizer-controls">Visualizer Controls</a></li>
@@ -61,8 +62,10 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="rsutil_module.html">The <cite>rsutil</cite> module</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="rsutil_module.html#module-rsutil">Core Functions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="rsutil_module.html#modules">Modules</a></li>
 <li class="toctree-l3"><a class="reference internal" href="rsutil_module.html#attributes">Attributes</a></li>
 <li class="toctree-l3"><a class="reference internal" href="rsutil_module.html#functions">Functions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="rsutil_module.html#examples">Examples</a></li>
 <li class="toctree-l3"><a class="reference internal" href="rsutil_module.html#rsutil.process_lattice"><code class="docutils literal notranslate"><span class="pre">process_lattice()</span></code></a></li>
 </ul>
 </li>
@@ -122,6 +125,7 @@
 <li class="toctree-l2"><a class="reference internal" href="exchange_map_module.html#rsutil.exchange.exchange_map.find_matching_indices"><code class="docutils literal notranslate"><span class="pre">find_matching_indices()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="exchange_map_module.html#rsutil.exchange.exchange_map.get_fermi_energy"><code class="docutils literal notranslate"><span class="pre">get_fermi_energy()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="exchange_map_module.html#rsutil.exchange.exchange_map.get_neighbors_list"><code class="docutils literal notranslate"><span class="pre">get_neighbors_list()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="exchange_map_module.html#rsutil.exchange.exchange_map.get_unique_neighbors_per_shell"><code class="docutils literal notranslate"><span class="pre">get_unique_neighbors_per_shell()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="exchange_map_module.html#rsutil.exchange.exchange_map.read_namelists"><code class="docutils literal notranslate"><span class="pre">read_namelists()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="exchange_map_module.html#rsutil.exchange.exchange_map.read_rs_clust"><code class="docutils literal notranslate"><span class="pre">read_rs_clust()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="exchange_map_module.html#rsutil.exchange.exchange_map.store_jij_namelist"><code class="docutils literal notranslate"><span class="pre">store_jij_namelist()</span></code></a></li>
@@ -129,6 +133,59 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="export_submodule.html">The <cite>export</cite> submodule</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="export_submodule.html#uppasd-export">UppASD Export</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="bands_submodule.html">The <cite>bands</cite> submodule</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="bands_submodule.html#key-capabilities">Key capabilities</a></li>
+<li class="toctree-l2"><a class="reference internal" href="bands_submodule.html#core-classes">Core classes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="bands_submodule.html#rsutil.bands.LatticeReader"><code class="docutils literal notranslate"><span class="pre">LatticeReader</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.LatticeReader.get_structure_info"><code class="docutils literal notranslate"><span class="pre">LatticeReader.get_structure_info()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.LatticeReader.parse_lattice_file"><code class="docutils literal notranslate"><span class="pre">LatticeReader.parse_lattice_file()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="bands_submodule.html#rsutil.bands.HamiltonianReader"><code class="docutils literal notranslate"><span class="pre">HamiltonianReader</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.HamiltonianReader.organize_hamiltonian_data"><code class="docutils literal notranslate"><span class="pre">HamiltonianReader.organize_hamiltonian_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.HamiltonianReader.parse_hamiltonian_file"><code class="docutils literal notranslate"><span class="pre">HamiltonianReader.parse_hamiltonian_file()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="bands_submodule.html#rsutil.bands.BandStructureCalculator"><code class="docutils literal notranslate"><span class="pre">BandStructureCalculator</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.BandStructureCalculator.calculate_bands"><code class="docutils literal notranslate"><span class="pre">BandStructureCalculator.calculate_bands()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.BandStructureCalculator.dump_hamiltonian_at_custom_points"><code class="docutils literal notranslate"><span class="pre">BandStructureCalculator.dump_hamiltonian_at_custom_points()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.BandStructureCalculator.dump_hamiltonian_at_points"><code class="docutils literal notranslate"><span class="pre">BandStructureCalculator.dump_hamiltonian_at_points()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.BandStructureCalculator.fourier_transform_hamiltonian"><code class="docutils literal notranslate"><span class="pre">BandStructureCalculator.fourier_transform_hamiltonian()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.BandStructureCalculator.plot_bands"><code class="docutils literal notranslate"><span class="pre">BandStructureCalculator.plot_bands()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.BandStructureCalculator.setup_kpath"><code class="docutils literal notranslate"><span class="pre">BandStructureCalculator.setup_kpath()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="bands_submodule.html#rsutil.bands.ProjectedBandCalculator"><code class="docutils literal notranslate"><span class="pre">ProjectedBandCalculator</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.ProjectedBandCalculator.calculate_projected_bands"><code class="docutils literal notranslate"><span class="pre">ProjectedBandCalculator.calculate_projected_bands()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.ProjectedBandCalculator.plot_projected_bands"><code class="docutils literal notranslate"><span class="pre">ProjectedBandCalculator.plot_projected_bands()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.ProjectedBandCalculator.plot_projection_analysis"><code class="docutils literal notranslate"><span class="pre">ProjectedBandCalculator.plot_projection_analysis()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="bands_submodule.html#rsutil.bands.FullBZCalculator"><code class="docutils literal notranslate"><span class="pre">FullBZCalculator</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.FullBZCalculator.calculate_full_bz_bands"><code class="docutils literal notranslate"><span class="pre">FullBZCalculator.calculate_full_bz_bands()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.FullBZCalculator.generate_kpoint_mesh"><code class="docutils literal notranslate"><span class="pre">FullBZCalculator.generate_kpoint_mesh()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="bands_submodule.html#rsutil.bands.DOSCalculator"><code class="docutils literal notranslate"><span class="pre">DOSCalculator</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.DOSCalculator.calculate_dos"><code class="docutils literal notranslate"><span class="pre">DOSCalculator.calculate_dos()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.DOSCalculator.calculate_dos_with_moments"><code class="docutils literal notranslate"><span class="pre">DOSCalculator.calculate_dos_with_moments()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.DOSCalculator.plot_dos"><code class="docutils literal notranslate"><span class="pre">DOSCalculator.plot_dos()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="bands_submodule.html#rsutil.bands.DOSMomentsCalculator"><code class="docutils literal notranslate"><span class="pre">DOSMomentsCalculator</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.DOSMomentsCalculator.calculate_moments"><code class="docutils literal notranslate"><span class="pre">DOSMomentsCalculator.calculate_moments()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.DOSMomentsCalculator.fermi_dirac"><code class="docutils literal notranslate"><span class="pre">DOSMomentsCalculator.fermi_dirac()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.DOSMomentsCalculator.find_fermi_level"><code class="docutils literal notranslate"><span class="pre">DOSMomentsCalculator.find_fermi_level()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.DOSMomentsCalculator.print_summary"><code class="docutils literal notranslate"><span class="pre">DOSMomentsCalculator.print_summary()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="bands_submodule.html#rsutil.bands.DOSMomentsCalculator.save_moments"><code class="docutils literal notranslate"><span class="pre">DOSMomentsCalculator.save_moments()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="bands_submodule.html#cli-examples">CLI examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="bands_submodule.html#programmatic-examples">Programmatic examples</a></li>
 </ul>
 </li>
 </ul>

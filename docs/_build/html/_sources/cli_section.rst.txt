@@ -3,17 +3,39 @@
 Command-Line Interface (CLI)
 =============================
 
-The **RS-utils CLI** provides a powerful command-line interface for interacting with the `rsutil` package. It allows users to process lattice structures, visualize data, create exchange input files, and export to other simulation formats with ease.
+The **RS-utils CLI** provides two main Python-only subcommands for band/DOS analysis plus legacy flags for lattice, exchange, export, and visualization.
 
-You can use the CLI to run various tasks by providing the corresponding flags. Below is an overview of the available options and usage examples.
-
-**Usage:**
-
-To use the CLI, run the script with the desired flags from your terminal:
+Top-level usage:
 
 .. code-block:: bash
 
-    rsutil [--flag] [options]
+    rsutil {bands,dos} [options]
+    rsutil [--setup|--exchange|--export|--lattice|--clust] [options]
+
+Band and DOS
+------------
+
+**Bands**
+
+.. code-block:: bash
+
+    # Band structure (high-symmetry path)
+    rsutil bands --lattice lattice.nml --hamiltonian rs2txt.dat --nk 100 --output bands.png
+
+    # Projected bands
+    rsutil bands --lattice lattice.nml --hamiltonian rs2txt.dat --nk 100 \
+                 --projections --projection orbital
+
+**DOS**
+
+.. code-block:: bash
+
+    # DOS with tetrahedron method
+    rsutil dos --lattice lattice.nml --hamiltonian rs2txt.dat --mesh 6 6 6
+
+    # DOS moments + Fermi level from electron count
+    rsutil dos --lattice lattice.nml --hamiltonian rs2txt.dat --mesh 6 6 6 \
+               --electrons 16 --moments
 
 
 Lattice Processing

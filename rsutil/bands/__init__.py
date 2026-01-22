@@ -7,6 +7,7 @@ This module provides comprehensive electronic structure analysis including:
 - Orbital and site projections
 - DOS moments and Fermi level determination
 - Non-collinear spin texture analysis
+- Support for multiple Hamiltonian formats (RS-LMTO, PAOFLOW, KITE)
 
 Examples
 --------
@@ -20,6 +21,13 @@ Basic band structure calculation:
     >>> bands = calc.calculate_bands(kpoints)
     >>> calc.plot_bands(kdist, bands, klabels, 'bands.png')
 
+Using format detection:
+
+    >>> from rsutil.bands import load_lattice, load_hamiltonian, BandStructureCalculator
+    >>> lattice = load_lattice('lattice.nml')  # Auto-detects RS-LMTO
+    >>> hamiltonian = load_hamiltonian('rs2txt.dat')
+    >>> calc = BandStructureCalculator(lattice, hamiltonian)
+
 DOS calculation:
 
     >>> from rsutil.bands import DOSCalculator, FullBZCalculator
@@ -29,7 +37,16 @@ DOS calculation:
     >>> dos_calc.plot_dos(dos_data, fermi_energy=0.0, output_file='dos.png')
 """
 
-from .readers import LatticeReader, HamiltonianReader
+from .readers import (
+    LatticeReader,
+    HamiltonianReader,
+    BaseLatticeReader,
+    BaseHamiltonianReader,
+    load_lattice,
+    load_hamiltonian,
+    detect_lattice_format,
+    detect_hamiltonian_format,
+)
 from .band_structure import BandStructureCalculator
 from .dos import DOSCalculator, FullBZCalculator, TetrahedronDOS
 from .dos_moments import DOSMomentsCalculator
@@ -40,8 +57,16 @@ from .band_analysis import BandAnalyzer
 __version__ = "1.0.0"
 
 __all__ = [
+    # Readers and factories
     "LatticeReader",
     "HamiltonianReader",
+    "BaseLatticeReader",
+    "BaseHamiltonianReader",
+    "load_lattice",
+    "load_hamiltonian",
+    "detect_lattice_format",
+    "detect_hamiltonian_format",
+    # Calculators
     "BandStructureCalculator",
     "DOSCalculator",
     "FullBZCalculator",
@@ -51,3 +76,4 @@ __all__ = [
     "SpinAnalyzer",
     "BandAnalyzer",
 ]
+
