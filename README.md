@@ -1,15 +1,19 @@
 # RS-utils
 
-RS-utils is a collection of modular Fortran utilities designed to support the RS‐LMTO‐ASA electronic structure code. This repository provides routines for reading and writing namelist files, processing lattice and atomic data, performing sphere-based calculations, and other related tasks used in LMTO calculations.
+RS-utils is a Python + Fortran toolkit for RS-LMTO workflows. It now includes a pure-Python band structure and DOS analysis module alongside the existing Fortran utilities for lattice setup and exchange/export workflows.
 
-## Description
+## Components
 
-The RS‐LMTO‐ASA method requires a variety of input and processing routines to handle configuration files, atomic data, and lattice information. This project gathers those utilities into a well-structured, modern Fortran codebase that includes:
+- **Band/DOS analysis (Python):**
+    - High-symmetry band structures with projections (orbital/site/spin)
+    - DOS with tetrahedron or Gaussian broadening
+    - DOS moments and Fermi level determination
+    - Requires only Python + NumPy/SciPy/Matplotlib/Spglib (no Fortran runtime)
 
-- **Namelist I/O:** Subroutines for reading and updating input files (e.g., lattice and atoms namelists).
-- **Atomic Utilities:** Functions to determine atomic numbers, electron counts, and other properties.
-- **Lattice Processing:** Routines to read, update, and write lattice configurations.
-- **Sphere Calculations:** Modules for initializing spheres, parsing structures, performing calculations, and writing output as needed for RS‐LMTO‐ASA.
+- **Legacy RS-LMTO utilities (Fortran):**
+    - Namelist I/O and lattice processing
+    - Exchange interaction mapping and export to UppASD
+    - CMake-based build of the Fortran library and tools
 
 ## Features
 
@@ -20,38 +24,69 @@ The RS‐LMTO‐ASA method requires a variety of input and processing routines t
 
 ## Installation
 
-### Prerequisites
+### Python (recommended)
 
-- A Fortran compiler that supports Fortran 2008 (e.g., gfortran, ifort)
-- CMake (version 3.10 or higher)
+```bash
+pip install -e .
+```
 
-### Building the Project
+Key runtime dependencies: numpy, scipy, matplotlib, spglib (pymatgen/seekpath used for k-paths).
 
-1. **Clone the repository:**
+### Fortran build (optional, for legacy utilities)
 
-    ```bash
-    git clone https://github.com/anbergman/RS-utils.git
-    ```
+```bash
+cmake -S . -B build
+cmake --build build
+```
 
-2. **Navigate to the project directory:**
+## CLI Usage
 
-    ```bash
-    cd RS-utils
-    ```
+Band structure and DOS (pure Python):
 
-3. **Create a build directory and configure the project with CMake:**
+```bash
+# Band structure (high-symmetry path)
+rsutil bands --lattice lattice.nml --hamiltonian rs2txt.dat --nk 100 --output bands.png
 
-    ```bash
-    cmake -S . -B build
-    ```
+# Projected bands
+rsutil bands --lattice lattice.nml --hamiltonian rs2txt.dat --nk 100 --projections --projection orbital
 
-4. **Build the project:**
+# DOS with Fermi level and moments
+rsutil dos --lattice lattice.nml --hamiltonian rs2txt.dat --mesh 6 6 6 --electrons 16 --moments
+```
 
-    ```bash
-    cmake --build .
-    ```
+Legacy workflow (Fortran-backed):
 
-This will create a binary `process_lattice.x` in the `./build/bin` directory of your repository.
+```bash
+# Lattice setup
+rsutil --setup --empty_spheres
+
+# Exchange interactions
+rsutil --exchange --cutoff 2.5 --unique --shell-width 0.1
+
+# Export to UppASD
+rsutil --export --data . --jij jijso.out --out uppasd_out
+```
+
+## Programmatic Examples (Python)
+
+```python
+from rsutil.bands import LatticeReader, HamiltonianReader, BandStructureCalculator, DOSCalculator, FullBZCalculator
+
+lattice = LatticeReader('lattice.nml')
+hamiltonian = HamiltonianReader('rs2txt.dat')
+
+# Bands
+calc = BandStructureCalculator(lattice, hamiltonian)
+kpoints, klabels, kdist = calc.setup_kpath(npoints=100)
+bands = calc.calculate_bands(kpoints)
+calc.plot_bands(kdist, bands, klabels, 'bands.png')
+
+# DOS
+bz = FullBZCalculator(lattice, hamiltonian)
+dos_calc = DOSCalculator(bz)
+dos = dos_calc.calculate_dos(mesh_size=(6, 6, 6))
+dos_calc.plot_dos(dos, fermi_energy=0.0, output_file='dos.png')
+```
 
 ## Usage
 
