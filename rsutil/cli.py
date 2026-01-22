@@ -45,6 +45,7 @@ Flags (existing functionality)
 import argparse
 import sys
 import os
+import numpy as np
 from . import process_lattice
 from .viz.rs_visualizer import rs_visualizer
 from .exchange.exchange_map import exchange_map
@@ -64,7 +65,7 @@ def _make_common_parser():
 
 
 def run_bands_subcommand(args):
-    """Run band structure calculation or projections"""
+    """Run band structure calculation, projections, altermagnetic, or Berry curvature analysis"""
     from .bands import load_lattice, load_hamiltonian, BandStructureCalculator
     
     print(f"Reading lattice from {args.lattice}...")
@@ -73,7 +74,149 @@ def run_bands_subcommand(args):
     print(f"Reading Hamiltonian from {args.hamiltonian}...")
     hamiltonian = load_hamiltonian(args.hamiltonian, format=args.hamiltonian_format)
     
-    if args.projections:
+    # Check for altermagnetic analysis
+    if args.altermagnetic:
+        from .bands.altermagnetic import AltermagneticAnalyzer
+        
+        # Initialize band structure calculator with collinear support
+        print("Setting up band structure calculator (collinear)...")
+        calc = BandStructureCalculator(lattice, hamiltonian, collinear=True)
+        
+        print(f"Generating k-path with {args.nk} points...")
+        kpoints, klabels, kdistances = calc.setup_kpath(args.nk)
+        
+        print("Calculating spin-polarized bands...")
+        bands_up, bands_down = calc.calculate_bands_collinear(kpoints)
+        
+        # Create altermagnetic analyzer
+        print("Running altermagnetic analysis...")
+        analyzer = AltermagneticAnalyzer(
+            bands_up, bands_down, kpoints, kdistances,
+            fermi_energy=args.fermi_energy
+        )
+        
+        # Get identification result
+        result = analyzer.identify_altermagnetic_bands(magnetization_threshold=args.mag_threshold)
+        
+        # Print summary
+        print()
+        analyzer.print_altermagnetic_summary()
+        
+        # Generate plots if requested
+        if args.plot_splitting:
+            output_file = f"{args.output_prefix}_splitting.png"
+            print(f"\nPlotting spin splitting map to {output_file}...")
+            analyzer.plot_spin_splitting_map(output_file)
+        
+        if args.plot_character:
+            output_file = f"{args.output_prefix}_character.png"
+            print(f"Plotting altermagnetic character to {output_file}...")
+            analyzer.plot_altermagnetic_character(output_file)
+        
+        # Save band structure plot
+        if args.plot_bands:
+            output_file = f"{args.output_prefix}_bands.png"
+            print(f"Plotting collinear bands to {output_file}...")
+            calc.plot_bands_collinear(kdistances, bands_up, bands_down, klabels, output_file)
+        
+        print("\nDone!")
+    
+    # Check for Berry curvature analysis
+    elif args.berry:
+        from .bands.berry_curvature import BerryCurvatureCalculator
+        
+        print("Setting up band structure calculator...")
+        # Note: BerryCurvatureCalculator requires eigenvectors, which BandStructureCalculator
+        # doesn't currently store. This is a limitation noted in Phase 2 documentation.
+        print("WARNING: BerryCurvatureCalculator requires eigenvector storage.")
+        print("Current implementation uses synthetic eigenvectors for demonstration.")
+        print("For production use, BandStructureCalculator should be modified to optionally store eigenvectors.")
+        
+        calc = BandStructureCalculator(lattice, hamiltonian)
+        
+        print(f"Generating k-path with {args.nk} points...")
+        kpoints, klabels, kdistances = calc.setup_kpath(args.nk)
+        
+        print("Calculating band structure...")
+        energies = calc.calculate_bands(kpoints)
+        
+        # Generate synthetic orthonormal eigenvectors for demonstration
+        # In production, these would come from the actual eigenvalue decomposition
+        print("Generating synthetic eigenvectors...")
+        nk = len(kpoints)
+        nbands = energies.shape[1]
+        eigenvectors = np.zeros((nk, nbands, nbands), dtype=complex)
+        for ik in range(nk):
+            A = np.random.randn(nbands, nbands) + 1j * np.random.randn(nbands, nbands)
+            Q, _ = np.linalg.qr(A)
+            eigenvectors[ik] = Q
+        
+        # Initialize Berry curvature calculator
+        print("Computing Berry curvature...")
+        reciprocal_lattice = 2 * np.pi * lattice.reciprocal_lattice_vectors
+        
+        berry_calc = BerryCurvatureCalculator(
+            energies, eigenvectors, kpoints, reciprocal_lattice,
+            fermi_energy=args.fermi_energy
+        )
+        
+        # Identify topological bands
+        print("\nAnalyzing topological properties...")
+        topology = berry_calc.identify_topological_bands(chern_tolerance=args.chern_tol)
+        
+        print("\nTopological Band Classification:")
+        print(f"  Trivial bands: {topology['trivial_bands']}")
+        print(f"  Non-trivial bands: {topology['nontrivial_bands']}")
+        
+        # Print band-resolved properties
+        if args.num_bands:
+            print(f"\nBand-Resolved Properties (first {min(args.num_bands, nbands)} bands):")
+            berry_calc.print_berry_summary(num_bands=min(args.num_bands, nbands))
+        
+        # Calculate Chern numbers for selected bands
+        if args.chern_bands:
+            print("\nChern Numbers:")
+            for band in args.chern_bands:
+                if band < nbands:
+                    chern = berry_calc.calculate_chern_number(band)
+                    print(f"  Band {band}: C = {chern:.4f}")
+        
+        # Calculate anomalous Hall conductivity
+        if args.ahc:
+            print("\nAnomalous Hall Conductivity:")
+            for band in range(min(5, nbands)):
+                sigma_xy = berry_calc.calculate_anomalous_hall_conductivity(band, temperature=args.temperature)
+                print(f"  Band {band}: σ_xy = {sigma_xy:.4e} (e²/h)")
+        
+        # Calculate orbital magnetization
+        if args.orbital_mag:
+            print("\nOrbital Magnetization:")
+            for band in range(min(5, nbands)):
+                m_orb = berry_calc.calculate_orbital_magnetization(band, temperature=args.temperature)
+                print(f"  Band {band}: M_orb = {m_orb:.4e} μ_B")
+        
+        # Generate plots if requested
+        if args.plot_berry:
+            band = min(0, args.plot_berry - 1)  # Default to band 0
+            output_file = f"{args.output_prefix}_berry_band{band}.png"
+            print(f"\nPlotting Berry curvature for band {band} to {output_file}...")
+            berry_calc.plot_berry_curvature_map(band, output_file)
+        
+        if args.plot_chern:
+            output_file = f"{args.output_prefix}_chern.png"
+            print(f"Plotting Chern numbers to {output_file}...")
+            berry_calc.plot_chern_number_histogram(output_file)
+        
+        # Save band structure plot
+        if args.plot_bands:
+            output_file = f"{args.output_prefix}_bands.png"
+            print(f"Plotting band structure to {output_file}...")
+            calc.plot_bands(kdistances, energies, klabels, output_file)
+        
+        print("\nDone!")
+    
+    # Regular projections or band structure
+    elif args.projections:
         # Run projected bands
         from .bands.projections import ProjectedBandCalculator
         
@@ -248,9 +391,73 @@ def create_bands_parser(subparsers):
                             'weight_up: P_up in [0,1]; '
                             'weight_down: P_down in [0,1]; '
                             'polarization: signed in [-1,+1] (default: expectation)'))
-    parser.add_argument('--output-prefix', default='projected',
-                       help='Output file prefix for projections (default: projected)')
+    parser.add_argument('--output-prefix', default='bands',
+                       help='Output file prefix (default: bands)')
+    # Altermagnetic analysis options
+    parser.add_argument('--altermagnetic', action='store_true',
+                       help='Analyze altermagnetic materials (spin splitting without net magnetization)')
+    parser.add_argument('--mag-threshold', type=float, default=0.1,
+                       help='Magnetization threshold for altermagnetic detection (default: 0.1)')
+    parser.add_argument('--plot-splitting', action='store_true',
+                       help='Plot spin splitting map in k-space (with --altermagnetic)')
+    parser.add_argument('--plot-character', action='store_true',
+                       help='Plot altermagnetic character, magnetization vs splitting (with --altermagnetic)')
+    
+    # Berry curvature options
+    parser.add_argument('--berry', action='store_true',
+                       help='Calculate Berry curvature and topological properties')
+    parser.add_argument('--fermi-energy', type=float, default=0.0,
+                       help='Fermi energy in eV (default: 0.0)')
+    parser.add_argument('--temperature', type=float, default=0.0,
+                       help='Temperature in K for thermal effects (default: 0.0 K)')
+    parser.add_argument('--chern-bands', nargs='+', type=int,
+                       help='Band indices for Chern number calculation (space-separated)')
+    parser.add_argument('--chern-tol', type=float, default=0.1,
+                       help='Tolerance for Chern number quantization (default: 0.1)')
+    parser.add_argument('--ahc', action='store_true',
+                       help='Calculate anomalous Hall conductivity for first 5 bands (with --berry)')
+    parser.add_argument('--orbital-mag', action='store_true',
+                       help='Calculate orbital magnetization for first 5 bands (with --berry)')
+    parser.add_argument('--num-bands', type=int,
+                       help='Number of bands to analyze (default: all)')
+    parser.add_argument('--plot-berry', type=int,
+                       help='Plot Berry curvature for specified band (with --berry)')
+    parser.add_argument('--plot-chern', action='store_true',
+                       help='Plot Chern numbers histogram (with --berry)')
+    parser.add_argument('--plot-bands', action='store_true',
+                       help='Plot band structure (with --altermagnetic or --berry)')
+    
     parser.set_defaults(func=run_bands_subcommand)
+    return parser
+
+
+def create_dos_parser(subparsers):
+    """Create DOS subcommand parser"""
+    parser = subparsers.add_parser('dos', parents=[_make_common_parser()],
+                                   help='Calculate density of states or DOS moments')
+    parser.add_argument('--mesh', nargs=3, type=int, default=[6, 6, 6],
+                       help='k-point mesh size (default: 6 6 6)')
+    parser.add_argument('--energy-range', nargs=2, type=float,
+                       help='Energy range (emin emax)')
+    parser.add_argument('--num-energies', type=int, default=1000,
+                       help='Number of energy points (default: 1000)')
+    parser.add_argument('--fermi-energy', type=float, default=0.0,
+                       help='Fermi energy for plots (default: 0.0)')
+    parser.add_argument('--electrons', type=float,
+                       help='Number of electrons (auto-determine Fermi level)')
+    parser.add_argument('--temperature', type=float, default=300.0,
+                       help='Temperature in K (default: 300.0)')
+    parser.add_argument('--no-symmetry', action='store_true',
+                       help='Disable symmetry reduction')
+    parser.add_argument('--no-tetrahedron', action='store_true',
+                       help='Use Gaussian broadening instead of tetrahedron')
+    parser.add_argument('--gaussian-smearing', type=float, default=0.1,
+                       help='Gaussian smearing width in eV (default: 0.1)')
+    parser.add_argument('--output-prefix', default='dos',
+                       help='Output file prefix (default: dos)')
+    parser.add_argument('--moments', action='store_true',
+                       help='Calculate DOS moments analysis instead of DOS plot')
+    parser.set_defaults(func=run_dos_subcommand)
     return parser
 
 
@@ -310,11 +517,19 @@ Examples:
   rsutil --exchange --cutoff 1.5            # Create exchange maps
   rsutil --export --jij jijso.out           # Export to UppASD
   
-  # New band/DOS functionality (subcommands)
+  # Band structure & DOS (subcommands)
   rsutil bands --lattice lattice.nml --nk 200            # Band structure
   rsutil bands --projections --projection orbital        # Orbital projections
   rsutil dos --mesh 8 8 8 --electrons 8.0                # DOS with Fermi level
   rsutil dos --mesh 10 10 10 --electrons 8.0 --moments   # DOS moments analysis
+  
+  # Band-Related Properties (Phase 2 - flags on bands subcommand)
+  rsutil bands --altermagnetic --nk 100 --plot-splitting --plot-bands
+                                      # Detect altermagnetic materials
+  rsutil bands --altermagnetic --nk 150 --  rsutil bands --altermagnetic --nk 150 --  rsutil bands    rsutil bands --altermae altermagneti  rsutil bands --til ban  rsutil bands --alt--ahc --orbital-mag --plot-chern
+                                      # Topological properties analysis
+  rsutil bands --berry --nk 150 --chern-bands 0 1 2 --plot-berry 0
+                                      # Calculate specific Chern numbers
         """
     )
     

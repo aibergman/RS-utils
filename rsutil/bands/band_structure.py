@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 from scipy.linalg import eigh
 from pathlib import Path
 import argparse
-from typing import Tuple, Dict, List, Optional
+from typing import Tuple, Dict, List
 import warnings
 
 from .readers import LatticeReader, HamiltonianReader
@@ -40,13 +40,35 @@ except ImportError:
 
 
 class BandStructureCalculator:
-    """Calculate band structure using TB-LMTO Hamiltonian"""
+    """Calculate band structure using TB-LMTO Hamiltonian
     
-    def __init__(self, lattice_reader: LatticeReader, hamiltonian_reader: HamiltonianReader):
+    Supports both non-collinear (default) and collinear spin-polarized calculations.
+    
+    Parameters
+    ----------
+    lattice_reader : LatticeReader
+        Reader for lattice structure
+    hamiltonian_reader : HamiltonianReader
+        Reader for Hamiltonian data
+    collinear : bool, optional
+        If True, separate spin-up and spin-down bands for collinear magnetism.
+        If False (default), use full non-collinear Hamiltonian.
+        
+    Attributes
+    ----------
+    collinear : bool
+        Whether to use collinear spin treatment
+    """
+    
+    def __init__(self, lattice_reader: LatticeReader, hamiltonian_reader: HamiltonianReader,
+                 collinear: bool = False):
         self.lattice = lattice_reader
         self.hamiltonian = hamiltonian_reader
+        self.collinear = collinear
         self.kpath = None
         self.band_energies = None
+        self.band_energies_up = None
+        self.band_energies_down = None
         
     def setup_kpath(self, num_points: int = 100) -> Tuple[np.ndarray, List[str], np.ndarray]:
         """Setup k-point path using structure analysis"""
@@ -171,6 +193,75 @@ class BandStructureCalculator:
         
         return np.array(kpoints), klabels, np.array(kdistances)
     
+    def extract_spin_blocks(self, H_full: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """Extract spin-up and spin-down blocks from full Hamiltonian
+        
+        The full Hamiltonian has structure (for each atom, 18×18 total):
+        - Indices 0-8: spin-up orbitals (9 orbitals)
+        - Indices 9-17: spin-down orbitals (9 orbitals)
+        
+        For collinear magnetism, we extract:
+        - H_up: diagonal block [0:9, 0:9] for all atoms
+        - H_down: diagonal block [9:18, 9:18] for all atoms
+        
+        Off-diagonal blocks represent spin-flip terms (SOC, non-collinear),
+        which are ignored in collinear approximation.
+        
+        Parameters
+        ----------
+        H_full : np.ndarray
+            Full Hamiltonian matrix (nbas*18 × nbas*18)
+            
+        Returns
+        -------
+        H_up : np.ndarray
+            Spin-up Hamiltonian (nbas*9 × nbas*9)
+        H_down : np.ndarray
+            Spin-down Hamiltonian (nbas*9 × nbas*9)
+        """
+        n_atoms = self.lattice.nbas
+        n_orb_per_spin = 9  # 9 orbitals per spin channel
+        n_up = n_atoms * n_orb_per_spin
+        n_down = n_atoms * n_orb_per_spin
+        
+        # Initialize spin-resolved Hamiltonians
+        H_up = np.zeros((n_up, n_up), dtype=complex)
+        H_down = np.zeros((n_down, n_down), dtype=complex)
+        
+        # Extract blocks for each atom
+        for iatom in range(n_atoms):
+            # Indices in full Hamiltonian
+            full_start = iatom * 18
+            up_start_full = full_start
+            up_end_full = full_start + 9
+            down_start_full = full_start + 9
+            down_end_full = full_start + 18
+            
+            # Indices in spin-resolved Hamiltonians
+            spin_start = iatom * 9
+            spin_end = spin_start + 9
+            
+            # Extract spin-up block
+            for jatom in range(n_atoms):
+                jfull_start = jatom * 18
+                jup_start_full = jfull_start
+                jup_end_full = jfull_start + 9
+                jdown_start_full = jfull_start + 9
+                jdown_end_full = jfull_start + 18
+                
+                jspin_start = jatom * 9
+                jspin_end = jspin_start + 9
+                
+                # Copy spin-up to spin-up block
+                H_up[spin_start:spin_end, jspin_start:jspin_end] = \
+                    H_full[up_start_full:up_end_full, jup_start_full:jup_end_full]
+                
+                # Copy spin-down to spin-down block
+                H_down[spin_start:spin_end, jspin_start:jspin_end] = \
+                    H_full[down_start_full:down_end_full, jdown_start_full:jdown_end_full]
+        
+        return H_up, H_down
+    
     def fourier_transform_hamiltonian(self, k_point: np.ndarray) -> np.ndarray:
         """Fourier transform the real-space Hamiltonian to k-space"""
         
@@ -285,7 +376,25 @@ class BandStructureCalculator:
         # print(f"Text dump saved to {filename}")
     
     def calculate_bands(self, kpoints: np.ndarray) -> np.ndarray:
-        """Calculate band structure for given k-points"""
+        """Calculate band structure for given k-points
+        
+        For collinear=False (default): Returns all bands from full 18×18 Hamiltonian
+        For collinear=True: Use calculate_bands_collinear() instead
+        
+        Parameters
+        ----------
+        kpoints : np.ndarray
+            Array of k-points in crystal coordinates (nk × 3)
+            
+        Returns
+        -------
+        band_energies : np.ndarray
+            Band energies at each k-point (nk × nbands)
+        """
+        if self.collinear:
+            raise ValueError("For collinear calculations, use calculate_bands_collinear() "
+                           "which returns separate up and down bands")
+        
         num_kpoints = len(kpoints)
         total_orbitals = self.lattice.nbas * self.hamiltonian.orbital_size
         
@@ -297,6 +406,61 @@ class BandStructureCalculator:
             band_energies[i, :] = np.real(eigenvalues)  # Take real part
         
         return band_energies
+    
+    def calculate_bands_collinear(self, kpoints: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """Calculate spin-polarized band structure for collinear magnetism
+        
+        Extracts spin-up and spin-down Hamiltonians from the full 18×18 matrix
+        and diagonalizes them separately. This gives two sets of band energies
+        that can differ due to exchange splitting in magnetic materials.
+        
+        Parameters
+        ----------
+        kpoints : np.ndarray
+            Array of k-points in crystal coordinates (nk × 3)
+            
+        Returns
+        -------
+        band_energies_up : np.ndarray
+            Spin-up band energies (nk × 9*nbas)
+        band_energies_down : np.ndarray
+            Spin-down band energies (nk × 9*nbas)
+            
+        Notes
+        -----
+        - Only valid for collinear magnetic calculations
+        - Ignores spin-flip terms (SOC, non-collinear magnetism)
+        - Each spin channel has 9*nbas bands (9 orbitals per atom)
+        """
+        if not self.collinear:
+            raise ValueError("calculate_bands_collinear() requires collinear=True. "
+                           "Use calculate_bands() for non-collinear calculations.")
+        
+        num_kpoints = len(kpoints)
+        n_orb_per_spin = self.lattice.nbas * 9  # 9 orbitals per atom per spin
+        
+        band_energies_up = np.zeros((num_kpoints, n_orb_per_spin))
+        band_energies_down = np.zeros((num_kpoints, n_orb_per_spin))
+        
+        for i, k in enumerate(kpoints):
+            # Get full Hamiltonian at this k-point
+            H_k = self.fourier_transform_hamiltonian(k)
+            
+            # Extract spin-resolved Hamiltonians
+            H_up, H_down = self.extract_spin_blocks(H_k)
+            
+            # Diagonalize each spin channel
+            eigs_up, _ = eigh(H_up)
+            eigs_down, _ = eigh(H_down)
+            
+            band_energies_up[i, :] = np.real(eigs_up)
+            band_energies_down[i, :] = np.real(eigs_down)
+        
+        # Store for later access
+        self.band_energies_up = band_energies_up
+        self.band_energies_down = band_energies_down
+        
+        return band_energies_up, band_energies_down
     
     def plot_bands(self, kdistances: np.ndarray, band_energies: np.ndarray, 
                    klabels: List[str], output_file: str = None):
@@ -331,6 +495,70 @@ class BandStructureCalculator:
         if output_file:
             plt.savefig(output_file, dpi=300, bbox_inches='tight')
             print(f"Band structure saved to {output_file}")
+        
+        plt.show()
+    
+    def plot_bands_collinear(self, kdistances: np.ndarray, 
+                            band_energies_up: np.ndarray, 
+                            band_energies_down: np.ndarray,
+                            klabels: List[str], 
+                            output_file: str = None):
+        """Plot spin-polarized band structure
+        
+        Parameters
+        ----------
+        kdistances : np.ndarray
+            Distances along k-path for x-axis
+        band_energies_up : np.ndarray
+            Spin-up band energies (nk × nbands)
+        band_energies_down : np.ndarray
+            Spin-down band energies (nk × nbands)
+        klabels : List[str]
+            Labels for high-symmetry k-points
+        output_file : str, optional
+            Output filename for saving the plot
+            
+        Notes
+        -----
+        Spin-up bands shown in red, spin-down in blue.
+        Exchange splitting visible as energy difference between channels.
+        """
+        plt.figure(figsize=(10, 8))
+        
+        # Plot spin-up bands in red
+        for band in range(band_energies_up.shape[1]):
+            plt.plot(kdistances, band_energies_up[:, band], 'r-', 
+                    linewidth=1, alpha=0.7, label='↑' if band == 0 else '')
+        
+        # Plot spin-down bands in blue
+        for band in range(band_energies_down.shape[1]):
+            plt.plot(kdistances, band_energies_down[:, band], 'b-', 
+                    linewidth=1, alpha=0.7, label='↓' if band == 0 else '')
+        
+        # Set up k-point labels
+        tick_positions = []
+        tick_labels = []
+        for i, label in enumerate(klabels):
+            if label:  # Non-empty label
+                tick_positions.append(kdistances[i])
+                tick_labels.append(label)
+        
+        plt.xticks(tick_positions, tick_labels)
+        
+        # Add vertical lines at high-symmetry points
+        for pos in tick_positions:
+            plt.axvline(x=pos, color='k', linestyle='--', alpha=0.3)
+        
+        plt.xlabel('k-path')
+        plt.ylabel('Energy (eV)')
+        plt.title('TB-LMTO Spin-Polarized Band Structure')
+        plt.legend(loc='best')
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        
+        if output_file:
+            plt.savefig(output_file, dpi=300, bbox_inches='tight')
+            print(f"Spin-polarized band structure saved to {output_file}")
         
         plt.show()
 

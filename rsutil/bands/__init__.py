@@ -53,6 +53,10 @@ from .dos_moments import DOSMomentsCalculator
 from .projections import ProjectedBandCalculator
 from .spin_analysis import SpinAnalyzer
 from .band_analysis import BandAnalyzer
+from .magnetic_moments import MagneticMomentCalculator
+from .effective_mass import EffectiveMassCalculator
+from .altermagnetic import AltermagneticAnalyzer
+from .berry_curvature import BerryCurvatureCalculator
 from .projection_utils import (
     guess_basis_order,
     degeneracy_groups,
@@ -84,6 +88,10 @@ __all__ = [
     "ProjectedBandCalculator",
     "SpinAnalyzer",
     "BandAnalyzer",
+    "MagneticMomentCalculator",
+    "EffectiveMassCalculator",
+    "AltermagneticAnalyzer",
+    "BerryCurvatureCalculator",
     # Projection utilities
     "guess_basis_order",
     "degeneracy_groups",
