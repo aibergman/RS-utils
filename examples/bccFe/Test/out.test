@@ -1,0 +1,47 @@
+[Oct  9 2025 11:54:33.165] [self.f90:1148]             [1m[32m<info> [0m[0mFe
+[Oct  9 2025 11:54:33.166] [self.f90:1223]             [1m[32m<info> [0m[0mXC functional: B-H 11.4285164584029595E-004
+[Oct  9 2025 11:54:33.166] [self.f90:1253]             [1m[32m<info> [0m[0mF core check:0
+[Oct  9 2025 11:54:33.222] [self.f90:875]              [1m[32m<info> [0m[0mAtomic SFC done for atom Fe
+[Oct  9 2025 11:54:33.222] [self.f90:899]              [1m[32m<info> [0m[0mFrom orthogonal to TB basis for atom Fe
+[Oct  9 2025 11:54:33.222] [self.f90:775]              [1m[32m<info> [0m[0mPerform recursion at step 1
+[Oct  9 2025 11:54:33.275] [recursion.f90:1448]        [1m[32m<info> [0m[0mBlock recursion on progress for atom 1
+[Oct  9 2025 11:54:35.499] [self.f90:819]              [1m[32m<info> [0m[0mCalculating the density of states and the new moment bands
+[Oct  9 2025 11:54:35.767] [bands.f90:252]             [1m[32m<info> [0m[0mValence is:        8.000000
+[Oct  9 2025 11:54:35.783] [bands.f90:335]             [1m[32m<info> [0m[0mFree Fermi energy:  0.131556
+[Oct  9 2025 11:54:35.843] [bands.f90:840]             [1m[32m<info> [0m[0mSpin moment of atom   1 is   1.435459
+[Oct  9 2025 11:54:35.843] [bands.f90:850]             [1m[32m<info> [0m[0mSpin moment projections of atom   1 is   0.000000   0.000000  -1.435459
+[Oct  9 2025 11:54:35.941] [bands.f90:936]             [1m[32m<info> [0m[0mOrbital moment of atom   1 is  -0.000000   0.000000  -0.024764
+[Oct  9 2025 11:54:35.942] [self.f90:722]              [1m[32m<info> [0m[0mMixtype is broyden
+[Oct  9 2025 11:54:35.942] [mix.f90:407]               [1m[32m<info> [0m[0mValence at atom   1 is   8.000000
+[Oct  9 2025 11:54:35.942] [mix.f90:410]               [1m[32m<info> [0m[0mCharge transfer at atom    1:  -0.000000  -0.000000  -0.000000
+[Oct  9 2025 11:54:35.942] [mix.f90:417]               [1m[32m<info> [0m[0mMoment diff for atom:   1 is   0.027000
+[Oct  9 2025 11:54:35.942] [charge.f90:382]            [1m[32m<info> [0m[0mExcess charge  -0.000000
+[Oct  9 2025 11:54:35.942] [charge.f90:393]            [1m[32m<info> [0m[0mClass    1 Chg. Transfer=  -0.000000 VMAD=   0.000000
+[Oct  9 2025 11:54:35.942] [self.f90:1148]             [1m[32m<info> [0m[0mFe
+[Oct  9 2025 11:54:35.942] [self.f90:1223]             [1m[32m<info> [0m[0mXC functional: B-H 11.4285164584029595E-004
+[Oct  9 2025 11:54:35.942] [self.f90:1253]             [1m[32m<info> [0m[0mF core check:0
+[Oct  9 2025 11:54:36.003] [self.f90:875]              [1m[32m<info> [0m[0mAtomic SFC done for atom Fe
+[Oct  9 2025 11:54:36.003] [self.f90:899]              [1m[32m<info> [0m[0mFrom orthogonal to TB basis for atom Fe
+[Oct  9 2025 11:54:36.003] [self.f90:761]              [1m[32m<info> [0m[0mNot converged! Diff= 0.0270001572
+[Oct  9 2025 11:54:36.004] [bands.f90:1107]            [1m[32m<info> [0m[0mMagnetic field on atom   1 is         0.000000         0.000000    -29944.265440
+[Oct  9 2025 11:54:36.004] [bands.f90:1108]            [1m[32m<info> [0m[0mMagnetic torque on atom   1 is        -0.000000         0.000000         0.000000
+[Oct  9 2025 11:54:36.004] [self.f90:946]              [1m[32m<info> [0m[0mCalculation finished. Report printed in report.out
+-------------------------------------------------------------------- TIMER REPORT ---------------------------------------------------------------------
+  CATEGORY                                            MEAN            MAX            MIN          TOTAL      TOTAL (%)         NCALLS   TOTAL NCALLS   
+  total                                                  -              -              -         4.3451          100.0              1             87   
+  └─ Calculation                                         -              -              -         4.3451          100.0              1             86   
+     ├─ Calculation*                                     -              -              -         0.5507           12.7              -              1   
+     ├─ pre-processing                                   -              -              -         0.9556           22.0              1              1   
+     └─ self-consistency                                 -              -              -         2.8388           65.3              1             84   
+        ├─ self-consistency*                             -              -              -         0.0010            0.0              -              1   
+        ├─ atomic-scf                               0.0590         0.0606         0.0575         0.1180            2.7              2              2   
+        ├─ recursion                                     -              -              -         2.2773           52.4              1             80   
+        │  ├─ recursion*                                 -              -              -         0.0605            1.4              -              1   
+        │  ├─ H|PSI_n>                              0.0781         0.1615         0.0027         1.5628           36.0             20             20   
+        │  ├─ H|Psi_n-A_n|Psi_n-B_n|Psi_n-1         0.0176         0.0376         0.0002         0.3515            8.1             20             20   
+        │  ├─ B_n+1                                 0.0001         0.0002         0.0001         0.0018            0.0             20             20   
+        │  └─ <PSI|B_n+1|PSI>                       0.0150         0.0316         0.0002         0.3007            6.9             20             20   
+        └─ calculation-of-DOS                            -              -              -         0.4425           10.2              1              1   
+------------------------------------------------------------------------------------------------------------------------------------------------------
+  * exclusive values to this label
+------------------------------------------------------------------------------------------------------------------------------------------------------

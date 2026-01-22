@@ -1,0 +1,426 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The exchange_map module &mdash; RS-utils  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="The export submodule" href="export_submodule.html" />
+    <link rel="prev" title="The exchange submodule" href="exchange_submodule.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            RS-utils
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="cli_section.html">Command-Line Interface (CLI)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="cli_section.html#lattice-processing">Lattice Processing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli_section.html#visualization">Visualization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli_section.html#exchange-interactions">Exchange Interactions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli_section.html#export-to-uppasd">Export to UppASD</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli_section.html#quick-reference">Quick Reference</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="rsutil_module.html">The <cite>rsutil</cite> module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="rsutil_module.html#module-rsutil">Core Functions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="rsutil_module.html#attributes">Attributes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="rsutil_module.html#functions">Functions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="rsutil_module.html#rsutil.process_lattice"><code class="docutils literal notranslate"><span class="pre">process_lattice()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="rsutil_module.html#submodules">Submodules</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="viz_submodule.html">The <cite>viz</cite> submodule</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="viz_submodule.html#key-features">Key Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="viz_submodule.html#core-classes">Core Classes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="viz_submodule.html#rsutil.viz.glyphs.Atom"><code class="docutils literal notranslate"><span class="pre">Atom</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="viz_submodule.html#rsutil.viz.glyphs.Bond"><code class="docutils literal notranslate"><span class="pre">Bond</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="viz_submodule.html#rsutil.viz.glyphs.Spin"><code class="docutils literal notranslate"><span class="pre">Spin</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="viz_submodule.html#input-and-structure">Input and Structure</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="viz_submodule.html#rsutil.viz.inputreader.InputReader"><code class="docutils literal notranslate"><span class="pre">InputReader</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.inputreader.InputReader.read_custom"><code class="docutils literal notranslate"><span class="pre">InputReader.read_custom()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.inputreader.InputReader.read_poscar"><code class="docutils literal notranslate"><span class="pre">InputReader.read_poscar()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.inputreader.InputReader.read_rs_clust"><code class="docutils literal notranslate"><span class="pre">InputReader.read_rs_clust()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.inputreader.InputReader.read_rs_lmto"><code class="docutils literal notranslate"><span class="pre">InputReader.read_rs_lmto()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.inputreader.InputReader.read_rs_lmto_nml"><code class="docutils literal notranslate"><span class="pre">InputReader.read_rs_lmto_nml()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.inputreader.InputReader.read_xyz"><code class="docutils literal notranslate"><span class="pre">InputReader.read_xyz()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="viz_submodule.html#rsutil.viz.structure.Structure"><code class="docutils literal notranslate"><span class="pre">Structure</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.structure.Structure.compute_conventional_cell"><code class="docutils literal notranslate"><span class="pre">Structure.compute_conventional_cell()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.structure.Structure.get_atom_spin_objects"><code class="docutils literal notranslate"><span class="pre">Structure.get_atom_spin_objects()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.structure.Structure.get_bond_objects"><code class="docutils literal notranslate"><span class="pre">Structure.get_bond_objects()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="viz_submodule.html#main-visualizer">Main Visualizer</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="viz_submodule.html#rsutil.viz.visualizer.Visualizer"><code class="docutils literal notranslate"><span class="pre">Visualizer</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.visualizer.Visualizer.expand_structure"><code class="docutils literal notranslate"><span class="pre">Visualizer.expand_structure()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.visualizer.Visualizer.get_cell"><code class="docutils literal notranslate"><span class="pre">Visualizer.get_cell()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.visualizer.Visualizer.render"><code class="docutils literal notranslate"><span class="pre">Visualizer.render()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.visualizer.Visualizer.save_screenshot"><code class="docutils literal notranslate"><span class="pre">Visualizer.save_screenshot()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.visualizer.Visualizer.toggle_bonds"><code class="docutils literal notranslate"><span class="pre">Visualizer.toggle_bonds()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.visualizer.Visualizer.toggle_cell"><code class="docutils literal notranslate"><span class="pre">Visualizer.toggle_cell()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.visualizer.Visualizer.toggle_extents"><code class="docutils literal notranslate"><span class="pre">Visualizer.toggle_extents()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.visualizer.Visualizer.toggle_periodicity"><code class="docutils literal notranslate"><span class="pre">Visualizer.toggle_periodicity()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.visualizer.Visualizer.toggle_perspective"><code class="docutils literal notranslate"><span class="pre">Visualizer.toggle_perspective()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.visualizer.Visualizer.toggle_spins"><code class="docutils literal notranslate"><span class="pre">Visualizer.toggle_spins()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="viz_submodule.html#usage-examples">Usage Examples</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="exchange_submodule.html">The <cite>exchange</cite> submodule</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">The <cite>exchange_map</cite> module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#functions">Functions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#rsutil.exchange.exchange_map.create_structure_and_analyzer"><code class="docutils literal notranslate"><span class="pre">create_structure_and_analyzer()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#rsutil.exchange.exchange_map.exchange_map"><code class="docutils literal notranslate"><span class="pre">exchange_map()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#rsutil.exchange.exchange_map.find_matching_indices"><code class="docutils literal notranslate"><span class="pre">find_matching_indices()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#rsutil.exchange.exchange_map.get_fermi_energy"><code class="docutils literal notranslate"><span class="pre">get_fermi_energy()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#rsutil.exchange.exchange_map.get_neighbors_list"><code class="docutils literal notranslate"><span class="pre">get_neighbors_list()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#rsutil.exchange.exchange_map.read_namelists"><code class="docutils literal notranslate"><span class="pre">read_namelists()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#rsutil.exchange.exchange_map.read_rs_clust"><code class="docutils literal notranslate"><span class="pre">read_rs_clust()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#rsutil.exchange.exchange_map.store_jij_namelist"><code class="docutils literal notranslate"><span class="pre">store_jij_namelist()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="export_submodule.html">The <cite>export</cite> submodule</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="export_submodule.html#uppasd-export">UppASD Export</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">RS-utils</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">The <cite>exchange_map</cite> module</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/exchange_map_module.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="the-exchange-map-module">
+<span id="exchange-map-module"></span><h1>The <cite>exchange_map</cite> module<a class="headerlink" href="#the-exchange-map-module" title="Link to this heading"></a></h1>
+<p>The <strong>`exchange_map`</strong> module provides the core functionality for mapping and calculating magnetic exchange interactions between atoms in a crystal structure.</p>
+<p><strong>Overview:</strong></p>
+<p>The exchange mapping process:</p>
+<ol class="arabic simple">
+<li><p>Reads the lattice structure from <code class="docutils literal notranslate"><span class="pre">lattice.nml</span></code></p></li>
+<li><p>Identifies all atomic neighbors within the specified cutoff distance</p></li>
+<li><p>Calculates exchange interaction strengths (J_ij values)</p></li>
+<li><p>Optionally groups neighbors into shells and selects unique representatives</p></li>
+<li><p>Accounts for symmetry operations when <code class="docutils literal notranslate"><span class="pre">--soc</span></code> flag is used</p></li>
+<li><p>Generates output files suitable for spin dynamics simulations</p></li>
+</ol>
+<p><strong>Key Parameters:</strong></p>
+<ul class="simple">
+<li><p><strong>cutoff</strong>: Maximum distance (in lattice units) for considering exchange interactions</p></li>
+<li><p><strong>unique</strong>: If <code class="docutils literal notranslate"><span class="pre">True</span></code>, identifies only unique neighbors per shell (reduces output size)</p></li>
+<li><p><strong>shell_width</strong>: Tolerance for grouping neighbors into shells by distance</p></li>
+<li><p><strong>soc</strong>: If <code class="docutils literal notranslate"><span class="pre">True</span></code>, includes spin-orbit coupling effects in symmetry considerations</p></li>
+</ul>
+<p><strong>Functions:</strong></p>
+<p id="module-rsutil.exchange.exchange_map">This module provides functions to read and process cluster and namelist files,
+create structures and analyzers, and determine neighbors and matching indices
+for atoms in a cluster. It also includes functionality to update and store
+input namelists with post-processing information.</p>
+<section id="functions">
+<h2>Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<p>read_rs_clust(clust_file, input_file)</p>
+<dl class="simple">
+<dt>read_namelists(input_file, lattice_file, verbose=False)</dt><dd><p>Reads input and lattice namelist files.</p>
+</dd>
+<dt>create_structure_and_analyzer(lattice_nml, input_nml)</dt><dd><p>Creates a Structure object and SpacegroupAnalyzer from lattice and input
+NML files.</p>
+</dd>
+<dt>get_neighbors_list(cluster, sites, cutoff=2.0, verbose=False)</dt><dd><p>Gets the neighbors list for each atom in the cluster.</p>
+</dd>
+<dt>find_matching_indices(cluster, neighbors)</dt><dd><p>Finds the indices of the atoms in the cluster that match the neighbor list.</p>
+</dd>
+<dt>store_jij_namelist(input_nml, matching_indices, atom_index)</dt><dd><p>Updates the input namelist with post-processing information and matching
+indices.</p>
+</dd>
+<dt>exchange_map(verbose=False)</dt><dd><p>Main function to read namelists, create structure and analyzer, get
+neighbors, and symmetry reduced neighbors.</p>
+</dd>
+</dl>
+</section>
+<dl class="py function">
+<dt class="sig sig-object py" id="rsutil.exchange.exchange_map.create_structure_and_analyzer">
+<span class="sig-prename descclassname"><span class="pre">rsutil.exchange.exchange_map.</span></span><span class="sig-name descname"><span class="pre">create_structure_and_analyzer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lattice_nml</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">input_nml</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">Structure</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">SpacegroupAnalyzer</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#rsutil.exchange.exchange_map.create_structure_and_analyzer" title="Link to this definition"></a></dt>
+<dd><p>Create a Structure object and SpacegroupAnalyzer from lattice and input NML files.</p>
+<section id="parameters">
+<h2>Parameters<a class="headerlink" href="#parameters" title="Link to this heading"></a></h2>
+<dl class="simple">
+<dt>lattice_nml<span class="classifier">dict</span></dt><dd><p>Parsed lattice NML file.</p>
+</dd>
+<dt>input_nml<span class="classifier">dict</span></dt><dd><p>Parsed input NML file.</p>
+</dd>
+</dl>
+</section>
+<section id="returns">
+<h2>Returns<a class="headerlink" href="#returns" title="Link to this heading"></a></h2>
+<dl class="simple">
+<dt>tuple</dt><dd><p>A tuple containing the Structure object and SpacegroupAnalyzer.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="rsutil.exchange.exchange_map.exchange_map">
+<span class="sig-prename descclassname"><span class="pre">rsutil.exchange.exchange_map.</span></span><span class="sig-name descname"><span class="pre">exchange_map</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cutoff</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#rsutil.exchange.exchange_map.exchange_map" title="Link to this definition"></a></dt>
+<dd><p>Main function to read namelists, create structure and analyzer,
+get neighbors, and symmetry reduced neighbors.</p>
+<section id="id1">
+<h2>Parameters<a class="headerlink" href="#id1" title="Link to this heading"></a></h2>
+<dl class="simple">
+<dt>cutoff<span class="classifier">float, optional</span></dt><dd><p>Cutoff distance to consider neighbors, by default 1.0.</p>
+</dd>
+<dt>verbose<span class="classifier">bool, optional</span></dt><dd><p>Flag to control printouts, by default False.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="rsutil.exchange.exchange_map.find_matching_indices">
+<span class="sig-prename descclassname"><span class="pre">rsutil.exchange.exchange_map.</span></span><span class="sig-name descname"><span class="pre">find_matching_indices</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cluster</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Molecule</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">neighbors</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="headerlink" href="#rsutil.exchange.exchange_map.find_matching_indices" title="Link to this definition"></a></dt>
+<dd><p>Find the indices of the atoms in the cluster that match the neighbor list.</p>
+<section id="id2">
+<h2>Parameters<a class="headerlink" href="#id2" title="Link to this heading"></a></h2>
+<dl class="simple">
+<dt>cluster<span class="classifier">Molecule</span></dt><dd><p>The cluster object containing atomic sites.</p>
+</dd>
+<dt>neighbors<span class="classifier">dict</span></dt><dd><p>Dictionary of neighbors for each atom.</p>
+</dd>
+</dl>
+</section>
+<section id="id3">
+<h2>Returns<a class="headerlink" href="#id3" title="Link to this heading"></a></h2>
+<dl class="simple">
+<dt>dict</dt><dd><p>Dictionary of atom indices that match the neighbor list.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="rsutil.exchange.exchange_map.get_fermi_energy">
+<span class="sig-prename descclassname"><span class="pre">rsutil.exchange.exchange_map.</span></span><span class="sig-name descname"><span class="pre">get_fermi_energy</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">report_file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'report.out'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">float</span></span></span><a class="headerlink" href="#rsutil.exchange.exchange_map.get_fermi_energy" title="Link to this definition"></a></dt>
+<dd><p>Extract the Fermi energy from the report file.</p>
+<section id="id4">
+<h2>Parameters<a class="headerlink" href="#id4" title="Link to this heading"></a></h2>
+<dl class="simple">
+<dt>report_file<span class="classifier">str, optional</span></dt><dd><p>Path to the report file, by default “report.out”.</p>
+</dd>
+</dl>
+</section>
+<section id="id5">
+<h2>Returns<a class="headerlink" href="#id5" title="Link to this heading"></a></h2>
+<dl class="simple">
+<dt>float</dt><dd><p>The Fermi energy value.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="rsutil.exchange.exchange_map.get_neighbors_list">
+<span class="sig-prename descclassname"><span class="pre">rsutil.exchange.exchange_map.</span></span><span class="sig-name descname"><span class="pre">get_neighbors_list</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cluster</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Molecule</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sites</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cutoff</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">2.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#rsutil.exchange.exchange_map.get_neighbors_list" title="Link to this definition"></a></dt>
+<dd><p>Get the neighbors list for each atom in the cluster.</p>
+<section id="id6">
+<h2>Parameters<a class="headerlink" href="#id6" title="Link to this heading"></a></h2>
+<dl class="simple">
+<dt>cluster<span class="classifier">Molecule</span></dt><dd><p>The cluster object containing atomic sites.</p>
+</dd>
+<dt>sites<span class="classifier">list</span></dt><dd><p>List of atom labels.</p>
+</dd>
+<dt>cutoff<span class="classifier">float, optional</span></dt><dd><p>Cutoff distance to consider neighbors, by default 2.0.</p>
+</dd>
+<dt>verbose<span class="classifier">bool, optional</span></dt><dd><p>Flag to control printouts, by default False.</p>
+</dd>
+</dl>
+</section>
+<section id="id7">
+<h2>Returns<a class="headerlink" href="#id7" title="Link to this heading"></a></h2>
+<dl class="simple">
+<dt>dict</dt><dd><p>Dictionary of neighbors for each atom, sorted by distance.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="rsutil.exchange.exchange_map.read_namelists">
+<span class="sig-prename descclassname"><span class="pre">rsutil.exchange.exchange_map.</span></span><span class="sig-name descname"><span class="pre">read_namelists</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lattice_file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">dict</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#rsutil.exchange.exchange_map.read_namelists" title="Link to this definition"></a></dt>
+<dd><p>Read input and lattice namelist files.</p>
+<section id="id8">
+<h2>Parameters<a class="headerlink" href="#id8" title="Link to this heading"></a></h2>
+<dl class="simple">
+<dt>input_file<span class="classifier">str</span></dt><dd><p>Path to the input namelist file.</p>
+</dd>
+<dt>lattice_file<span class="classifier">str</span></dt><dd><p>Path to the lattice namelist file.</p>
+</dd>
+<dt>verbose<span class="classifier">bool, optional</span></dt><dd><p>Flag to control printouts, by default False.</p>
+</dd>
+</dl>
+</section>
+<section id="id9">
+<h2>Returns<a class="headerlink" href="#id9" title="Link to this heading"></a></h2>
+<dl class="simple">
+<dt>tuple</dt><dd><p>A tuple containing the parsed input and lattice namelists.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="rsutil.exchange.exchange_map.read_rs_clust">
+<span class="sig-prename descclassname"><span class="pre">rsutil.exchange.exchange_map.</span></span><span class="sig-name descname"><span class="pre">read_rs_clust</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">clust_file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">input_file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Molecule</span></span></span><a class="headerlink" href="#rsutil.exchange.exchange_map.read_rs_clust" title="Link to this definition"></a></dt>
+<dd><p>Reads a cluster file and an input file to create a Structure object.</p>
+<dl class="simple">
+<dt>Parameters:</dt><dd><p>clust_file (str): Path to the cluster file.
+input_file (str): Path to the input.nml file containing the &amp;atoms block.</p>
+</dd>
+<dt>Returns:</dt><dd><p>Molecule: A Molecule object built from the parsed cluster file and input file.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="rsutil.exchange.exchange_map.store_jij_namelist">
+<span class="sig-prename descclassname"><span class="pre">rsutil.exchange.exchange_map.</span></span><span class="sig-name descname"><span class="pre">store_jij_namelist</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_nml</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">matching_indices</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">atom_index</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="headerlink" href="#rsutil.exchange.exchange_map.store_jij_namelist" title="Link to this definition"></a></dt>
+<dd><p>Update the input namelist with post-processing information and matching indices.</p>
+<section id="id10">
+<h2>Parameters<a class="headerlink" href="#id10" title="Link to this heading"></a></h2>
+<dl class="simple">
+<dt>input_nml<span class="classifier">dict</span></dt><dd><p>Parsed input namelist.</p>
+</dd>
+<dt>matching_indices<span class="classifier">dict</span></dt><dd><p>Dictionary of atom indices that match the neighbor list.</p>
+</dd>
+<dt>atom_index<span class="classifier">int</span></dt><dd><p>Index of the atom in rec_sites.</p>
+</dd>
+</dl>
+</section>
+<section id="id11">
+<h2>Returns<a class="headerlink" href="#id11" title="Link to this heading"></a></h2>
+<dl class="simple">
+<dt>dict</dt><dd><p>Updated input namelist.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<p><strong>Example Usage:</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">rsutil.exchange.exchange_map</span><span class="w"> </span><span class="kn">import</span> <span class="n">exchange_map</span>
+
+<span class="c1"># Standard calculation: all neighbors up to 2.5 lattice units</span>
+<span class="n">exchange_map</span><span class="p">(</span><span class="n">cutoff</span><span class="o">=</span><span class="mf">2.5</span><span class="p">)</span>
+
+<span class="c1"># Advanced: find unique representatives of each neighbor shell</span>
+<span class="n">exchange_map</span><span class="p">(</span>
+    <span class="n">cutoff</span><span class="o">=</span><span class="mf">3.0</span><span class="p">,</span>
+    <span class="n">unique</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">shell_width</span><span class="o">=</span><span class="mf">0.1</span>  <span class="c1"># Group neighbors within 0.1 lattice units</span>
+<span class="p">)</span>
+
+<span class="c1"># With spin-orbit coupling considerations</span>
+<span class="n">exchange_map</span><span class="p">(</span>
+    <span class="n">cutoff</span><span class="o">=</span><span class="mf">2.5</span><span class="p">,</span>
+    <span class="n">soc</span><span class="o">=</span><span class="kc">True</span>  <span class="c1"># Account for SOC in symmetry</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Output:</strong></p>
+<p>The module generates exchange interaction files in formats compatible with:</p>
+<ul class="simple">
+<li><p>RS-LMTO-ASA simulations</p></li>
+<li><p>UppASD (Uppsala Atomistic Spin Dynamics)</p></li>
+<li><p>Other spin dynamics packages</p></li>
+</ul>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="exchange_submodule.html" class="btn btn-neutral float-left" title="The exchange submodule" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="export_submodule.html" class="btn btn-neutral float-right" title="The export submodule" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Anders Bergman.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

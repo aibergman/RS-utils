@@ -1,0 +1,418 @@
+import numpy as np
+import pyvista as pv
+
+# ----------------------------
+# 1. Atom, Bond and Spin Classes
+# ----------------------------
+class Atom:
+    def __init__(self, position, species, atom_type, radius=0.5, color='white', **kwargs):
+        """
+        Represents an atom for visualization.
+
+        Args:
+            position (list or array): [x, y, z] position.
+            species (str): Chemical symbol.
+            atom_type (str): Atom type (can be the same as species).
+            radius (float): Radius for the sphere.
+            color (str): Color used to render.
+            kwargs: Any additional render information.
+        """
+        self.position = np.array(position)
+        self.species = species
+        self.atom_type = atom_type
+        self.radius = radius
+        self.color = color
+        self.render_info = kwargs
+
+class Bond:
+    def __init__(self, start, end, radius=0.1, color='grey', **kwargs):
+        """
+        Represents a bond (rendered as a cylinder).
+
+        Args:
+            start (list or array): [x, y, z] start position.
+            end (list or array): [x, y, z] end position.
+            radius (float): Cylinder radius.
+            color (str): Cylinder color.
+            kwargs: Additional render-related options.
+        """
+        self.start = np.array(start)
+        self.end = np.array(end)
+        self.radius = radius
+        self.color = color
+        self.render_info = kwargs
+
+class Spin:
+    def __init__(self, position, direction=(0, 1, 0), magnitude=0.0,
+                 base_radius=0.1, tip_radius=0.05, color='red', **kwargs):
+        """
+        Represents a magnetic moment as an arrow.
+
+        Args:
+            position (list or array): Position of the atom.
+            direction (tuple or array): Direction of the spin.
+            magnitude (float): Length scale factor.
+            base_radius (float): Radius of the arrow’s shaft.
+            tip_radius (float): Radius of the arrow’s tip.
+            color (str): Color for the arrow.
+            kwargs: Any additional information.
+        """
+        self.position = np.array(position)
+        self.direction = np.array(direction)
+        self.magnitude = magnitude
+        self.base_radius = base_radius
+        self.tip_radius = tip_radius
+        self.color = color
+        self.render_info = kwargs
+
+# ----------------------------
+# 2. Structure Class
+# ----------------------------
+class Structure:
+    def __init__(self, atoms, bonds=None, spins=None,
+                 unit_cell=None, conventional_cell=None, bond_cutoff=1.5):
+        """
+        Contains all the structural information.
+
+        Args:
+            atoms (list): List of Atom objects.
+            bonds (list): List of Bond objects (can be empty; bonds may be generated).
+            spins (list): List of Spin objects (optional; default spin will be provided if missing).
+            unit_cell (3x3 array-like): Lattice vectors for the unit cell.
+            conventional_cell (3x3 array-like): Lattice vectors for the conventional cell.
+            bond_cutoff (float): Distance below which atoms are bonded.
+        """
+        self.atoms = atoms
+        self.bonds = bonds if bonds is not None else []
+        self.spins = spins if spins is not None else []
+        self.unit_cell = np.array(unit_cell) if unit_cell is not None else None
+        self.conventional_cell = np.array(conventional_cell) if conventional_cell is not None else None
+        self.bond_cutoff = bond_cutoff
+
+    def get_atom_spin_objects(self):
+        """
+        Returns a list of tuples (Atom, Spin). If a spin is not provided
+        for a given atom, a default (zero magnitude) spin is created.
+        """
+        atom_spin_list = []
+        for atom in self.atoms:
+            # Look for a spin whose position matches the atom (within tolerance)
+            spin = next((s for s in self.spins if np.allclose(s.position, atom.position)), None)
+            if spin is None:
+                # Default spin with zero magnitude if no magnetic info provided.
+                spin = Spin(position=atom.position, direction=(0, 0, 0), magnitude=0.0)
+            atom_spin_list.append((atom, spin))
+        return atom_spin_list
+
+    def get_bond_objects(self):
+        """
+        Returns a list of Bond objects. If the bonds list is empty, automatically
+        generates bonds based on the distance cutoff.
+        """
+        # Auto-generate bonds if none are provided
+        if not self.bonds:
+            n = len(self.atoms)
+            for i in range(n):
+                for j in range(i + 1, n):
+                    pos_i = self.atoms[i].position
+                    pos_j = self.atoms[j].position
+                    if np.linalg.norm(pos_i - pos_j) <= self.bond_cutoff:
+                        self.bonds.append(Bond(start=pos_i, end=pos_j))
+        return self.bonds
+
+# ----------------------------
+# 3. Input Reader Class
+# ----------------------------
+class InputReader:
+    @staticmethod
+    def read_xyz(file_path):
+        """
+        Reads a simple .xyz file and returns a Structure.
+        Assumes the first line is the number of atoms and the second line is a comment.
+        Each subsequent line: species x y z
+        """
+        atoms = []
+        with open(file_path, 'r') as f:
+            lines = f.readlines()
+        num_atoms = int(lines[0].strip())
+        # Comment line (unused here)
+        _ = lines[1].strip()
+        for line in lines[2:2 + num_atoms]:
+            parts = line.split()
+            species = parts[0]
+            position = [float(x) for x in parts[1:4]]
+            # Here, we set atom_type equal to species by default.
+            atoms.append(Atom(position=position, species=species, atom_type=species))
+        # Create a structure (cells can be set later or read from additional info)
+        return Structure(atoms=atoms)
+
+    @staticmethod
+    def read_custom(file_path):
+        """
+        Stub for reading a custom file format.
+        Implement your own file parser here.
+        """
+        pass
+    @staticmethod
+    def read_poscar(file_path):
+        """
+        Reads a POSCAR file and returns a Structure.
+        """
+        with open(file_path, 'r') as f:
+            lines = f.readlines()
+
+        # The first line is a comment (ignored)
+        comment = lines[0].strip()
+
+        # The second line is the scaling factor
+        scaling_factor = float(lines[1].strip())
+
+        # The next three lines are the lattice vectors
+        lattice_vectors = []
+        for i in range(2, 5):
+            vector = [float(x) for x in lines[i].strip().split()]
+            lattice_vectors.append(vector)
+        lattice_vectors = np.array(lattice_vectors) * scaling_factor
+
+        # The next line(s) are the element symbols (optional in some formats)
+        element_symbols = lines[5].strip().split()
+
+        # The next line(s) are the number of atoms of each element
+        num_atoms = [int(x) for x in lines[6].strip().split()]
+
+        # The next line indicates whether the coordinates are direct or cartesian
+        coord_type = lines[7].strip().lower()
+        is_direct = coord_type.startswith('d')
+
+        # The next lines are the atomic positions
+        atoms = []
+        atom_index = 0
+        for i, symbol in enumerate(element_symbols):
+            for j in range(num_atoms[i]):
+                position = [float(x) for x in lines[8 + atom_index].strip().split()[:3]]
+                if is_direct:
+                    position = np.dot(lattice_vectors.T, position)
+                atoms.append(Atom(position=position, species=symbol, atom_type=symbol))
+                atom_index += 1
+
+        return Structure(atoms=atoms, unit_cell=lattice_vectors)
+
+# ----------------------------
+# 4. Visualizer Class
+# ----------------------------
+class Visualizer:
+    def __init__(self, structure: Structure):
+        """
+        Visualizer for a Structure using pyvista.
+
+        Provides interactive toggles:
+          - bonds / no bonds
+          - unit cell / conventional cell
+          - spins / no spins
+          - extents / no extents
+          - 2d-periodic / non-periodic
+          - 3d-periodic / non-periodic
+        """
+        self.structure = structure
+        self.plotter = pv.Plotter()
+
+        # Toggle options (default settings)
+        self.show_bonds = True
+        self.show_spins = True
+        self.use_conventional = False  # False means use unit cell
+        self.show_extents = False
+        self.periodicity = None  # Options: None, '2d', '3d'
+
+    def toggle_bonds(self):
+        self.show_bonds = not self.show_bonds
+        self.render()
+
+    def toggle_spins(self):
+        self.show_spins = not self.show_spins
+        self.render()
+
+    def toggle_cell(self):
+        self.use_conventional = not self.use_conventional
+        self.render()
+
+    def toggle_extents(self):
+        self.show_extents = not self.show_extents
+        self.render()
+
+    def toggle_periodicity(self, period='2d'):
+        """
+        Toggles periodicity.
+        period: '2d' or '3d'; if already enabled with this type, then disables periodic images.
+        """
+        if self.periodicity == period:
+            self.periodicity = None
+        else:
+            self.periodicity = period
+        self.render()
+
+    def get_cell(self):
+        """
+        Returns the lattice cell matrix based on the toggle.
+        """
+        if self.use_conventional and self.structure.conventional_cell is not None:
+            return self.structure.conventional_cell
+        elif self.structure.unit_cell is not None:
+            return self.structure.unit_cell
+        return None
+
+    def expand_structure(self, cell, grid_dims):
+        """
+        Expands the structure by replicating the cell.
+
+        Args:
+            cell: 3x3 lattice matrix.
+            grid_dims (tuple): (nx, ny, nz) number of replications.
+
+        Returns:
+            A list of new Atom objects corresponding to the periodic images.
+        """
+        atoms_expanded = []
+        for i in range(grid_dims[0]):
+            for j in range(grid_dims[1]):
+                for k in range(grid_dims[2]):
+                    # Compute the translation vector: cell * [i, j, k]
+                    translation = np.dot(cell.T, [i, j, k])
+                    for atom in self.structure.atoms:
+                        new_pos = atom.position + translation
+                        atoms_expanded.append(
+                            Atom(position=new_pos, species=atom.species,
+                                 atom_type=atom.atom_type, radius=atom.radius, color=atom.color)
+                        )
+        return atoms_expanded
+
+    def render(self):
+        """
+        Clears and re-renders the scene with current toggles.
+        """
+        self.plotter.clear()
+
+        # 1. Render Atoms (using sphere glyphs)
+        for atom in self.structure.atoms:
+            sphere = pv.Sphere(radius=atom.radius, center=atom.position)
+            self.plotter.add_mesh(sphere, color=atom.color)
+
+        # 2. Render Bonds (if toggled on)
+        if self.show_bonds:
+            bonds = self.structure.get_bond_objects()
+            for bond in bonds:
+                # Compute vector details
+                vector = bond.end - bond.start
+                length = np.linalg.norm(vector)
+                center = (bond.start + bond.end) / 2
+                direction = vector / length if length else [0, 0, 1]
+                # Create a cylinder between the two atoms
+                cylinder = pv.Cylinder(center=center, direction=direction,
+                                       radius=bond.radius, height=length)
+                self.plotter.add_mesh(cylinder, color=bond.color)
+
+        # 3. Render Spins (if toggled on)
+        if self.show_spins:
+            for atom, spin in self.structure.get_atom_spin_objects():
+                if spin.magnitude > 0:
+                    # Create an arrow for the spin. The tip_length is a fraction of the magnitude.
+                    arrow = pv.Arrow(start=atom.position,
+                                     direction=spin.direction,
+                                     tip_length=0.2 * spin.magnitude,
+                                     tip_radius=spin.tip_radius,
+                                     shaft_radius=spin.base_radius,
+                                     scale=spin.magnitude)
+                    self.plotter.add_mesh(arrow, color=spin.color)
+
+        # 4. Render Extents (if toggled on)
+        if self.show_extents:
+            cell = self.get_cell()
+            if cell is not None:
+                # Calculate the eight corners of the cell
+                origin = np.array([0, 0, 0])
+                a, b, c = cell[0], cell[1], cell[2]
+                corners = np.array([
+                    origin,
+                    a,
+                    b,
+                    c,
+                    a + b,
+                    a + c,
+                    b + c,
+                    a + b + c
+                ])
+                xmin, ymin, zmin = corners.min(axis=0)
+                xmax, ymax, zmax = corners.max(axis=0)
+                # Create a wireframe box to represent the extents
+                box = pv.Box(bounds=(xmin, xmax, ymin, ymax, zmin, zmax))
+                self.plotter.add_mesh(box, style='wireframe', color='black')
+
+        # 5. Render Periodic Images (if toggled on)
+        if self.periodicity is not None:
+            if self.periodicity == '2d':
+                grid_dims = (5, 5, 1)
+            elif self.periodicity == '3d':
+                grid_dims = (4, 4, 4)
+            cell = self.get_cell()
+            if cell is not None:
+                atoms_expanded = self.expand_structure(cell, grid_dims)
+                # Render these periodic images with a lower opacity
+                for atom in atoms_expanded:
+                    sphere = pv.Sphere(radius=atom.radius, center=atom.position)
+                    self.plotter.add_mesh(sphere, color=atom.color, opacity=0.5)
+
+        # Finally, show/update the interactive plotter.
+        self.plotter.show(auto_close=False)
+
+# ----------------------------
+# 5. Example usage
+# ----------------------------
+if __name__ == "__main__":
+    # Create a few Atom objects manually (in a real scenario these might come from a file)
+    atoms = [
+        Atom(position=[0, 0, 0], species='Fe', atom_type='Fe', radius=0.5, color='orange'),
+        Atom(position=[1, 0, 0], species='Fe', atom_type='Fe', radius=0.5, color='orange'),
+        Atom(position=[0, 1, 0], species='Fe', atom_type='Fe', radius=0.5, color='orange')
+    ]
+
+    # Define a simple unit cell (orthorhombic / cubic)
+    unit_cell = [[1, 0, 0],
+                 [0, 1, 0],
+                 [0, 0, 1]]
+    # For demonstration, we do not provide a separate conventional cell.
+    structure = Structure(atoms=atoms, unit_cell=unit_cell, bond_cutoff=1.2)
+
+    # structure = InputReader.read_poscar('/Users/andersb/Jobb/RS_tools_python/POSCAR')
+    # Print the structure content verbosely for debugging
+    print("Structure Debug Info:")
+    print(f"Number of atoms: {len(structure.atoms)}")
+    for atom in structure.atoms:
+        print(f"Atom: {atom.species}, Position: {atom.position}, Radius: {atom.radius}, Color: {atom.color}")
+
+    print(f"Number of bonds: {len(structure.bonds)}")
+    for bond in structure.bonds:
+        print(f"Bond: Start: {bond.start}, End: {bond.end}, Radius: {bond.radius}, Color: {bond.color}")
+
+    print(f"Number of spins: {len(structure.spins)}")
+    for spin in structure.spins:
+        print(f"Spin: Position: {spin.position}, Direction: {spin.direction}, Magnitude: {spin.magnitude}, Color: {spin.color}")
+
+    if structure.unit_cell is not None:
+        print("Unit Cell:")
+        print(structure.unit_cell)
+
+    if structure.conventional_cell is not None:
+        print("Conventional Cell:")
+        print(structure.conventional_cell)
+    # Create a Visualizer instance with the structure.
+    viz = Visualizer(structure=structure)
+
+    # Example: toggle some options before rendering
+    # viz.toggle_bonds()         # To turn bonds on/off
+    # viz.toggle_spins()         # To show/hide spin arrows
+    # viz.toggle_cell()          # To switch between unit and conventional cells
+    # viz.toggle_extents()       # To show/hide the cell extents
+    # viz.toggle_periodicity('2d')  # To show a 2D periodic replication (5x5 grid)
+    # viz.toggle_periodicity('3d')  # To show a 3D periodic replication (4x4x4 grid)
+
+    # Render the structure with default settings
+    viz.render()

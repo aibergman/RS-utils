@@ -1,0 +1,1 @@
+/opt/homebrew/bin/gfortran CMakeFiles/rsutil.x.dir/source/process_lattice.f90.o -o rsutil.x  librsutil_lib.a

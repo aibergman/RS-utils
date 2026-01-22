@@ -1,0 +1,248 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The rsutil module &mdash; RS-utils  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="The viz submodule" href="viz_submodule.html" />
+    <link rel="prev" title="Command-Line Interface (CLI)" href="cli_section.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            RS-utils
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="cli_section.html">Command-Line Interface (CLI)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="cli_section.html#lattice-processing">Lattice Processing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli_section.html#visualization">Visualization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli_section.html#exchange-interactions">Exchange Interactions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli_section.html#export-to-uppasd">Export to UppASD</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli_section.html#quick-reference">Quick Reference</a></li>
+</ul>
+</li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">The <cite>rsutil</cite> module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#module-rsutil">Core Functions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#attributes">Attributes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#functions">Functions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#rsutil.process_lattice"><code class="docutils literal notranslate"><span class="pre">process_lattice()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#submodules">Submodules</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="viz_submodule.html">The <cite>viz</cite> submodule</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="viz_submodule.html#key-features">Key Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="viz_submodule.html#core-classes">Core Classes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="viz_submodule.html#rsutil.viz.glyphs.Atom"><code class="docutils literal notranslate"><span class="pre">Atom</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="viz_submodule.html#rsutil.viz.glyphs.Bond"><code class="docutils literal notranslate"><span class="pre">Bond</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="viz_submodule.html#rsutil.viz.glyphs.Spin"><code class="docutils literal notranslate"><span class="pre">Spin</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="viz_submodule.html#input-and-structure">Input and Structure</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="viz_submodule.html#rsutil.viz.inputreader.InputReader"><code class="docutils literal notranslate"><span class="pre">InputReader</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.inputreader.InputReader.read_custom"><code class="docutils literal notranslate"><span class="pre">InputReader.read_custom()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.inputreader.InputReader.read_poscar"><code class="docutils literal notranslate"><span class="pre">InputReader.read_poscar()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.inputreader.InputReader.read_rs_clust"><code class="docutils literal notranslate"><span class="pre">InputReader.read_rs_clust()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.inputreader.InputReader.read_rs_lmto"><code class="docutils literal notranslate"><span class="pre">InputReader.read_rs_lmto()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.inputreader.InputReader.read_rs_lmto_nml"><code class="docutils literal notranslate"><span class="pre">InputReader.read_rs_lmto_nml()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.inputreader.InputReader.read_xyz"><code class="docutils literal notranslate"><span class="pre">InputReader.read_xyz()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="viz_submodule.html#rsutil.viz.structure.Structure"><code class="docutils literal notranslate"><span class="pre">Structure</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.structure.Structure.compute_conventional_cell"><code class="docutils literal notranslate"><span class="pre">Structure.compute_conventional_cell()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.structure.Structure.get_atom_spin_objects"><code class="docutils literal notranslate"><span class="pre">Structure.get_atom_spin_objects()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.structure.Structure.get_bond_objects"><code class="docutils literal notranslate"><span class="pre">Structure.get_bond_objects()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="viz_submodule.html#main-visualizer">Main Visualizer</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="viz_submodule.html#rsutil.viz.visualizer.Visualizer"><code class="docutils literal notranslate"><span class="pre">Visualizer</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.visualizer.Visualizer.expand_structure"><code class="docutils literal notranslate"><span class="pre">Visualizer.expand_structure()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.visualizer.Visualizer.get_cell"><code class="docutils literal notranslate"><span class="pre">Visualizer.get_cell()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.visualizer.Visualizer.render"><code class="docutils literal notranslate"><span class="pre">Visualizer.render()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.visualizer.Visualizer.save_screenshot"><code class="docutils literal notranslate"><span class="pre">Visualizer.save_screenshot()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.visualizer.Visualizer.toggle_bonds"><code class="docutils literal notranslate"><span class="pre">Visualizer.toggle_bonds()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.visualizer.Visualizer.toggle_cell"><code class="docutils literal notranslate"><span class="pre">Visualizer.toggle_cell()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.visualizer.Visualizer.toggle_extents"><code class="docutils literal notranslate"><span class="pre">Visualizer.toggle_extents()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.visualizer.Visualizer.toggle_periodicity"><code class="docutils literal notranslate"><span class="pre">Visualizer.toggle_periodicity()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.visualizer.Visualizer.toggle_perspective"><code class="docutils literal notranslate"><span class="pre">Visualizer.toggle_perspective()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="viz_submodule.html#rsutil.viz.visualizer.Visualizer.toggle_spins"><code class="docutils literal notranslate"><span class="pre">Visualizer.toggle_spins()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="viz_submodule.html#usage-examples">Usage Examples</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="exchange_submodule.html">The <cite>exchange</cite> submodule</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exchange_map_module.html">The <cite>exchange_map</cite> module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="exchange_map_module.html#functions">Functions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="exchange_map_module.html#rsutil.exchange.exchange_map.create_structure_and_analyzer"><code class="docutils literal notranslate"><span class="pre">create_structure_and_analyzer()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="exchange_map_module.html#rsutil.exchange.exchange_map.exchange_map"><code class="docutils literal notranslate"><span class="pre">exchange_map()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="exchange_map_module.html#rsutil.exchange.exchange_map.find_matching_indices"><code class="docutils literal notranslate"><span class="pre">find_matching_indices()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="exchange_map_module.html#rsutil.exchange.exchange_map.get_fermi_energy"><code class="docutils literal notranslate"><span class="pre">get_fermi_energy()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="exchange_map_module.html#rsutil.exchange.exchange_map.get_neighbors_list"><code class="docutils literal notranslate"><span class="pre">get_neighbors_list()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="exchange_map_module.html#rsutil.exchange.exchange_map.read_namelists"><code class="docutils literal notranslate"><span class="pre">read_namelists()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="exchange_map_module.html#rsutil.exchange.exchange_map.read_rs_clust"><code class="docutils literal notranslate"><span class="pre">read_rs_clust()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="exchange_map_module.html#rsutil.exchange.exchange_map.store_jij_namelist"><code class="docutils literal notranslate"><span class="pre">store_jij_namelist()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="export_submodule.html">The <cite>export</cite> submodule</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="export_submodule.html#uppasd-export">UppASD Export</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">RS-utils</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">The <cite>rsutil</cite> module</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/rsutil_module.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="the-rsutil-module">
+<span id="rsutil-module"></span><h1>The <cite>rsutil</cite> module<a class="headerlink" href="#the-rsutil-module" title="Link to this heading"></a></h1>
+<p>The <strong>`rsutil`</strong> module is the core of the RS-utils package. It provides utilities for processing lattice structures in RS-LMTO-ASA calculations, including:</p>
+<ul class="simple">
+<li><p><strong>Lattice Processing</strong>: The main <code class="docutils literal notranslate"><span class="pre">process_lattice()</span></code> function calculates optimal Wigner-Seitz radii and generates starting parameters for atomic calculations.</p></li>
+<li><p><strong>Data Visualization</strong>: Interactive 3D visualization of atomic structures and magnetic properties.</p></li>
+<li><p><strong>Exchange Interactions</strong>: Generation of exchange interaction files (J_ij) for spin dynamics simulations.</p></li>
+<li><p><strong>Format Conversion</strong>: Export to UppASD format and other simulation engines.</p></li>
+</ul>
+<section id="module-rsutil">
+<span id="core-functions"></span><h2>Core Functions<a class="headerlink" href="#module-rsutil" title="Link to this heading"></a></h2>
+<p>This module provides a Python wrapper for the <cite>process_lattice</cite> Fortran routine
+from the <cite>rsutil</cite> shared library.</p>
+<section id="attributes">
+<h3>Attributes<a class="headerlink" href="#attributes" title="Link to this heading"></a></h3>
+<dl class="simple">
+<dt>lib_filename<span class="classifier">Optional[str]</span></dt><dd><p>The filename of the <cite>rsutil</cite> shared library, determined dynamically.</p>
+</dd>
+<dt>lib_path<span class="classifier">str</span></dt><dd><p>The full path to the <cite>rsutil</cite> shared library.</p>
+</dd>
+<dt>_rsutil<span class="classifier">ctypes.CDLL</span></dt><dd><p>The loaded <cite>rsutil</cite> shared library.</p>
+</dd>
+</dl>
+</section>
+<section id="functions">
+<h3>Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h3>
+<dl class="simple">
+<dt>process_lattice() -&gt; None</dt><dd><p>Python wrapper for the <cite>process_lattice</cite> Fortran routine.</p>
+</dd>
+</dl>
+</section>
+<dl class="py function">
+<dt class="sig sig-object py" id="rsutil.process_lattice">
+<span class="sig-prename descclassname"><span class="pre">rsutil.</span></span><span class="sig-name descname"><span class="pre">process_lattice</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cluster_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'periodic'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">empty_spheres</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_empty_radius</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1.2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_empty_radius</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">2.5</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#rsutil.process_lattice" title="Link to this definition"></a></dt>
+<dd><p>Python wrapper for the process_lattice() Fortran routine.</p>
+<section id="parameters">
+<h3>Parameters<a class="headerlink" href="#parameters" title="Link to this heading"></a></h3>
+<dl class="simple">
+<dt>cluster_type<span class="classifier">str, optional</span></dt><dd><p>Type of cluster: ‘periodic’ (default) or ‘free’.
+If ‘periodic’, sets pbc to .true.
+If ‘free’, sets pbc to .false.</p>
+</dd>
+<dt>empty_spheres<span class="classifier">bool, optional</span></dt><dd><p>Enable empty sphere calculations (default: False).</p>
+</dd>
+<dt>min_empty_radius<span class="classifier">float, optional</span></dt><dd><p>Minimum empty sphere radius (default: 1.2).</p>
+</dd>
+<dt>max_empty_radius<span class="classifier">float, optional</span></dt><dd><p>Maximum empty sphere radius (default: 2.5).</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+</section>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading"></a></h2>
+<p>The package is organized into several submodules:</p>
+<ul class="simple">
+<li><p><strong>``rsutil.viz``</strong>: Visualization tools for structures and simulations</p></li>
+<li><p><strong>``rsutil.exchange``</strong>: Exchange interaction calculation and mapping</p></li>
+<li><p><strong>``rsutil.export``</strong>: Export functionality for other simulation formats</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="cli_section.html" class="btn btn-neutral float-left" title="Command-Line Interface (CLI)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="viz_submodule.html" class="btn btn-neutral float-right" title="The viz submodule" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Anders Bergman.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

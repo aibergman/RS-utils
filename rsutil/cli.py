@@ -60,7 +60,7 @@ def _make_common_parser():
 
 
 def run_bands_subcommand(args):
-    """Run band structure calculation"""
+    """Run band structure calculation or projections"""
     from .bands import LatticeReader, HamiltonianReader, BandStructureCalculator
     
     print(f"Reading lattice from {args.lattice}...")
@@ -69,179 +69,171 @@ def run_bands_subcommand(args):
     print(f"Reading Hamiltonian from {args.hamiltonian}...")
     hamiltonian = HamiltonianReader(args.hamiltonian)
     
-    print("Setting up band structure calculator...")
-    calc = BandStructureCalculator(lattice, hamiltonian)
-    
-    print(f"Generating k-path with {args.nk} points...")
-    kpoints, klabels, kdistances = calc.setup_kpath(args.nk)
-    
-    print("Calculating band structure...")
-    band_energies = calc.calculate_bands(kpoints)
-    
-    print(f"Plotting results to {args.output}...")
-    calc.plot_bands(kdistances, band_energies, klabels, args.output)
-    
-    print("Done!")
+    if args.projections:
+        # Run projected bands
+        from .bands.projections import ProjectedBandCalculator
+        
+        print("Setting up projected band structure calculator...")
+        proj_calc = ProjectedBandCalculator(lattice, hamiltonian)
+        
+        print(f"Generating k-path with {args.nk} points...")
+        kpoints, klabels, kdistances = proj_calc.setup_kpath(args.nk)
+        
+        print("Calculating projected band structure...")
+        band_energies, projections = proj_calc.calculate_projected_bands(kpoints)
+        
+        projection_type = args.projection
+        output_file = f"{args.output_prefix}_{projection_type}.png"
+        print(f"Plotting {projection_type} projections to {output_file}...")
+        proj_calc.plot_projected_bands(kdistances, band_energies, projections, 
+                                       klabels, projection_type, output_file)
+        
+        print("Done!")
+    else:
+        # Run regular band structure
+        print("Setting up band structure calculator...")
+        calc = BandStructureCalculator(lattice, hamiltonian)
+        
+        print(f"Generating k-path with {args.nk} points...")
+        kpoints, klabels, kdistances = calc.setup_kpath(args.nk)
+        
+        print("Calculating band structure...")
+        band_energies = calc.calculate_bands(kpoints)
+        
+        print(f"Plotting results to {args.output}...")
+        calc.plot_bands(kdistances, band_energies, klabels, args.output)
+        
+        print("Done!")
 
 
 def run_dos_subcommand(args):
-    """Run DOS calculation"""
+    """Run DOS calculation or DOS moments analysis"""
     from .bands import LatticeReader, HamiltonianReader, FullBZCalculator, DOSCalculator
     
-    lattice = LatticeReader(args.lattice)
-    hamiltonian = HamiltonianReader(args.hamiltonian)
-    bz_calc = FullBZCalculator(lattice, hamiltonian)
-    dos_calc = DOSCalculator(bz_calc)
-    
-    # If electrons are specified, use Fermi level determination
-    if args.electrons is not None:
-        print(f"Calculating DOS with Fermi level determination for {args.electrons} electrons...")
-        energy_range_val = tuple(args.energy_range) if args.energy_range else None
-        dos_data, moments_calc = dos_calc.calculate_dos_with_moments(
-            mesh_size=tuple(args.mesh),
-            target_electrons=args.electrons,
-            temperature=getattr(args, 'temperature', 300.0),
-            energy_range=energy_range_val,
-            num_energies=args.num_energies,
-            use_symmetry=not args.no_symmetry,
-            use_tetrahedron=not args.no_tetrahedron,
-            gaussian_smearing=getattr(args, 'gaussian_smearing', 0.1),
-            output_prefix=args.output_prefix
-        )
+    if args.moments:
+        # Run DOS moments analysis
+        from .bands.dos_moments import DOSMomentsCalculator
         
-        fermi_level = moments_calc.fermi_level
-        if fermi_level is not None:
-            print(f"Fermi level determined: {fermi_level:.6f} eV")
-            dos_calc.plot_dos(dos_data, fermi_energy=fermi_level, 
-                            output_file=f"{args.output_prefix}.png")
-        else:
-            print("Warning: Could not determine Fermi level")
-            dos_calc.plot_dos(dos_data, fermi_energy=0.0,
-                            output_file=f"{args.output_prefix}.png")
-    else:
-        # Simple DOS calculation
-        print("Calculating DOS...")
+        lattice = LatticeReader(args.lattice)
+        hamiltonian = HamiltonianReader(args.hamiltonian)
+        bz_calc = FullBZCalculator(lattice, hamiltonian)
+        dos_calc = DOSCalculator(bz_calc)
+        
+        print("Calculating DOS for moments analysis...")
+        use_tetrahedron = not getattr(args, 'no_tetrahedron', False)
+        
         dos_data = dos_calc.calculate_dos(
             mesh_size=tuple(args.mesh),
             energy_range=tuple(args.energy_range) if args.energy_range else None,
             num_energies=args.num_energies,
             use_symmetry=not args.no_symmetry,
-            use_tetrahedron=not args.no_tetrahedron,
-            gaussian_smearing=getattr(args, 'gaussian_smearing', 0.1)
+            use_tetrahedron=use_tetrahedron,
+            gaussian_smearing=0.1
         )
         
-        fermi_energy = getattr(args, 'fermi_energy', 0.0)
-        dos_calc.plot_dos(dos_data, fermi_energy=fermi_energy,
-                        output_file=f"{args.output_prefix}.png")
-    
-    print("Done!")
-
-
-def run_moments_subcommand(args):
-    """Run DOS moments analysis"""
-    from .bands import LatticeReader, HamiltonianReader, FullBZCalculator, DOSCalculator
-    from .bands.dos_moments import DOSMomentsCalculator
-    
-    lattice = LatticeReader(args.lattice)
-    hamiltonian = HamiltonianReader(args.hamiltonian)
-    bz_calc = FullBZCalculator(lattice, hamiltonian)
-    dos_calc = DOSCalculator(bz_calc)
-    
-    print("Calculating DOS for moments analysis...")
-    use_tetrahedron = not getattr(args, 'gaussian', False)
-    
-    dos_data = dos_calc.calculate_dos(
-        mesh_size=tuple(args.mesh),
-        energy_range=tuple(args.energy_range) if args.energy_range else None,
-        num_energies=args.num_energies,
-        use_symmetry=not args.no_symmetry,
-        use_tetrahedron=use_tetrahedron,
-        gaussian_smearing=0.1
-    )
-    
-    # Perform moments analysis
-    moments_calc = DOSMomentsCalculator(dos_data, lattice, hamiltonian)
-    
-    if args.electrons:
-        print(f"Finding Fermi level for {args.electrons} electrons...")
-        fermi_level = moments_calc.find_fermi_level(args.electrons, args.temperature)
-        print(f"Fermi level: {fermi_level:.6f} eV")
+        # Perform moments analysis
+        moments_calc = DOSMomentsCalculator(
+            dos_data['energies'], 
+            dos_data['total_dos'],
+            dos_data.get('orbital_dos'),
+            temperature=args.temperature
+        )
+        
+        if args.electrons:
+            print(f"Finding Fermi level for {args.electrons} electrons...")
+            energy_range = tuple(args.energy_range) if args.energy_range else None
+            fermi_level = moments_calc.find_fermi_level(args.electrons, energy_range)
+            print(f"Fermi level: {fermi_level:.6f} eV")
+        else:
+            print("Auto-detecting electron count...")
+            # Count electrons at zero energy
+            total_electrons = moments_calc.total_dos.sum() * (moments_calc.energies[1] - moments_calc.energies[0]) 
+            fermi_level = moments_calc.find_fermi_level(total_electrons)
+            print(f"Fermi level: {fermi_level:.6f} eV")
+        
+        # Calculate moments
+        print("\nCalculating DOS moments...")
+        moments = moments_calc.calculate_moments(fermi_level)
+        
+        # Print results
+        print("\nDOS Moments:")
+        if 'total' in moments:
+            print(f"\nTotal DOS:")
+            total_moments = moments['total']
+            print(f"  Occupation (electrons):      {total_moments['occupation']:.4f}")
+            print(f"  Avg Energy (rel to EF):      {total_moments['avg_energy_rel_ef']:.4f} eV")
+            print(f"  Energy Spread (width):       {total_moments['band_width']:.4f} eV")
+            print(f"  Band Center:                 {total_moments['band_center']:.4f} eV")
+        
+        # Save results
+        moments_calc.save_moments(f"{args.output_prefix}_moments.npz")
+        print(f"\nResults saved to {args.output_prefix}_moments.npz")
+        print("Done!")
     else:
-        print("Auto-detecting electron count...")
-        fermi_level = moments_calc.find_fermi_level(temperature=args.temperature)
-        print(f"Fermi level: {fermi_level:.6f} eV")
-    
-    # Calculate moments
-    print("\nCalculating DOS moments...")
-    moments = moments_calc.calculate_moments(fermi_level, args.temperature)
-    
-    # Print results
-    moments_calc.print_moments(moments)
-    
-    # Save results
-    moments_calc.save_moments(moments, f"{args.output_prefix}_moments.txt")
-    
-    print(f"\nResults saved to {args.output_prefix}_moments.txt")
-    print("Done!")
-
-
-def run_projections_subcommand(args):
-    """Run projected bands calculation"""
-    from .bands import LatticeReader, HamiltonianReader
-    from .bands.projections import ProjectedBandCalculator
-    
-    lattice = LatticeReader(args.lattice)
-    hamiltonian = HamiltonianReader(args.hamiltonian)
-    
-    print("Calculating projected bands...")
-    proj_calc = ProjectedBandCalculator(lattice, hamiltonian)
-    
-    projection_type = args.projection
-    if projection_type == 'all' or projection_type == 'orbital':
-        print("Calculating orbital projections...")
-        proj_calc.plot_orbital_projections(output_prefix=f"{args.output_prefix}_orbital")
-    
-    if projection_type == 'all' or projection_type == 'site':
-        print("Calculating site projections...")
-        proj_calc.plot_site_projections(output_prefix=f"{args.output_prefix}_site")
-    
-    if projection_type == 'all' or projection_type == 'spin':
-        print("Calculating spin projections...")
-        proj_calc.plot_spin_projections(output_prefix=f"{args.output_prefix}_spin")
-    
-    print("Done!")
-
-
-def run_complete_subcommand(args):
-    """Run complete analysis"""
-    from .bands.complete_analysis import CompleteAnalysis
-    
-    print("Running complete analysis...")
-    analysis = CompleteAnalysis(args.lattice, args.hamiltonian)
-    
-    analysis.run_complete_analysis(
-        nk_line=args.nk_line,
-        dos_mesh=tuple(args.dos_mesh),
-        energy_range=tuple(args.energy_range) if args.energy_range else None,
-        num_energies=args.num_energies,
-        fermi_energy=args.fermi_energy,
-        skip_dos=args.skip_dos,
-        skip_projections=args.skip_projections,
-        use_symmetry=not args.no_symmetry,
-        output_prefix=getattr(args, 'output_prefix', 'complete_analysis')
-    )
-    
-    print("Done!")
+        # Run regular DOS calculation
+        lattice = LatticeReader(args.lattice)
+        hamiltonian = HamiltonianReader(args.hamiltonian)
+        bz_calc = FullBZCalculator(lattice, hamiltonian)
+        dos_calc = DOSCalculator(bz_calc)
+        
+        # If electrons are specified, use Fermi level determination
+        if args.electrons is not None:
+            print(f"Calculating DOS with Fermi level determination for {args.electrons} electrons...")
+            energy_range_val = tuple(args.energy_range) if args.energy_range else None
+            dos_data, moments_calc = dos_calc.calculate_dos_with_moments(
+                mesh_size=tuple(args.mesh),
+                target_electrons=args.electrons,
+                temperature=getattr(args, 'temperature', 300.0),
+                energy_range=energy_range_val,
+                num_energies=args.num_energies,
+                use_symmetry=not args.no_symmetry,
+                use_tetrahedron=not args.no_tetrahedron,
+                gaussian_smearing=getattr(args, 'gaussian_smearing', 0.1),
+                output_prefix=args.output_prefix
+            )
+            
+            fermi_level = moments_calc.fermi_level
+            if fermi_level is not None:
+                print(f"Fermi level determined: {fermi_level:.6f} eV")
+                dos_calc.plot_dos(dos_data, fermi_energy=fermi_level, 
+                                output_file=f"{args.output_prefix}.png")
+            else:
+                print("Warning: Could not determine Fermi level")
+                dos_calc.plot_dos(dos_data, fermi_energy=0.0,
+                                output_file=f"{args.output_prefix}.png")
+        else:
+            # Simple DOS calculation
+            print("Calculating DOS...")
+            dos_data = dos_calc.calculate_dos(
+                mesh_size=tuple(args.mesh),
+                energy_range=tuple(args.energy_range) if args.energy_range else None,
+                num_energies=args.num_energies,
+                use_symmetry=not args.no_symmetry,
+                use_tetrahedron=not args.no_tetrahedron,
+                gaussian_smearing=getattr(args, 'gaussian_smearing', 0.1)
+            )
+            
+            fermi_energy = getattr(args, 'fermi_energy', 0.0)
+            dos_calc.plot_dos(dos_data, fermi_energy=fermi_energy,
+                            output_file=f"{args.output_prefix}.png")
+        
+        print("Done!")
 
 
 def create_bands_parser(subparsers):
     """Create bands subcommand parser"""
     parser = subparsers.add_parser('bands', parents=[_make_common_parser()],
-                                   help='Calculate band structure')
+                                   help='Calculate band structure and projections')
     parser.add_argument('--nk', type=int, default=100,
                        help='Number of k-points along path (default: 100)')
     parser.add_argument('--output', default='band_structure.png',
                        help='Output plot file (default: band_structure.png)')
+    parser.add_argument('--projections', action='store_true',
+                       help='Calculate projected bands instead of total bands')
+    parser.add_argument('--projection', choices=['orbital', 'site', 'spin', 'all'],
+                       default='all', help='Type of projection (default: all)')
+    parser.add_argument('--output-prefix', default='projected',
+                       help='Output file prefix for projections (default: projected)')
     parser.set_defaults(func=run_bands_subcommand)
     return parser
 
@@ -249,7 +241,7 @@ def create_bands_parser(subparsers):
 def create_dos_parser(subparsers):
     """Create DOS subcommand parser"""
     parser = subparsers.add_parser('dos', parents=[_make_common_parser()],
-                                   help='Calculate density of states')
+                                   help='Calculate density of states or DOS moments')
     parser.add_argument('--mesh', nargs=3, type=int, default=[6, 6, 6],
                        help='k-point mesh size (default: 6 6 6)')
     parser.add_argument('--energy-range', nargs=2, type=float,
@@ -270,69 +262,9 @@ def create_dos_parser(subparsers):
                        help='Gaussian smearing width in eV (default: 0.1)')
     parser.add_argument('--output-prefix', default='dos',
                        help='Output file prefix (default: dos)')
+    parser.add_argument('--moments', action='store_true',
+                       help='Calculate DOS moments analysis instead of DOS plot')
     parser.set_defaults(func=run_dos_subcommand)
-    return parser
-
-
-def create_moments_parser(subparsers):
-    """Create moments subcommand parser"""
-    parser = subparsers.add_parser('moments', parents=[_make_common_parser()],
-                                   help='DOS moments analysis')
-    parser.add_argument('--mesh', nargs=3, type=int, default=[8, 8, 8],
-                       help='k-point mesh size (default: 8 8 8)')
-    parser.add_argument('--electrons', type=float,
-                       help='Number of electrons (auto-detect if not specified)')
-    parser.add_argument('--temperature', type=float, default=300.0,
-                       help='Temperature in K (default: 300.0)')
-    parser.add_argument('--no-symmetry', action='store_true',
-                       help='Disable symmetry reduction')
-    parser.add_argument('--gaussian', action='store_true',
-                       help='Use Gaussian broadening instead of tetrahedron')
-    parser.add_argument('--num-energies', type=int, default=1000,
-                       help='Number of energy points (default: 1000)')
-    parser.add_argument('--energy-range', nargs=2, type=float,
-                       help='Energy range (emin emax)')
-    parser.add_argument('--output-prefix', default='dos_moments',
-                       help='Output file prefix (default: dos_moments)')
-    parser.set_defaults(func=run_moments_subcommand)
-    return parser
-
-
-def create_projections_parser(subparsers):
-    """Create projections subcommand parser"""
-    parser = subparsers.add_parser('projections', parents=[_make_common_parser()],
-                                   help='Calculate projected bands')
-    parser.add_argument('--projection', choices=['orbital', 'site', 'spin', 'all'],
-                       default='all', help='Type of projection (default: all)')
-    parser.add_argument('--output-prefix', default='projected',
-                       help='Output file prefix (default: projected)')
-    parser.set_defaults(func=run_projections_subcommand)
-    return parser
-
-
-def create_complete_parser(subparsers):
-    """Create complete analysis subcommand parser"""
-    parser = subparsers.add_parser('complete', parents=[_make_common_parser()],
-                                   help='Run complete combined analysis')
-    parser.add_argument('--nk-line', type=int, default=100,
-                       help='Number of k-points for band path (default: 100)')
-    parser.add_argument('--dos-mesh', nargs=3, type=int, default=[6, 6, 6],
-                       help='k-point mesh for DOS (default: 6 6 6)')
-    parser.add_argument('--energy-range', nargs=2, type=float,
-                       help='Energy range for DOS (emin emax)')
-    parser.add_argument('--num-energies', type=int, default=500,
-                       help='Number of energy points for DOS (default: 500)')
-    parser.add_argument('--fermi-energy', type=float, default=0.0,
-                       help='Fermi energy (default: 0.0)')
-    parser.add_argument('--skip-dos', action='store_true',
-                       help='Skip DOS calculation')
-    parser.add_argument('--skip-projections', action='store_true',
-                       help='Skip projection calculations')
-    parser.add_argument('--no-symmetry', action='store_true',
-                       help='Disable symmetry reduction for DOS')
-    parser.add_argument('--output-prefix', default='complete_analysis',
-                       help='Output file prefix (default: complete_analysis)')
-    parser.set_defaults(func=run_complete_subcommand)
     return parser
 
 
@@ -364,10 +296,9 @@ Examples:
   
   # New band/DOS functionality (subcommands)
   rsutil bands --lattice lattice.nml --nk 200            # Band structure
+  rsutil bands --projections --projection orbital        # Orbital projections
   rsutil dos --mesh 8 8 8 --electrons 8.0                # DOS with Fermi level
-  rsutil moments --mesh 10 10 10 --temperature 300       # DOS moments
-  rsutil projections --projection orbital                # Orbital projections
-  rsutil complete --dos-mesh 8 8 8                       # Complete analysis
+  rsutil dos --mesh 10 10 10 --electrons 8.0 --moments   # DOS moments analysis
         """
     )
     
@@ -377,9 +308,6 @@ Examples:
     # Add band/DOS subcommands
     create_bands_parser(subparsers)
     create_dos_parser(subparsers)
-    create_moments_parser(subparsers)
-    create_projections_parser(subparsers)
-    create_complete_parser(subparsers)
     
     # Existing flags for backward compatibility
     parser.add_argument(

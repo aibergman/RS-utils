@@ -1,0 +1,35 @@
+{
+	"bmi-installation" : null,
+	"compiler-frontend-variant" : "GNU",
+	"compiler-id" : "GNU",
+	"compiler-simulate-id" : "",
+	"config" : "Debug",
+	"cxx-modules" : {},
+	"database-info" : null,
+	"dir-cur-bld" : "/Users/andersb/Jobb/RS_tools/build",
+	"dir-cur-src" : "/Users/andersb/Jobb/RS_tools",
+	"dir-top-bld" : "/Users/andersb/Jobb/RS_tools/build",
+	"dir-top-src" : "/Users/andersb/Jobb/RS_tools",
+	"exports" : [],
+	"forward-modules-from-target-dirs" : [],
+	"include-dirs" : 
+	[
+		"modules"
+	],
+	"language" : "Fortran",
+	"linked-target-dirs" : 
+	[
+		"/Users/andersb/Jobb/RS_tools/build/CMakeFiles/rsutil_lib.dir"
+	],
+	"module-dir" : "/Users/andersb/Jobb/RS_tools/build/modules",
+	"sources" : 
+	{
+		"CMakeFiles/rsutil.x.dir/source/process_lattice.f90.o" : 
+		{
+			"language" : "Fortran",
+			"source" : "/Users/andersb/Jobb/RS_tools/source/process_lattice.f90"
+		}
+	},
+	"submodule-ext" : ".smod",
+	"submodule-sep" : "@"
+}

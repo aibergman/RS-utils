@@ -1,0 +1,42 @@
+import os
+import subprocess
+import sys
+import pathlib
+
+
+def get_poetry_env():
+    """Get Poetry virtual environment path."""
+    try:
+        env_path = subprocess.check_output(["poetry", "env", "info", "--path"]).decode().strip()
+        return env_path
+    except subprocess.CalledProcessError:
+        return None
+
+
+def build_wheel():
+    """Custom build process for Poetry (runs CMake)."""
+    print("🔧 Running CMake to build Fortran extension...")
+
+    # Ensure the build directory exists
+    os.makedirs("build", exist_ok=True)
+    os.chdir("build")
+
+    # Get Poetry virtual environment path
+    poetry_env = get_poetry_env()
+    python_bin = pathlib.Path(poetry_env) / "bin" / "python" if poetry_env else sys.executable
+
+    # Run CMake with the correct Python environment
+    subprocess.run([
+        "cmake",
+        f"-DPython3_EXECUTABLE={python_bin}",
+        "-DENABLE_PYTHON_BINDINGS=ON",
+        ".."
+    ], check=True)
+
+    subprocess.run(["make"], check=True)
+
+    print("✅ CMake build complete. Compiled shared library should be in rsutil/_rsutil.so")
+
+
+if __name__ == "__main__":
+    build_wheel()

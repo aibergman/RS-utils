@@ -1,0 +1,140 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{siunitx}
+
+\begin{document}
+
+\section*{Choosing the Out-of-Plane Lattice Vector for a 2D System}
+
+When simulating a truly two-dimensional material using a three-dimensional code with periodic boundary conditions, one must pick a third lattice vector~$\mathbf{c}$ that
+
+\begin{itemize}
+  \item is orthogonal to the in-plane vectors $\mathbf{a}$ and $\mathbf{b}$,
+  \item has a length large enough to avoid spurious interactions between periodic images,
+  \item and ideally preserves a consistent “effective density” so that any algorithms expecting a 3D cell volume still behave reasonably.
+\end{itemize}
+
+Here’s one way to pick $\mathbf{c}$:
+
+\subsection*{1.\quad Relate cell volume and particle radius in 3D}
+
+In three dimensions, if we imagine each of the $N$ particles occupies a volume equal to that of a sphere of radius~$r_\mathrm{avg}$, then
+\begin{equation}
+  V_\mathrm{cell}
+  = N \, V_{\rm sphere}
+  = N \,\frac{4}{3}\pi r_\mathrm{avg}^3
+  \,.
+  \label{eq:3D-volume}
+\end{equation}
+
+\subsection*{2.\quad Relate cell area and particle radius in 2D}
+
+In two dimensions, each particle “occupies” a circle of radius~$r_\mathrm{avg}$, so
+\begin{equation}
+  A_\mathrm{cell}
+  = N \, A_{\rm circle}
+  = N \,\pi r_\mathrm{avg}^2
+  \,.
+  \label{eq:2D-area}
+\end{equation}
+
+Since $A_\mathrm{cell}$ and $N$ are known, solve \eqref{eq:2D-area} for
+\begin{equation}
+  r_\mathrm{avg}
+  = \sqrt{\frac{A_\mathrm{cell}}{N\,\pi}}.
+  \label{eq:r-avg}
+\end{equation}
+
+\subsection*{3.\quad Compute an effective 3D cell volume}
+
+Plugging \eqref{eq:r-avg} into \eqref{eq:3D-volume}, we obtain an effective 3D volume:
+\begin{equation}
+  V_\mathrm{cell}
+  = N \,\frac{4}{3}\,\pi
+    \left(\sqrt{\frac{A_\mathrm{cell}}{N\,\pi}}\right)^{\!3}
+  = \frac{4}{3}\,\pi
+    \,\frac{A_\mathrm{cell}^{3/2}}{(N\,\pi)^{1/2}}
+  \,.
+  \label{eq:V-cell-effective}
+\end{equation}
+
+\subsection*{4.\quad Determine the out-of-plane lattice constant}
+
+By definition of the parallelepiped volume,
+\[
+  V_\mathrm{cell}
+  = \bigl|\mathbf{a}\times\mathbf{b}\bigr|\;|\mathbf{c}|
+  = A_\mathrm{cell}\;c
+  \,,
+\]
+since $\mathbf{c}\perp\mathbf{a},\mathbf{b}$ by construction.  Hence
+\begin{equation}
+  c \;=\; |\mathbf{c}|
+  \;=\;
+  \frac{V_\mathrm{cell}}{A_\mathrm{cell}}
+  = \frac{\displaystyle
+      \frac{4}{3}\,\pi
+      \,A_\mathrm{cell}^{3/2}/(N\,\pi)^{1/2}
+    }{A_\mathrm{cell}}
+  = \frac{4}{3}\,\pi
+    \,\frac{\sqrt{A_\mathrm{cell}}}{\sqrt{N\,\pi}}
+  = \frac{4}{3}\,\pi\,r_\mathrm{avg}
+  \,.
+  \label{eq:c-length}
+\end{equation}
+
+\subsection*{5.\quad Algorithmic summary}
+
+\begin{enumerate}
+  \item Compute the 2D cell area
+    \[
+      A_\mathrm{cell} \;=\; \bigl|\mathbf{a}\times\mathbf{b}\bigr|.
+    \]
+  \item Compute
+    \(\displaystyle r_\mathrm{avg} = \sqrt{A_\mathrm{cell}/(N\,\pi)}\).
+  \item Compute the effective 3D cell volume via
+    \(\displaystyle V_\mathrm{cell} = N\,(4/3)\,\pi\,r_\mathrm{avg}^3\).
+  \item Set
+    \(\displaystyle \mathbf{c} = c\,\hat{\mathbf{n}}\),
+    where \(\hat{\mathbf{n}}\) is the unit vector perpendicular to
+    \(\mathbf{a}\) and \(\mathbf{b}\), and
+    \(\displaystyle c = V_\mathrm{cell}/A_\mathrm{cell}\).
+  \item Now run your regular 3D routines using the cell
+    \(\{\mathbf{a},\mathbf{b},\mathbf{c}\}\).
+\end{enumerate}
+
+\textbf{Note.}  This construction assumes a perfectly flat 2D lattice
+(i.e.\ well-defined $A_\mathrm{cell}$) and aims only to give a
+self-consistent “height” for $\mathbf{c}$.  In practice you may still
+want to increase $c$ further to avoid any long-range image interactions
+(e.g.\ electrostatics, van der Waals).
+
+\subsection*{6.\quad Closed-form expression for \(c\)}
+
+Since 
+\[
+A_{\rm cell} = \lvert \mathbf{a}\times\mathbf{b}\rvert 
+             = a\,b\,\cos\theta,
+\]
+we have from step 4
+\[
+c 
+= \frac{V_{\rm cell}}{A_{\rm cell}}
+= \frac{\displaystyle\frac{4}{3}\,\pi\,r_{\rm avg}^3\,N}{A_{\rm cell}}
+= \frac{4}{3\sqrt{\pi}}
+    \sqrt{\frac{A_{\rm cell}}{N}}
+= \frac{4}{3\sqrt{\pi}}
+    \sqrt{\frac{a\,b\,\cos\theta}{N}}.
+\]
+In the common case of an orthogonal basis (\(\theta=90^\circ\), \(\cos\theta=1\)),
+\[
+\boxed{
+c 
+= z 
+= \frac{4}{3\sqrt{\pi}}
+  \,\sqrt{\frac{a\,b}{N}}
+}.
+\]
+
+\end{document}

@@ -1,0 +1,6 @@
+pyyaml
+pytest
+f90nml
+numpy
+sphinx_rtd_theme
+

@@ -1,0 +1,27 @@
+Metadata-Version: 2.4
+Name: rsutil
+Version: 0.10.0
+Summary: Utilities for the RS-LMTO code including band structure and DOS analysis
+Author: Anders Bergman
+Author-email: anders.bergman@physics.uu.se
+Requires-Dist: numpy>=1.20.0
+Requires-Dist: pyvista
+Requires-Dist: pymatgen
+Requires-Dist: f90nml
+Requires-Dist: matplotlib>=3.5.0
+Requires-Dist: scipy>=1.7.0
+Requires-Dist: spglib>=2.0.0
+Provides-Extra: full
+Requires-Dist: pymatgen>=2022.0.0; extra == "full"
+Provides-Extra: dev
+Requires-Dist: pytest>=6.0.0; extra == "dev"
+Requires-Dist: black; extra == "dev"
+Requires-Dist: flake8; extra == "dev"
+Dynamic: author
+Dynamic: author-email
+Dynamic: description
+Dynamic: provides-extra
+Dynamic: requires-dist
+Dynamic: summary
+
+Utilities for the RS-LMTO code including lattice processing, visualization, exchange mapping, UppASD export, band structure calculations, and density of states analysis

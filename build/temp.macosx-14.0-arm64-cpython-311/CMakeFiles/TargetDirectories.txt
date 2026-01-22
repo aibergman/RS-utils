@@ -1,0 +1,6 @@
+/Users/andersb/Jobb/RS_tools/build/temp.macosx-14.0-arm64-cpython-311/CMakeFiles/rsutil_lib.dir
+/Users/andersb/Jobb/RS_tools/build/temp.macosx-14.0-arm64-cpython-311/CMakeFiles/rsutil.x.dir
+/Users/andersb/Jobb/RS_tools/build/temp.macosx-14.0-arm64-cpython-311/CMakeFiles/f90wrap_generate.dir
+/Users/andersb/Jobb/RS_tools/build/temp.macosx-14.0-arm64-cpython-311/CMakeFiles/rsutil.dir
+/Users/andersb/Jobb/RS_tools/build/temp.macosx-14.0-arm64-cpython-311/CMakeFiles/edit_cache.dir
+/Users/andersb/Jobb/RS_tools/build/temp.macosx-14.0-arm64-cpython-311/CMakeFiles/rebuild_cache.dir
