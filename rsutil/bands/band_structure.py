@@ -15,10 +15,11 @@ Author: Created for rslmto_official
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FixedLocator, FixedFormatter, NullLocator
 from scipy.linalg import eigh
 from pathlib import Path
 import argparse
-from typing import Tuple, Dict, List
+from typing import Tuple, Dict, List, Optional
 import warnings
 
 from .readers import LatticeReader, HamiltonianReader
@@ -69,6 +70,10 @@ class BandStructureCalculator:
         self.band_energies = None
         self.band_energies_up = None
         self.band_energies_down = None
+        # Eigenvector storage (Phase 3)
+        self.eigenvectors = None
+        self.eigenvectors_up = None
+        self.eigenvectors_down = None
         
     def setup_kpath(self, num_points: int = 100) -> Tuple[np.ndarray, List[str], np.ndarray]:
         """Setup k-point path using structure analysis"""
@@ -375,7 +380,7 @@ class BandStructureCalculator:
         
         # print(f"Text dump saved to {filename}")
     
-    def calculate_bands(self, kpoints: np.ndarray) -> np.ndarray:
+    def calculate_bands(self, kpoints: np.ndarray, store_eigenvectors: bool = False) -> np.ndarray:
         """Calculate band structure for given k-points
         
         For collinear=False (default): Returns all bands from full 18×18 Hamiltonian
@@ -385,11 +390,21 @@ class BandStructureCalculator:
         ----------
         kpoints : np.ndarray
             Array of k-points in crystal coordinates (nk × 3)
+        store_eigenvectors : bool, optional
+            If True, store eigenvectors in self.eigenvectors for Berry curvature
+            calculations. Eigenvectors are stored as (nk, nbands, nbands) complex array.
+            Default is False for backward compatibility.
             
         Returns
         -------
         band_energies : np.ndarray
             Band energies at each k-point (nk × nbands)
+            
+        Notes
+        -----
+        When store_eigenvectors=True, the eigenvectors can be accessed via
+        self.eigenvectors after calling this method. This is required for
+        Berry curvature and topological property calculations.
         """
         if self.collinear:
             raise ValueError("For collinear calculations, use calculate_bands_collinear() "
@@ -400,14 +415,24 @@ class BandStructureCalculator:
         
         band_energies = np.zeros((num_kpoints, total_orbitals))
         
+        if store_eigenvectors:
+            eigenvectors = np.zeros((num_kpoints, total_orbitals, total_orbitals), dtype=complex)
+        
         for i, k in enumerate(kpoints):
             H_k = self.fourier_transform_hamiltonian(k)
-            eigenvalues, _ = eigh(H_k)
+            eigenvalues, eigvecs = eigh(H_k)
             band_energies[i, :] = np.real(eigenvalues)  # Take real part
+            
+            if store_eigenvectors:
+                eigenvectors[i, :, :] = eigvecs
+        
+        if store_eigenvectors:
+            self.eigenvectors = eigenvectors
         
         return band_energies
     
-    def calculate_bands_collinear(self, kpoints: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def calculate_bands_collinear(self, kpoints: np.ndarray, 
+                                   store_eigenvectors: bool = False) -> Tuple[np.ndarray, np.ndarray]:
         """Calculate spin-polarized band structure for collinear magnetism
         
         Extracts spin-up and spin-down Hamiltonians from the full 18×18 matrix
@@ -418,6 +443,9 @@ class BandStructureCalculator:
         ----------
         kpoints : np.ndarray
             Array of k-points in crystal coordinates (nk × 3)
+        store_eigenvectors : bool, optional
+            If True, store eigenvectors in self.eigenvectors_up and self.eigenvectors_down
+            for spin-resolved Berry curvature calculations. Default is False.
             
         Returns
         -------
@@ -431,6 +459,8 @@ class BandStructureCalculator:
         - Only valid for collinear magnetic calculations
         - Ignores spin-flip terms (SOC, non-collinear magnetism)
         - Each spin channel has 9*nbas bands (9 orbitals per atom)
+        - When store_eigenvectors=True, eigenvectors are accessible via
+          self.eigenvectors_up and self.eigenvectors_down
         """
         if not self.collinear:
             raise ValueError("calculate_bands_collinear() requires collinear=True. "
@@ -442,6 +472,10 @@ class BandStructureCalculator:
         band_energies_up = np.zeros((num_kpoints, n_orb_per_spin))
         band_energies_down = np.zeros((num_kpoints, n_orb_per_spin))
         
+        if store_eigenvectors:
+            eigenvectors_up = np.zeros((num_kpoints, n_orb_per_spin, n_orb_per_spin), dtype=complex)
+            eigenvectors_down = np.zeros((num_kpoints, n_orb_per_spin, n_orb_per_spin), dtype=complex)
+        
         for i, k in enumerate(kpoints):
             # Get full Hamiltonian at this k-point
             H_k = self.fourier_transform_hamiltonian(k)
@@ -450,60 +484,109 @@ class BandStructureCalculator:
             H_up, H_down = self.extract_spin_blocks(H_k)
             
             # Diagonalize each spin channel
-            eigs_up, _ = eigh(H_up)
-            eigs_down, _ = eigh(H_down)
+            eigs_up, eigvecs_up = eigh(H_up)
+            eigs_down, eigvecs_down = eigh(H_down)
             
             band_energies_up[i, :] = np.real(eigs_up)
             band_energies_down[i, :] = np.real(eigs_down)
+            
+            if store_eigenvectors:
+                eigenvectors_up[i, :, :] = eigvecs_up
+                eigenvectors_down[i, :, :] = eigvecs_down
         
         # Store for later access
         self.band_energies_up = band_energies_up
         self.band_energies_down = band_energies_down
         
+        if store_eigenvectors:
+            self.eigenvectors_up = eigenvectors_up
+            self.eigenvectors_down = eigenvectors_down
+        
         return band_energies_up, band_energies_down
     
     def plot_bands(self, kdistances: np.ndarray, band_energies: np.ndarray, 
-                   klabels: List[str], output_file: str = None):
-        """Plot the band structure"""
+                   klabels: List[str], output_file: Optional[str] = None,
+                   energy_range: Optional[Tuple[float, float]] = None):
+        """Plot the band structure with publication-quality styling
         
-        plt.figure(figsize=(10, 8))
+        Parameters
+        ----------
+        kdistances : np.ndarray
+            K-point distances along path
+        band_energies : np.ndarray
+            Band energies (nk × nbands)
+        klabels : List[str]
+            High-symmetry point labels
+        output_file : str, optional
+            Output file path
+        energy_range : tuple, optional
+            (E_min, E_max) for y-axis limits
+        """
+        fig, ax = plt.subplots(figsize=(10, 8))
         
-        # Plot all bands
+        # Plot all bands with clean styling
         for band in range(band_energies.shape[1]):
-            plt.plot(kdistances, band_energies[:, band], 'b-', linewidth=1)
+            ax.plot(kdistances, band_energies[:, band], color='#2E86AB', 
+                   linewidth=1.5, alpha=0.8)
         
-        # Set up k-point labels
+        # Set up k-point labels with explicit tick control
         tick_positions = []
         tick_labels = []
         for i, label in enumerate(klabels):
-            if label:  # Non-empty label
+            if label:
                 tick_positions.append(kdistances[i])
                 tick_labels.append(label)
         
-        plt.xticks(tick_positions, tick_labels)
+        if tick_positions:
+            ax.xaxis.set_major_locator(FixedLocator(tick_positions))
+            ax.xaxis.set_major_formatter(FixedFormatter(tick_labels))
+            ax.xaxis.set_minor_locator(NullLocator())
+            
+            # Add thin vertical lines at symmetry points
+            for pos in tick_positions[1:-1]:
+                ax.axvline(pos, color='black', linestyle='-', linewidth=0.5, alpha=0.5, zorder=0)
         
-        # Add vertical lines at high-symmetry points
-        for pos in tick_positions:
-            plt.axvline(x=pos, color='k', linestyle='--', alpha=0.3)
+        # Set axis limits and styling
+        ax.set_xlim(kdistances[0], kdistances[-1])
+        ax.margins(x=0)
         
-        plt.xlabel('k-path')
-        plt.ylabel('Energy (eV)')
-        plt.title('TB-LMTO Band Structure')
-        plt.grid(True, alpha=0.3)
-        plt.tight_layout()
+        # Compute tight y-limits
+        if energy_range:
+            target_ylim = tuple(energy_range)
+        else:
+            e_min = float(np.min(band_energies))
+            e_max = float(np.max(band_energies))
+            e_range = e_max - e_min
+            e_pad = 0.02 * e_range
+            target_ylim = (e_min - e_pad, e_max + e_pad)
+        
+        ax.set_ylim(*target_ylim)
+        ax.autoscale(False)
+        
+        ax.set_xlabel('k-path', fontsize=12)
+        ax.set_ylabel('Energy (eV)', fontsize=12)
+        ax.set_title('TB-LMTO Band Structure', fontsize=14)
+        
+        # Clean appearance
+        ax.grid(False)
+        ax.minorticks_off()
+        ax.set_axisbelow(True)
         
         if output_file:
+            fig.tight_layout()
             plt.savefig(output_file, dpi=300, bbox_inches='tight')
             print(f"Band structure saved to {output_file}")
-        
-        plt.show()
+            plt.close()
+        else:
+            plt.show()
     
     def plot_bands_collinear(self, kdistances: np.ndarray, 
                             band_energies_up: np.ndarray, 
                             band_energies_down: np.ndarray,
                             klabels: List[str], 
-                            output_file: str = None):
-        """Plot spin-polarized band structure
+                            output_file: Optional[str] = None,
+                            energy_range: Optional[Tuple[float, float]] = None):
+        """Plot spin-polarized band structure with publication-quality styling
         
         Parameters
         ----------
@@ -517,50 +600,77 @@ class BandStructureCalculator:
             Labels for high-symmetry k-points
         output_file : str, optional
             Output filename for saving the plot
+        energy_range : tuple, optional
+            (E_min, E_max) for y-axis limits
             
         Notes
         -----
         Spin-up bands shown in red, spin-down in blue.
         Exchange splitting visible as energy difference between channels.
         """
-        plt.figure(figsize=(10, 8))
+        fig, ax = plt.subplots(figsize=(10, 8))
         
         # Plot spin-up bands in red
         for band in range(band_energies_up.shape[1]):
-            plt.plot(kdistances, band_energies_up[:, band], 'r-', 
-                    linewidth=1, alpha=0.7, label='↑' if band == 0 else '')
+            ax.plot(kdistances, band_energies_up[:, band], color='#E63946', 
+                   linewidth=1.5, alpha=0.75, label='Spin ↑' if band == 0 else '')
         
         # Plot spin-down bands in blue
         for band in range(band_energies_down.shape[1]):
-            plt.plot(kdistances, band_energies_down[:, band], 'b-', 
-                    linewidth=1, alpha=0.7, label='↓' if band == 0 else '')
+            ax.plot(kdistances, band_energies_down[:, band], color='#457B9D', 
+                   linewidth=1.5, alpha=0.75, label='Spin ↓' if band == 0 else '')
         
-        # Set up k-point labels
+        # Set up k-point labels with explicit tick control
         tick_positions = []
         tick_labels = []
         for i, label in enumerate(klabels):
-            if label:  # Non-empty label
+            if label:
                 tick_positions.append(kdistances[i])
                 tick_labels.append(label)
         
-        plt.xticks(tick_positions, tick_labels)
+        if tick_positions:
+            ax.xaxis.set_major_locator(FixedLocator(tick_positions))
+            ax.xaxis.set_major_formatter(FixedFormatter(tick_labels))
+            ax.xaxis.set_minor_locator(NullLocator())
+            
+            # Add thin vertical lines at symmetry points
+            for pos in tick_positions[1:-1]:
+                ax.axvline(pos, color='black', linestyle='-', linewidth=0.5, alpha=0.5, zorder=0)
         
-        # Add vertical lines at high-symmetry points
-        for pos in tick_positions:
-            plt.axvline(x=pos, color='k', linestyle='--', alpha=0.3)
+        # Set axis limits and styling
+        ax.set_xlim(kdistances[0], kdistances[-1])
+        ax.margins(x=0)
         
-        plt.xlabel('k-path')
-        plt.ylabel('Energy (eV)')
-        plt.title('TB-LMTO Spin-Polarized Band Structure')
-        plt.legend(loc='best')
-        plt.grid(True, alpha=0.3)
-        plt.tight_layout()
+        # Compute tight y-limits from both spin channels
+        if energy_range:
+            target_ylim = tuple(energy_range)
+        else:
+            e_min = float(min(np.min(band_energies_up), np.min(band_energies_down)))
+            e_max = float(max(np.max(band_energies_up), np.max(band_energies_down)))
+            e_range = e_max - e_min
+            e_pad = 0.02 * e_range
+            target_ylim = (e_min - e_pad, e_max + e_pad)
+        
+        ax.set_ylim(*target_ylim)
+        ax.autoscale(False)
+        
+        ax.set_xlabel('k-path', fontsize=12)
+        ax.set_ylabel('Energy (eV)', fontsize=12)
+        ax.set_title('TB-LMTO Spin-Polarized Band Structure', fontsize=14)
+        ax.legend(loc='best', frameon=False)
+        
+        # Clean appearance
+        ax.grid(False)
+        ax.minorticks_off()
+        ax.set_axisbelow(True)
         
         if output_file:
+            fig.tight_layout()
             plt.savefig(output_file, dpi=300, bbox_inches='tight')
             print(f"Spin-polarized band structure saved to {output_file}")
-        
-        plt.show()
+            plt.close()
+        else:
+            plt.show()
 
 
 def main():

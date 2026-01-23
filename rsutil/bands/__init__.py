@@ -57,6 +57,8 @@ from .magnetic_moments import MagneticMomentCalculator
 from .effective_mass import EffectiveMassCalculator
 from .altermagnetic import AltermagneticAnalyzer
 from .berry_curvature import BerryCurvatureCalculator
+from .spin_texture import SpinTextureCalculator
+from .fat_bands import FatBandsPlotter
 from .projection_utils import (
     guess_basis_order,
     degeneracy_groups,
@@ -92,6 +94,8 @@ __all__ = [
     "EffectiveMassCalculator",
     "AltermagneticAnalyzer",
     "BerryCurvatureCalculator",
+    "SpinTextureCalculator",
+    "FatBandsPlotter",
     # Projection utilities
     "guess_basis_order",
     "degeneracy_groups",

@@ -126,34 +126,22 @@ def run_bands_subcommand(args):
         from .bands.berry_curvature import BerryCurvatureCalculator
         
         print("Setting up band structure calculator...")
-        # Note: BerryCurvatureCalculator requires eigenvectors, which BandStructureCalculator
-        # doesn't currently store. This is a limitation noted in Phase 2 documentation.
-        print("WARNING: BerryCurvatureCalculator requires eigenvector storage.")
-        print("Current implementation uses synthetic eigenvectors for demonstration.")
-        print("For production use, BandStructureCalculator should be modified to optionally store eigenvectors.")
-        
         calc = BandStructureCalculator(lattice, hamiltonian)
         
         print(f"Generating k-path with {args.nk} points...")
         kpoints, klabels, kdistances = calc.setup_kpath(args.nk)
         
-        print("Calculating band structure...")
-        energies = calc.calculate_bands(kpoints)
+        print("Calculating band structure with eigenvector storage...")
+        energies = calc.calculate_bands(kpoints, store_eigenvectors=True)
         
-        # Generate synthetic orthonormal eigenvectors for demonstration
-        # In production, these would come from the actual eigenvalue decomposition
-        print("Generating synthetic eigenvectors...")
-        nk = len(kpoints)
-        nbands = energies.shape[1]
-        eigenvectors = np.zeros((nk, nbands, nbands), dtype=complex)
-        for ik in range(nk):
-            A = np.random.randn(nbands, nbands) + 1j * np.random.randn(nbands, nbands)
-            Q, _ = np.linalg.qr(A)
-            eigenvectors[ik] = Q
+        # Use real eigenvectors from Hamiltonian diagonalization (Phase 3)
+        eigenvectors = calc.eigenvectors
+        print(f"Eigenvector shape: {eigenvectors.shape}")
         
         # Initialize Berry curvature calculator
         print("Computing Berry curvature...")
-        reciprocal_lattice = 2 * np.pi * lattice.reciprocal_lattice_vectors
+        a = lattice.lattice_vectors
+        reciprocal_lattice = 2 * np.pi * np.linalg.inv(a.T)  # Reciprocal lattice vectors as columns
         
         berry_calc = BerryCurvatureCalculator(
             energies, eigenvectors, kpoints, reciprocal_lattice,
@@ -212,6 +200,139 @@ def run_bands_subcommand(args):
             output_file = f"{args.output_prefix}_bands.png"
             print(f"Plotting band structure to {output_file}...")
             calc.plot_bands(kdistances, energies, klabels, output_file)
+        
+        print("\nDone!")
+    
+    # Check for spin texture analysis (Phase 4)
+    elif args.spin_texture:
+        from .bands.spin_texture import SpinTextureCalculator
+        
+        print("Setting up band structure calculator with eigenvector storage...")
+        calc = BandStructureCalculator(lattice, hamiltonian)
+        
+        print(f"Generating k-path with {args.nk} points...")
+        kpoints, klabels, kdistances = calc.setup_kpath(args.nk)
+        
+        print("Calculating band structure with eigenvector storage...")
+        energies = calc.calculate_bands(kpoints, store_eigenvectors=True)
+        eigenvectors = calc.eigenvectors
+        
+        # Initialize spin texture calculator
+        print("Calculating spin texture...")
+        a = lattice.lattice_vectors
+        reciprocal_lattice = 2 * np.pi * np.linalg.inv(a.T)
+        
+        spin_calc = SpinTextureCalculator(
+            energies, eigenvectors, kpoints, reciprocal_lattice,
+            fermi_energy=args.fermi_energy
+        )
+        
+        spin_texture = spin_calc.calculate_spin_texture()
+        print(f"Spin texture shape: {spin_texture.shape}")
+        print(f"Average spin polarization: {np.mean(spin_calc.spin_polarization):.4f}")
+        
+        # Analyze specific band if requested
+        if args.spin_band is not None:
+            band_idx = args.spin_band
+            print(f"\nAnalyzing spin texture for band {band_idx}...")
+            
+            # Spin-momentum locking
+            locking = spin_calc.identify_spin_momentum_locking(band_idx, energy_window=0.1)
+            print(f"  Locking type: {locking['locking_type']}")
+            print(f"  Locking strength: {locking['locking_strength']:.3f}")
+            print(f"  Dominant spin orientation: {locking['spin_orientation']}")
+            
+            # Plot 2D spin texture
+            output_file = f"{args.output_prefix}_spin_texture_band{band_idx}.png"
+            print(f"Plotting 2D spin texture to {output_file}...")
+            spin_calc.plot_spin_texture_2d(band_idx, component=args.spin_component,
+                                          plane=args.spin_plane, output_file=output_file)
+            
+            # Plot 3D Fermi surface if requested
+            if args.plot_spin_fermi:
+                output_file = f"{args.output_prefix}_fermi_spin_band{band_idx}.png"
+                print(f"Plotting 3D Fermi surface to {output_file}...")
+                spin_calc.plot_fermi_surface_spin_texture(band_idx, output_file=output_file)
+            
+            # Rashba analysis if requested
+            if args.rashba_analysis:
+                print(f"\nExtracting Rashba parameters for band {band_idx}...")
+                try:
+                    rashba_params = spin_calc.extract_rashba_parameters(band_idx)
+                    print(f"  αR = {rashba_params['alpha_R']:.4e} eV·Å")
+                    print(f"  E0 = {rashba_params['E_0']:.4f} eV")
+                    print(f"  Fit quality (R²) = {rashba_params['fit_quality']:.4f}")
+                except Exception as e:
+                    print(f"  Rashba analysis failed: {e}")
+        
+        print("\nDone!")
+    
+    # Check for fat bands visualization (Phase 4)
+    elif args.fat_bands:
+        from .bands.fat_bands import FatBandsPlotter
+        
+        print("Setting up band structure calculator with eigenvector storage...")
+        calc = BandStructureCalculator(lattice, hamiltonian)
+        
+        print(f"Generating k-path with {args.nk} points...")
+        kpoints, klabels, kdistances = calc.setup_kpath(args.nk)
+        
+        print("Calculating band structure with eigenvector storage...")
+        energies = calc.calculate_bands(kpoints, store_eigenvectors=True)
+        eigenvectors = calc.eigenvectors
+        
+        # Initialize fat bands plotter
+        print("Preparing fat bands visualization...")
+        fat_plotter = FatBandsPlotter(
+            energies, eigenvectors, kdistances, klabels,
+            fermi_energy=args.fermi_energy
+        )
+        
+        # Use energy range only if explicitly provided
+        energy_range = tuple(args.energy_range) if args.energy_range else None
+        
+        # Plot based on type
+        if args.fat_type == 'spin':
+            output_file = f"{args.output_prefix}_fat_bands_spin.png"
+            print(f"Plotting spin-resolved fat bands to {output_file}...")
+            fat_plotter.plot_spin_resolved_fat_bands(
+                energy_range=energy_range, output_file=output_file
+            )
+        
+        elif args.fat_type == 'linewidth' and args.fat_orbitals:
+            projections = fat_plotter.calculate_orbital_projections(args.fat_orbitals)
+            output_file = f"{args.output_prefix}_fat_bands_orbitals.png"
+            print(f"Plotting orbital fat bands (linewidth) to {output_file}...")
+            fat_plotter.plot_fat_bands_linewidth(
+                projections, scale_factor=args.fat_scale,
+                energy_range=energy_range, output_file=output_file,
+                title=f"Fat Bands - Orbitals {args.fat_orbitals}"
+            )
+        
+        elif args.fat_type == 'color' and args.fat_orbitals:
+            projections = fat_plotter.calculate_orbital_projections(args.fat_orbitals)
+            output_file = f"{args.output_prefix}_fat_bands_orbitals_color.png"
+            print(f"Plotting orbital fat bands (color) to {output_file}...")
+            fat_plotter.plot_fat_bands_color(
+                projections, energy_range=energy_range, output_file=output_file,
+                title=f"Fat Bands - Orbitals {args.fat_orbitals}"
+            )
+        
+        elif args.fat_orbital_groups:
+            import json
+            orbital_groups = json.loads(args.fat_orbital_groups)
+            output_file = f"{args.output_prefix}_fat_bands_groups.png"
+            print(f"Plotting orbital character fat bands to {output_file}...")
+            fat_plotter.plot_orbital_character(
+                orbital_groups, energy_range=energy_range, output_file=output_file
+            )
+        
+        else:
+            print("Default: Plotting spin-resolved fat bands...")
+            output_file = f"{args.output_prefix}_fat_bands_spin.png"
+            fat_plotter.plot_spin_resolved_fat_bands(
+                energy_range=energy_range, output_file=output_file
+            )
         
         print("\nDone!")
     
@@ -393,6 +514,8 @@ def create_bands_parser(subparsers):
                             'polarization: signed in [-1,+1] (default: expectation)'))
     parser.add_argument('--output-prefix', default='bands',
                        help='Output file prefix (default: bands)')
+    parser.add_argument('--energy-range', nargs=2, type=float,
+                       help='Y-axis energy range (emin emax) for band plots')
     # Altermagnetic analysis options
     parser.add_argument('--altermagnetic', action='store_true',
                        help='Analyze altermagnetic materials (spin splitting without net magnetization)')
@@ -426,6 +549,32 @@ def create_bands_parser(subparsers):
                        help='Plot Chern numbers histogram (with --berry)')
     parser.add_argument('--plot-bands', action='store_true',
                        help='Plot band structure (with --altermagnetic or --berry)')
+    
+    # Spin texture options (Phase 4)
+    parser.add_argument('--spin-texture', action='store_true',
+                       help='Calculate and visualize spin texture')
+    parser.add_argument('--spin-band', type=int,
+                       help='Band index for spin texture analysis (with --spin-texture)')
+    parser.add_argument('--spin-plane', choices=['xy', 'xz', 'yz'], default='xy',
+                       help='k-space plane for 2D spin texture plot (default: xy)')
+    parser.add_argument('--spin-component', choices=['x', 'y', 'z', 'magnitude'], default='z',
+                       help='Spin component for coloring (default: z)')
+    parser.add_argument('--rashba-analysis', action='store_true',
+                       help='Extract Rashba/Dresselhaus parameters (with --spin-texture)')
+    parser.add_argument('--plot-spin-fermi', action='store_true',
+                       help='Plot 3D Fermi surface with spin texture (with --spin-texture)')
+    
+    # Fat bands options (Phase 4)
+    parser.add_argument('--fat-bands', action='store_true',
+                       help='Plot fat bands showing orbital/spin projections')
+    parser.add_argument('--fat-type', choices=['linewidth', 'color', 'spin'], default='spin',
+                       help='Fat bands visualization type (default: spin)')
+    parser.add_argument('--fat-orbitals', nargs='+', type=int,
+                       help='Orbital indices for fat bands projection')
+    parser.add_argument('--fat-orbital-groups', type=str,
+                       help='Orbital groups as JSON string, e.g., \'{"s":[0,9],"p":[1,2,3,10,11,12]}\'')
+    parser.add_argument('--fat-scale', type=float, default=5.0,
+                       help='Scale factor for fat bands linewidth (default: 5.0)')
     
     parser.set_defaults(func=run_bands_subcommand)
     return parser

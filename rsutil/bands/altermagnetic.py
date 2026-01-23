@@ -246,7 +246,7 @@ class AltermagneticAnalyzer:
         return degeneracies
     
     def plot_spin_splitting_map(self, output_file: Optional[str] = None) -> None:
-        """Plot spin splitting as function of k and band
+        """Plot spin splitting as function of k and band with publication-quality styling
         
         Parameters
         ----------
@@ -259,34 +259,40 @@ class AltermagneticAnalyzer:
             print("Warning: matplotlib not available for plotting")
             return
         
-        fig, ax = plt.subplots(figsize=(14, 6))
+        fig, ax = plt.subplots(figsize=(12, 6))
         
-        # Plot spin splitting for all bands
+        # Plot spin splitting for all bands with improved colormap
         im = ax.contourf(self.kdistances, range(self.band_energies_up.shape[1]),
-                         np.abs(self.spin_splitting).T, levels=20, cmap='RdYlBu')
+                         np.abs(self.spin_splitting).T, levels=30, cmap='RdYlBu_r')
         
-        # Add contour lines
+        # Add contour lines for clarity
         cs = ax.contour(self.kdistances, range(self.band_energies_up.shape[1]),
-                       np.abs(self.spin_splitting).T, levels=10, colors='k', alpha=0.3)
-        ax.clabel(cs, inline=True, fontsize=8)
+                       np.abs(self.spin_splitting).T, levels=8, colors='black', 
+                       alpha=0.25, linewidths=0.5)
+        ax.clabel(cs, inline=True, fontsize=8, fmt='%.3f')
         
         ax.set_xlabel('k-path', fontsize=12)
         ax.set_ylabel('Band Index', fontsize=12)
-        ax.set_title('Spin Splitting |E_up - E_down| (eV)', fontsize=14, fontweight='bold')
+        ax.set_title('Spin Splitting |E$_\\uparrow$ - E$_\\downarrow$|', fontsize=14)
         
         cbar = plt.colorbar(im, ax=ax)
-        cbar.set_label('|ΔE| (eV)', fontsize=11)
+        cbar.set_label('|$\\Delta$E| (eV)', fontsize=11)
         
-        plt.tight_layout()
+        # Clean appearance
+        ax.set_xlim(self.kdistances[0], self.kdistances[-1])
+        ax.margins(x=0)
+        
+        fig.tight_layout()
         
         if output_file:
             plt.savefig(output_file, dpi=300, bbox_inches='tight')
             print(f"Spin splitting map saved to {output_file}")
-        
-        plt.show()
+            plt.close()
+        else:
+            plt.show()
     
     def plot_altermagnetic_character(self, output_file: Optional[str] = None) -> None:
-        """Plot altermagnetic character indicators
+        """Plot altermagnetic character indicators with publication-quality styling
         
         Shows: net magnetization vs spin splitting strength
         
@@ -319,33 +325,41 @@ class AltermagneticAnalyzer:
         
         scatter = ax.scatter(mag_per_band, split_per_band, 
                            c=range(len(mag_per_band)), cmap='viridis',
-                           s=100, alpha=0.7, edgecolors='black', linewidth=1)
+                           s=120, alpha=0.8, edgecolors='black', linewidth=1.2)
         
-        ax.axhline(y=0, color='k', linestyle='--', linewidth=0.8, alpha=0.3)
-        ax.axvline(x=0, color='k', linestyle='--', linewidth=0.8, alpha=0.3)
+        ax.axhline(y=0, color='gray', linestyle='-', linewidth=1, alpha=0.5, zorder=0)
+        ax.axvline(x=0, color='gray', linestyle='-', linewidth=1, alpha=0.5, zorder=0)
         
-        # Add regions
-        ax.fill_between([-10, 10], 0, 10, alpha=0.1, color='blue', label='Altermagnetic region')
+        # Add altermagnetic region indicator
+        ax.fill_between([-15, 15], 0.01, max(split_per_band) * 1.3 if len(split_per_band) > 0 else 1, 
+                       alpha=0.08, color='#4ECDC4', label='Altermagnetic region\n(low magnetization, high splitting)')
         
-        ax.set_xlabel('Magnetization per band (electrons)', fontsize=12)
+        ax.set_xlabel('Net Magnetization per Band (electrons)', fontsize=12)
         ax.set_ylabel('Spin Splitting Strength (eV)', fontsize=12)
-        ax.set_title('Altermagnetic Character Analysis', fontsize=14, fontweight='bold')
-        ax.grid(True, alpha=0.3)
-        ax.set_xlim(-10, 10)
-        ax.set_ylim(0, max(split_per_band) * 1.2)
+        ax.set_title('Altermagnetic Character Analysis', fontsize=14)
+        
+        # Set limits with padding
+        if len(mag_per_band) > 0:
+            mag_range = max(abs(mag_per_band.max()), abs(mag_per_band.min()), 1)
+            ax.set_xlim(-mag_range * 1.2, mag_range * 1.2)
+            ax.set_ylim(-0.01, max(split_per_band) * 1.2 if split_per_band.max() > 0 else 0.5)
+        
+        ax.grid(False)
+        ax.set_axisbelow(True)
         
         cbar = plt.colorbar(scatter, ax=ax)
         cbar.set_label('Band Index', fontsize=11)
         
-        ax.legend(loc='upper right')
+        ax.legend(loc='upper right', frameon=False, fontsize=10)
         
-        plt.tight_layout()
+        fig.tight_layout()
         
         if output_file:
             plt.savefig(output_file, dpi=300, bbox_inches='tight')
             print(f"Altermagnetic character plot saved to {output_file}")
-        
-        plt.show()
+            plt.close()
+        else:
+            plt.show()
     
     def print_altermagnetic_summary(self) -> None:
         """Print formatted altermagnetic analysis summary"""

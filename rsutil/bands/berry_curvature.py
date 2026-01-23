@@ -352,7 +352,7 @@ class BerryCurvatureCalculator:
     
     def plot_berry_curvature_map(self, band_idx: int,
                                 output_file: Optional[str] = None) -> None:
-        """Plot Berry curvature map in k-space
+        """Plot Berry curvature map in k-space with publication-quality styling
         
         Parameters
         ----------
@@ -377,36 +377,42 @@ class BerryCurvatureCalculator:
             kx = self.kpoints[:, 0]
             ky = self.kpoints[:, 1]
             
-            # Plot as scatter with color map
-            scatter = ax.scatter(kx, ky, c=np.abs(omega_z), s=50,
-                               cmap='RdYlBu', alpha=0.8, edgecolors='black')
+            # Plot as scatter with improved color map
+            scatter = ax.scatter(kx, ky, c=omega_z, s=60,
+                               cmap='coolwarm', alpha=0.8, edgecolors='black', linewidth=0.5)
             
-            ax.set_xlabel('k_x (2π/a)', fontsize=12)
-            ax.set_ylabel('k_y (2π/a)', fontsize=12)
+            ax.set_xlabel('k$_x$ (2$\\pi$/a)', fontsize=12)
+            ax.set_ylabel('k$_y$ (2$\\pi$/a)', fontsize=12)
+            ax.set_aspect('equal', adjustable='datalim')
         else:
-            # 1D representation
-            ax.plot(range(len(omega_z)), omega_z, 'o-', linewidth=2, markersize=6)
+            # 1D representation with improved styling
+            ax.plot(range(len(omega_z)), omega_z, 'o-', color='#2E86AB',
+                   linewidth=2, markersize=7, markerfacecolor='white', 
+                   markeredgewidth=1.5, markeredgecolor='#2E86AB')
             ax.set_xlabel('k-point index', fontsize=12)
-            ax.set_ylabel('Ω_z (k)', fontsize=12)
+            ax.set_ylabel('$\\Omega_z$ (k)', fontsize=12)
             scatter = None
+            ax.axhline(0, color='gray', linestyle='-', linewidth=0.8, alpha=0.5, zorder=0)
         
-        ax.set_title(f'Berry Curvature - Band {band_idx}', fontsize=14, fontweight='bold')
-        ax.grid(True, alpha=0.3)
+        ax.set_title(f'Berry Curvature - Band {band_idx}', fontsize=14)
+        ax.grid(False)
+        ax.set_axisbelow(True)
         
         if scatter:
             cbar = plt.colorbar(scatter, ax=ax)
-            cbar.set_label('|Ω_z| (arbitrary units)', fontsize=11)
+            cbar.set_label('$\\Omega_z$ (arbitrary units)', fontsize=11)
         
-        plt.tight_layout()
+        fig.tight_layout()
         
         if output_file:
             plt.savefig(output_file, dpi=300, bbox_inches='tight')
             print(f"Berry curvature map saved to {output_file}")
-        
-        plt.show()
+            plt.close()
+        else:
+            plt.show()
     
     def plot_chern_number_histogram(self, output_file: Optional[str] = None) -> None:
-        """Plot Chern numbers for all bands
+        """Plot Chern numbers for all bands with publication-quality styling
         
         Parameters
         ----------
@@ -430,26 +436,38 @@ class BerryCurvatureCalculator:
         
         fig, ax = plt.subplots(figsize=(10, 6))
         
-        colors = ['red' if c != 0 else 'blue' for c in chern_numbers]
-        ax.bar(range(len(chern_numbers)), chern_numbers, color=colors, alpha=0.7, edgecolor='black')
+        # Color code: non-trivial (non-zero) in red, trivial (zero) in blue
+        colors = ['#E63946' if abs(c) > 0.1 else '#457B9D' for c in chern_numbers]
+        bars = ax.bar(range(len(chern_numbers)), chern_numbers, 
+                 color=colors, alpha=0.8, edgecolor='black', linewidth=1.2)
         
-        # Add integer grid
+        # Add integer grid lines
         for i in range(-3, 4):
-            ax.axhline(y=i, color='gray', linestyle='--', alpha=0.3, linewidth=0.5)
+            ax.axhline(y=i, color='gray', linestyle='-', alpha=0.3, linewidth=0.5, zorder=0)
         
         ax.set_xlabel('Band Index', fontsize=12)
         ax.set_ylabel('Chern Number', fontsize=12)
-        ax.set_title('Chern Numbers vs Band Index', fontsize=14, fontweight='bold')
+        ax.set_title('Chern Numbers vs Band Index', fontsize=14)
         ax.set_xticks(range(len(chern_numbers)))
-        ax.grid(True, axis='y', alpha=0.3)
+        ax.grid(False)
+        ax.set_axisbelow(True)
         
-        plt.tight_layout()
+        # Add legend
+        from matplotlib.patches import Patch
+        legend_elements = [
+            Patch(facecolor='#E63946', edgecolor='black', label='Non-trivial (C ≠ 0)'),
+            Patch(facecolor='#457B9D', edgecolor='black', label='Trivial (C = 0)')
+        ]
+        ax.legend(handles=legend_elements, loc='best', frameon=False)
+        
+        fig.tight_layout()
         
         if output_file:
             plt.savefig(output_file, dpi=300, bbox_inches='tight')
             print(f"Chern number histogram saved to {output_file}")
-        
-        plt.show()
+            plt.close()
+        else:
+            plt.show()
     
     def print_berry_summary(self, num_bands: int = 5) -> None:
         """Print summary of Berry curvature and topological properties
@@ -487,3 +505,160 @@ class BerryCurvatureCalculator:
         print()
         print("=" * 70)
         print()
+    
+    def calculate_orbital_resolved_berry_curvature(self, band_idx: int,
+                                                   n_orb_per_spin: int = 9) -> Dict:
+        """
+        Decompose Berry curvature by orbital character.
+        
+        For each orbital α, calculate the contribution:
+            Ω^α(k) = ∑_n |⟨α|ψ_n(k)⟩|² Ω_n(k)
+        
+        Parameters
+        ----------
+        band_idx : int
+            Band index to analyze
+        n_orb_per_spin : int
+            Number of orbitals per spin channel (default: 9 for TB-LMTO)
+            
+        Returns
+        -------
+        orbital_berry : dict
+            Dictionary containing:
+            - 'total_curvature': Total Berry curvature for the band
+            - 'orbital_contributions': Berry curvature by orbital (n_orb,)
+            - 'spin_contributions': Berry curvature by spin channel (2,)
+            - 'dominant_orbital': Index of dominant orbital
+            - 'orbital_weights': Orbital character weights
+            
+        Notes
+        -----
+        For non-collinear calculations with 18 orbitals:
+        - Orbitals 0-8: spin-up (s, px, py, pz, dxy, dyz, dz2, dxz, dx2-y2)
+        - Orbitals 9-17: spin-down (same sequence)
+        """
+        # Calculate Berry curvature for this band
+        try:
+            berry_curv_z = self.calculate_berry_curvature_kubo(band_idx)
+        except:
+            # Fallback to 2D calculation
+            berry_curv_z, _ = self.calculate_berry_curvature_2d(band_idx)
+        
+        # Extract orbital contributions from eigenvectors
+        total_orbitals = self.eigenvectors.shape[1]
+        orbital_berry = np.zeros(total_orbitals)
+        
+        # For each k-point, weight Berry curvature by orbital character
+        for ik in range(self.nk):
+            psi = self.eigenvectors[ik, :, band_idx]
+            orbital_weights = np.abs(psi)**2
+            
+            # Distribute Berry curvature according to orbital character
+            orbital_berry += orbital_weights * berry_curv_z[ik]
+        
+        # Normalize by number of k-points
+        orbital_berry /= self.nk
+        
+        # Separate by spin if applicable
+        if total_orbitals >= 2 * n_orb_per_spin:
+            spin_up_contrib = np.sum(orbital_berry[:n_orb_per_spin])
+            spin_down_contrib = np.sum(orbital_berry[n_orb_per_spin:2*n_orb_per_spin])
+            spin_contributions = np.array([spin_up_contrib, spin_down_contrib])
+        else:
+            spin_contributions = np.array([np.sum(orbital_berry), 0.0])
+        
+        # Identify dominant orbital
+        dominant_orbital = np.argmax(np.abs(orbital_berry))
+        
+        # Calculate total
+        total_curvature = np.sum(berry_curv_z) / self.nk
+        
+        return {
+            'total_curvature': total_curvature,
+            'orbital_contributions': orbital_berry,
+            'spin_contributions': spin_contributions,
+            'dominant_orbital': dominant_orbital,
+            'dominant_contribution': orbital_berry[dominant_orbital],
+            'orbital_labels': self._get_orbital_labels(n_orb_per_spin)
+        }
+    
+    def _get_orbital_labels(self, n_orb_per_spin: int = 9) -> List[str]:
+        """Get orbital labels for TB-LMTO basis"""
+        if n_orb_per_spin == 9:
+            orb_names = ['s', 'px', 'py', 'pz', 'dxy', 'dyz', 'dz2', 'dxz', 'dx2-y2']
+            labels = [f"{orb}↑" for orb in orb_names] + [f"{orb}↓" for orb in orb_names]
+        else:
+            labels = [f"orb{i}↑" for i in range(n_orb_per_spin)] + \
+                    [f"orb{i}↓" for i in range(n_orb_per_spin)]
+        
+        return labels
+    
+    def plot_orbital_resolved_berry_curvature(self, band_idx: int,
+                                             output_file: Optional[str] = None):
+        """
+        Plot orbital-resolved Berry curvature contributions as bar chart.
+        
+        Parameters
+        ----------
+        band_idx : int
+            Band index to analyze
+        output_file : str, optional
+            Save plot to file if provided
+        """
+        import matplotlib.pyplot as plt
+        
+        # Calculate orbital-resolved Berry curvature
+        orb_data = self.calculate_orbital_resolved_berry_curvature(band_idx)
+        
+        orb_contrib = orb_data['orbital_contributions']
+        orb_labels = orb_data['orbital_labels']
+        n_orb = len(orb_contrib)
+        
+        # Create plot
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
+        
+        # Plot 1: All orbital contributions
+        colors = ['blue'] * (n_orb // 2) + ['red'] * (n_orb // 2)
+        ax1.bar(range(n_orb), orb_contrib, color=colors, alpha=0.7, edgecolor='black')
+        ax1.set_xlabel('Orbital Index')
+        ax1.set_ylabel('Berry Curvature Contribution (a.u.)')
+        ax1.set_title(f'Orbital-Resolved Berry Curvature - Band {band_idx}')
+        ax1.grid(True, alpha=0.3, axis='y')
+        ax1.axhline(y=0, color='black', linestyle='-', linewidth=0.8)
+        
+        # Add vertical separator between spin channels
+        if n_orb >= 18:
+            ax1.axvline(x=n_orb//2 - 0.5, color='gray', linestyle='--', linewidth=2)
+            ax1.text(n_orb//4, ax1.get_ylim()[1]*0.9, 'Spin ↑', ha='center', fontsize=12, weight='bold')
+            ax1.text(3*n_orb//4, ax1.get_ylim()[1]*0.9, 'Spin ↓', ha='center', fontsize=12, weight='bold')
+        
+        # Plot 2: Spin-resolved contributions
+        spin_contrib = orb_data['spin_contributions']
+        ax2.bar(['Spin ↑', 'Spin ↓'], spin_contrib, color=['blue', 'red'], alpha=0.7, edgecolor='black')
+        ax2.set_ylabel('Total Berry Curvature (a.u.)')
+        ax2.set_title('Spin-Resolved Berry Curvature')
+        ax2.grid(True, alpha=0.3, axis='y')
+        ax2.axhline(y=0, color='black', linestyle='-', linewidth=0.8)
+        
+        # Add summary text
+        total = orb_data['total_curvature']
+        dominant = orb_data['dominant_orbital']
+        dom_label = orb_labels[dominant] if dominant < len(orb_labels) else f"Orb {dominant}"
+        
+        summary = f"Total: {total:.4e} a.u.\n"
+        summary += f"Dominant: {dom_label} ({orb_data['dominant_contribution']:.4e})"
+        ax2.text(0.98, 0.97, summary, transform=ax2.transAxes,
+                verticalalignment='top', horizontalalignment='right',
+                bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5),
+                fontsize=10, family='monospace')
+        
+        plt.tight_layout()
+        
+        if output_file:
+            plt.savefig(output_file, dpi=300, bbox_inches='tight')
+            print(f"Saved orbital-resolved Berry curvature plot to {output_file}")
+        else:
+            plt.show()
+        
+        plt.close()
+

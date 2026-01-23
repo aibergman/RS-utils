@@ -1,2 +1,0 @@
-[console_scripts]
-rsutil = rsutil.cli:main
