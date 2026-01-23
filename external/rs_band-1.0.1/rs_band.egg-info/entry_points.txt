@@ -1,5 +1,0 @@
-[console_scripts]
-rs-band = rs_band.cli:main
-rs-band-dos = rs_band.cli:dos_analysis
-rs-band-projections = rs_band.cli:projection_analysis
-rs-band-quick = rs_band.cli:quick_analysis
