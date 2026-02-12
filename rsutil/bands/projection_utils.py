@@ -11,9 +11,11 @@ import numpy as np
 from typing import Tuple, List, Dict, Optional, Union
 
 
-def guess_basis_order(ham_r: Dict[Tuple[int, int, int], np.ndarray],
-                      n_orbitals: int,
-                      threshold: float = 1e-3) -> str:
+def guess_basis_order(
+    ham_r: Dict[Tuple[int, int, int], np.ndarray],
+    n_orbitals: int,
+    threshold: float = 1e-3,
+) -> str:
     """Auto-detect basis ordering from real-space Hamiltonian H(R).
 
     Heuristic: For spin_first basis, the first half contains all spin-up states
@@ -42,21 +44,22 @@ def guess_basis_order(ham_r: Dict[Tuple[int, int, int], np.ndarray],
     - "spin_first": Basis ordered as [atom1_up, atom2_up, ..., atom1_down, atom2_down, ...]
     """
     H0 = ham_r.get((0, 0, 0), None)
-    
+
     # Default to atom_spin if H(0,0,0) not available or odd dimension
     if H0 is None or (n_orbitals % 2 != 0):
         return "atom_spin"
-    
+
     # Check spin-first hypothesis: split at n_half
     n_half = n_orbitals // 2
     cross = np.max(np.abs(H0[:n_half, n_half:]))
-    within = max(np.max(np.abs(H0[:n_half, :n_half])),
-                 np.max(np.abs(H0[n_half:, n_half:])))
-    
+    within = max(
+        np.max(np.abs(H0[:n_half, :n_half])), np.max(np.abs(H0[n_half:, n_half:]))
+    )
+
     # If cross coupling is tiny vs within-block coupling -> likely spin_first
     if within > 0 and cross < threshold * within:
         return "spin_first"
-    
+
     return "atom_spin"
 
 
@@ -91,11 +94,13 @@ def degeneracy_groups(evals: np.ndarray, tol: float = 1e-8) -> List[Tuple[int, i
     return groups
 
 
-def gauge_fix_evecs(evals: np.ndarray,
-                    evecs: np.ndarray,
-                    sop_sel: np.ndarray,
-                    sel_idx: np.ndarray,
-                    deg_tol: float = 1e-8) -> np.ndarray:
+def gauge_fix_evecs(
+    evals: np.ndarray,
+    evecs: np.ndarray,
+    sop_sel: np.ndarray,
+    sel_idx: np.ndarray,
+    deg_tol: float = 1e-8,
+) -> np.ndarray:
     """Apply gauge fixing to eigenvectors in degenerate subspaces.
 
     In each degenerate block, rotates eigenvectors to maximize the spin
@@ -127,40 +132,42 @@ def gauge_fix_evecs(evals: np.ndarray,
     """
     if sel_idx is None or sop_sel is None:
         return evecs
-    
+
     # Restrict eigenvectors to selected atom subspace
     Usel_full = evecs[sel_idx, :]  # (n_selected, n_bands)
     groups = degeneracy_groups(evals, tol=deg_tol)
-    
+
     for start, end in groups:
         m = end - start
         if m <= 1:
             continue
-        
+
         # Extract degenerate block
         Usel = Usel_full[:, start:end]  # (n_selected, m)
-        
+
         # Construct projected operator in degenerate subspace
         Osub = Usel.conj().T @ (sop_sel @ Usel)  # (m, m)
-        
+
         # Diagonalize to find optimal rotation
         w, W = np.linalg.eigh(Osub)  # Hermitian diagonalization
-        
+
         # Sort by eigenvalue (largest first = highest spin projection)
         order = np.argsort(w.real)[::-1]
         W = W[:, order]
-        
+
         # Apply rotation to full eigenvectors in this block
         evecs[:, start:end] = evecs[:, start:end] @ W
-    
+
     return evecs
 
 
-def atom_orbital_indices(atom_indices: List[int],
-                         orbitals_per_atom: int,
-                         n_orb_per_spin: int,
-                         basis_order: str,
-                         n_atoms_total: int) -> np.ndarray:
+def atom_orbital_indices(
+    atom_indices: List[int],
+    orbitals_per_atom: int,
+    n_orb_per_spin: int,
+    basis_order: str,
+    n_atoms_total: int,
+) -> np.ndarray:
     """Map selected atoms to their orbital indices in the Hamiltonian basis.
 
     Handles different basis orderings:
@@ -191,14 +198,14 @@ def atom_orbital_indices(atom_indices: List[int],
         If basis_order is unrecognized
     """
     idx = []
-    
+
     if basis_order == "atom_spin":
         # Each atom's orbitals are contiguous: [up, down]
         for a in atom_indices:
             base = a * orbitals_per_atom
             idx.extend(range(base, base + orbitals_per_atom))
         return np.array(idx, dtype=int)
-    
+
     elif basis_order == "spin_first":
         # First half: all spin-up, Second half: all spin-down
         Nup = n_atoms_total * n_orb_per_spin
@@ -208,14 +215,18 @@ def atom_orbital_indices(atom_indices: List[int],
             idx.extend(range(up_base, up_base + n_orb_per_spin))
             idx.extend(range(dn_base, dn_base + n_orb_per_spin))
         return np.array(idx, dtype=int)
-    
+
     else:
-        raise ValueError(f"Unknown basis_order: {basis_order}. Must be 'atom_spin' or 'spin_first'.")
+        raise ValueError(
+            f"Unknown basis_order: {basis_order}. Must be 'atom_spin' or 'spin_first'."
+        )
 
 
-def parse_atom_selection(selection: Union[str, int, List[int], np.ndarray],
-                        n_atoms: int,
-                        positions: Optional[List[Tuple]] = None) -> Tuple[List[int], str]:
+def parse_atom_selection(
+    selection: Union[str, int, List[int], np.ndarray],
+    n_atoms: int,
+    positions: Optional[List[Tuple]] = None,
+) -> Tuple[List[int], str]:
     """Parse flexible atom selection specification.
 
     Parameters
@@ -245,17 +256,17 @@ def parse_atom_selection(selection: Union[str, int, List[int], np.ndarray],
         s = selection.strip()
         if s.lower() == "all":
             return list(range(n_atoms)), "all-atoms"
-        
+
         # Label-based selection
         if positions is None:
             raise ValueError(f"Cannot match label '{s}' without positions list")
-        
+
         idx = [a for a, (label, _, _, _) in enumerate(positions) if label == s]
         if not idx:
             available = sorted(set(p[0] for p in positions))
             raise ValueError(f"Label '{s}' matched no atoms. Available: {available}")
         return idx, f"label-{s}"
-    
+
     if isinstance(selection, (int, np.integer)):
         a = int(selection)
         # Try 1-based indexing first
@@ -265,21 +276,21 @@ def parse_atom_selection(selection: Union[str, int, List[int], np.ndarray],
         if 0 <= a < n_atoms:
             return [a], f"atom{a + 1}"
         raise ValueError(f"Atom index {a} out of range [0, {n_atoms-1}]")
-    
+
     if isinstance(selection, (list, tuple, np.ndarray)):
         atoms = [int(x) for x in selection]
-        
+
         # Check if 1-based
         if all(1 <= a <= n_atoms for a in atoms):
             atoms_0based = [a - 1 for a in atoms]
             return atoms_0based, "atoms" + "-".join(str(a) for a in atoms)
-        
+
         # Check if 0-based
         if all(0 <= a < n_atoms for a in atoms):
             return atoms, "atoms" + "-".join(str(a + 1) for a in atoms)
-        
+
         raise ValueError(f"Atom indices {atoms} out of range [0, {n_atoms-1}]")
-    
+
     raise ValueError(f"Unsupported selection type: {type(selection)}")
 
 
@@ -307,15 +318,16 @@ def get_projection_vrange(mode: str) -> Tuple[float, float]:
         "weight_down": (0.0, 1.0),
         "polarization": (-1.0, +1.0),
     }
-    
+
     if mode not in modes:
-        raise ValueError(f"Unknown projection mode: {mode}. Must be one of {list(modes.keys())}")
-    
+        raise ValueError(
+            f"Unknown projection mode: {mode}. Must be one of {list(modes.keys())}"
+        )
+
     return modes[mode]
 
 
-def compute_quantity_from_sexp(sexp: np.ndarray,
-                               mode: str) -> np.ndarray:
+def compute_quantity_from_sexp(sexp: np.ndarray, mode: str) -> np.ndarray:
     """Convert spin expectation value to desired projection quantity.
 
     Parameters
