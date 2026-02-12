@@ -93,6 +93,9 @@ The ``--exchange`` flag creates exchange interaction input files (J_ij) for spin
 - ``--shell-width``: Width of shells for grouping neighbors when using ``--unique`` (default: 0.1).
 - ``--soc``: Account for spin-orbit coupling in symmetry considerations.
 - ``--data``: Directory for input files (default: current directory).
+- ``--rij-out``: Path to write R_ij neighbor mappings (optional). Use with ``--exchange``.
+- ``--rij-format``: Format for R_ij output; supported values: ``json`` (machine readable) and
+    ``txt`` (human readable, fixed-width columns). Default: ``json``.
 
 **Example:**
 
@@ -106,6 +109,12 @@ The ``--exchange`` flag creates exchange interaction input files (J_ij) for spin
 
     # From a specific directory
     rsutil --exchange --data /path/to/data --cutoff 2.0
+
+    # Write R_ij mapping to a JSON file
+    rsutil --exchange --cutoff 3.0 --rij-out rij_map.json --rij-format json
+
+    # Write human-readable fixed-width R_ij table
+    rsutil --exchange --cutoff 3.0 --rij-out rij_map.txt --rij-format txt --unique
 
 
 Export to UppASD
