@@ -36,6 +36,7 @@ import f90nml
 import numpy as np
 from pymatgen.core import Lattice, Molecule, Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
+import json
 
 
 def read_rs_clust(clust_file: str, input_file: str) -> Molecule:
@@ -240,7 +241,8 @@ def get_neighbors_list(
 
 def get_unique_neighbors_per_shell(
     cluster: Molecule, sites: list[int], cutoff: float = 2.0,
-        shell_width: float = 0.1, verbose: bool = False, spacegroup_analyzer: SpacegroupAnalyzer = None) -> dict[int, list]:
+        shell_width: float = 0.1, verbose: bool = False, spacegroup_analyzer: SpacegroupAnalyzer = None,
+        structure: Structure = None) -> dict[int, list]:
     """
     Get unique neighbors per shell for each atom in the cluster.
     
@@ -271,12 +273,37 @@ def get_unique_neighbors_per_shell(
     """
     unique_neighbors: dict[int, list] = {}
     
-    def are_vectors_symmetry_equivalent(v1: np.ndarray, v2: np.ndarray, 
-                                       symm_ops, tolerance: float = 1e-4) -> bool:
-        """Check if two vectors are related by a symmetry operation."""
+    def are_vectors_symmetry_equivalent(v1_cart: np.ndarray, v2_cart: np.ndarray,
+                                       symm_ops, tol: float = 1e-4) -> bool:
+        """Check if two Cartesian vectors are related by a symmetry operation.
+
+        Symmetry operations from pymatgen are given in fractional coordinates,
+        so convert Cartesian vectors to fractional using the provided
+        `structure` lattice before applying rotations.
+        """
+        if structure is None:
+            # Fallback: compare Cartesian vectors directly
+            for symm_op in symm_ops:
+                rotated = symm_op.rotation_matrix @ v1_cart
+                if np.allclose(rotated, v2_cart, atol=tol):
+                    return True
+            return False
+
+        # Convert absolute Cartesian coordinates to fractional relative vectors
+        # We convert via absolute coords because pymatgen lattice methods expect
+        # absolute positions; use an arbitrary origin shift that cancels when
+        # subtracting.
+        # Use center at origin: get fractional coords of the endpoints then subtract.
+        # Here v1_cart and v2_cart are difference vectors; create dummy points
+        # and convert by adding to origin.
+        frac_v1 = structure.lattice.get_fractional_coords([v1_cart])[0]
+        frac_v2 = structure.lattice.get_fractional_coords([v2_cart])[0]
+
         for symm_op in symm_ops:
-            rotated = symm_op.rotation_matrix @ v1
-            if np.allclose(rotated, v2, atol=tolerance):
+            rotated = symm_op.rotation_matrix @ frac_v1
+            # account for periodic images by checking equivalence modulo 1
+            diff = np.mod(rotated - frac_v2 + 0.5, 1.0) - 0.5
+            if np.allclose(diff, 0.0, atol=tol):
                 return True
         return False
     
@@ -302,27 +329,30 @@ def get_unique_neighbors_per_shell(
         symm_ops = spacegroup_analyzer.get_symmetry_operations() if spacegroup_analyzer else []
         
         for shell_distance in sorted(shell_neighbors.keys()):
+            # Track seen combinations per shell to allow distinct shells to retain
+            # their own representatives while deduplicating within the shell.
+            shell_seen_combinations = []
             for neighbor in shell_neighbors[shell_distance]:
                 vector = neighbor.coords - center.coords
                 species = neighbor.species_string
-                
+
                 # Check if this (species, vector) is symmetry-equivalent to any seen combination
                 is_new = True
                 if spacegroup_analyzer is not None:
-                    for seen_species, seen_vector in seen_combinations:
+                    for seen_species, seen_vector in shell_seen_combinations:
                         if seen_species == species:
                             if are_vectors_symmetry_equivalent(vector, seen_vector, symm_ops):
                                 is_new = False
                                 break
                 else:
                     # Fallback without symmetry: exact vector match
-                    for seen_species, seen_vector in seen_combinations:
+                    for seen_species, seen_vector in shell_seen_combinations:
                         if seen_species == species and np.allclose(vector, seen_vector, atol=1e-5):
                             is_new = False
                             break
-                
+
                 if is_new:
-                    seen_combinations.append((species, vector))
+                    shell_seen_combinations.append((species, vector))
                     unique_list.append(neighbor)
         
         # Sort by distance
@@ -340,6 +370,99 @@ def get_unique_neighbors_per_shell(
                 )
     
     return unique_neighbors
+
+
+def get_Rij_mappings(cluster: Molecule, neighbors: dict, one_based: bool = True) -> list:
+    """
+    Construct a flat list of R_ij records for each center atom from neighbor lists.
+
+    Each record has fields: i, j, R_ij (list), distance, species_i, species_j.
+
+    Parameters
+    ----------
+    cluster : Molecule
+        Cluster/molecule containing sites.
+    neighbors : dict
+        Output from `get_neighbors_list` or `get_unique_neighbors_per_shell`.
+    one_based : bool, optional
+        If True, return atom indices in 1-based Fortran-style indexing (default True).
+
+    Returns
+    -------
+    list
+        List of records, each a dict: {"i": int, "j": int, "R_ij": [x,y,z], "distance": float, "species_i": str, "species_j": str}
+    """
+    records: list = []
+    for i_atom, neighbor_list in neighbors.items():
+        center = cluster[i_atom]
+        species_i = getattr(center, "species_string", str(center.species))
+        i_idx = (i_atom + 1) if one_based else i_atom
+        for neighbor in neighbor_list:
+            j_idx = (neighbor.index + 1) if one_based else neighbor.index
+            R = (neighbor.coords - center.coords).tolist()
+            rec = {
+                "i": int(i_idx),
+                "j": int(j_idx),
+                "R_ij": [float(x) for x in R],
+                "distance": float(neighbor.nn_distance),
+                "species_i": str(species_i),
+                "species_j": str(neighbor.species_string),
+            }
+            records.append(rec)
+    return records
+
+
+def write_Rij_mappings(mappings: dict, filename: str, fmt: str = "json") -> None:
+    """
+    Write R_ij mappings to disk in supported formats. Currently supports JSON.
+
+    Parameters
+    ----------
+    mappings : dict
+        Output from `get_Rij_mappings`.
+    filename : str
+        Path to write the mappings to.
+    fmt : str, optional
+        Output format ('json' supported), by default 'json'.
+    """
+    fmt_l = fmt.lower()
+    # Normalize mappings input: accept dict mapping->list or flat list of records
+    if isinstance(mappings, dict):
+        # convert dict-of-lists to flat list
+        records = []
+        for key in sorted(mappings.keys()):
+            for entry in mappings[key]:
+                rec = {
+                    "i": int(key),
+                    "j": int(entry.get("j")),
+                    "R_ij": [float(x) for x in entry.get("R_ij", [])],
+                    "distance": float(entry.get("distance", 0.0)),
+                    "species_i": str(entry.get("species_i", "")),
+                    "species_j": str(entry.get("species", "")),
+                }
+                records.append(rec)
+    else:
+        records = list(mappings)
+
+    if fmt_l == "json":
+        with open(filename, "w", encoding="utf-8") as fh:
+            json.dump(records, fh, indent=2)
+    elif fmt_l == "txt":
+        # Human readable plain-text format
+        with open(filename, "w", encoding="utf-8") as fh:
+            # fixed-width columns: i(4) j(4) Rx(12.8f) Ry(12.8f) Rz(12.8f) dist(12.8f) species_i(10) species_j(10)
+            fh.write("# i j R_x R_y R_z distance species_i species_j\n")
+            fmt_line = "{:4d} {:4d} {:12.8f} {:12.8f} {:12.8f} {:12.8f} {:10s} {:10s}\n"
+            for rec in records:
+                i = int(rec.get("i"))
+                j = int(rec.get("j"))
+                rx, ry, rz = rec.get("R_ij", [0.0, 0.0, 0.0])
+                dist = float(rec.get("distance", 0.0))
+                si = str(rec.get("species_i", ""))[:10]
+                sj = str(rec.get("species_j", ""))[:10]
+                fh.write(fmt_line.format(i, j, rx, ry, rz, dist, si, sj))
+    else:
+        raise ValueError(f"Unsupported format: {fmt}")
 
 
 # Not working yet
@@ -534,7 +657,8 @@ def store_jij_namelist(input_nml: dict, matching_indices: dict, atom_index: int)
 # atoms_list = [atom for atom in atoms]
 #
 def exchange_map(cutoff: float = 1.0, verbose: bool = False, unique: bool = False, 
-                  shell_width: float = 0.1, soc: bool = False) -> None:
+                  shell_width: float = 0.1, soc: bool = False,
+                  rij_out: str | None = None, rij_fmt: str = "json") -> None:
     """
     Main function to read namelists, create structure and analyzer,
     get neighbors, and symmetry reduced neighbors.
@@ -575,8 +699,8 @@ def exchange_map(cutoff: float = 1.0, verbose: bool = False, unique: bool = Fals
 
     if unique:
         neighbors = get_unique_neighbors_per_shell(
-            cluster, rec_sites, cutoff=cutoff, shell_width=shell_width, 
-            verbose=verbose, spacegroup_analyzer=spacegroup_analyzer
+            cluster, rec_sites, cutoff=cutoff, shell_width=shell_width,
+            verbose=verbose, spacegroup_analyzer=spacegroup_analyzer, structure=structure
         )
     else:
         neighbors = get_neighbors_list(cluster, rec_sites, cutoff=cutoff, verbose=verbose)
@@ -591,6 +715,16 @@ def exchange_map(cutoff: float = 1.0, verbose: bool = False, unique: bool = Fals
 
     for atom in rec_sites:
         store_jij_namelist(input_nml, matching_indices, atom)
+
+    # Optionally write R_ij mappings for the neighbor network
+    if rij_out:
+        try:
+            mappings = get_Rij_mappings(cluster, neighbors, one_based=True)
+            write_Rij_mappings(mappings, rij_out, fmt=rij_fmt)
+            if verbose:
+                print(f"Wrote R_ij mappings to {rij_out} (format={rij_fmt})")
+        except Exception as exc:
+            print(f"Failed to write R_ij mappings to {rij_out}: {exc}")
 
 
 if __name__ == "__main__":

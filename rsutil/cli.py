@@ -93,6 +93,14 @@ def main():
         help='Account for spin-orbit coupling in symmetry considerations'
     )
     parser.add_argument(
+        '--rij-out', type=str, default=None,
+        help='Write R_ij mappings to this file (JSON)'
+    )
+    parser.add_argument(
+        '--rij-format', type=str, default='json', choices=['json', 'txt'],
+        help='Format for R_ij output (json or txt; default: json)'
+    )
+    parser.add_argument(
         '--export', '-E', action='store_true', default=False,
         help='Export RS-LMTO inputs to UppASD format'
     )
@@ -136,7 +144,14 @@ def main():
         rs_visualizer(args.data, clust=args.clust)
     # Create exchange input files if --exchange flag is provided
     elif args.exchange:
-        exchange_map(cutoff=args.cutoff, unique=args.unique, shell_width=args.shell_width, soc=args.soc)
+        exchange_map(
+            cutoff=args.cutoff,
+            unique=args.unique,
+            shell_width=args.shell_width,
+            soc=args.soc,
+            rij_out=args.rij_out,
+            rij_fmt=args.rij_format,
+        )
     # Export to UppASD if requested
     elif args.export:
         # default lattice path in data dir
