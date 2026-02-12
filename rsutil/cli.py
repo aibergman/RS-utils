@@ -1600,7 +1600,7 @@ Examples:
   # Band-Related Properties (Phase 2 - flags on bands subcommand)
   rsutil bands --altermagnetic --nk 100 --plot-splitting --plot-bands
                                       # Detect altermagnetic materials
-  rsutil bands --altermagnetic --nk 150 --  rsutil bands --altermagnetic --nk 150 --  rsutil bands    rsutil bands --altermae altermagneti  rsutil bands --til ban  rsutil bands --alt--ahc --orbital-mag --plot-chern
+  rsutil bands --berry --nk 150 --ahc --orbital-mag --plot-chern
                                       # Topological properties analysis
   rsutil bands --berry --nk 150 --chern-bands 0 1 2 --plot-berry 0
                                       # Calculate specific Chern numbers

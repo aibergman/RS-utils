@@ -36,7 +36,7 @@ Getting Started
 
    # Spin-projected bands with Sz expectation values
    rsutil bands --lattice lattice.nml --hamiltonian rs2txt.dat --nk 100 \
-       --projections --projection spin --spin-mode expectation --output bands_spin.png
+       --projections --projection spin --projections-mode expectation --output bands_spin.png
 
    # Orbital-projected bands (s, p, d character)
    rsutil bands --lattice lattice.nml --hamiltonian rs2txt.dat --nk 100 \

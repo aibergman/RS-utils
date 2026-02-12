@@ -13,6 +13,7 @@ RS-utils is a Python + Fortran toolkit for RS-LMTO workflows. It now includes a 
 - **Legacy RS-LMTO utilities (Fortran):**
     - Namelist I/O and lattice processing
     - Exchange interaction mapping and export to UppASD
+    - Export to LMTO47 CTRL format
     - CMake-based build of the Fortran library and tools
 
 ## Features
@@ -99,7 +100,42 @@ rsutil --exchange --cutoff 3.0 --unique --rij-out rij_map.txt --rij-format txt
 
 # Export to UppASD format (requires built exchange files)
 rsutil --export --jij jijso.out --dmi dmi --out uppasd_export
+
+# Export to LMTO47 CTRL format
+rsutil --lmto47 --nspin 2 --lmx 3 --out lmto47_out
 ```
+
+LMAX notes
+----------
+
+- ``--lmx`` controls two paths:
+  - Setup path (``--setup``): overrides RS-LMTO generation ``lmax`` (default ``2`` = spd).
+  - LMTO47 path (``--lmto47``): writes ``LMX`` in LMTO47 ``CLASS`` entries.
+- Current backend support is ``0 <= lmax <= 3`` (spdf); larger values are rejected.
+
+Setup safety workflow
+---------------------
+
+Recommended workflow for destructive or batch updates:
+
+```bash
+# 1) Generate outputs and validate
+rsutil --setup --validate --summary
+
+# 2) Optional automatic replacement with backups
+rsutil --setup --in-place --backup
+```
+
+Namelist compatibility notes
+----------------------------
+
+The setup pipeline preserves selected extended ``&lattice`` fields when present in input:
+
+- ``strux_backend``
+- ``strux_want_sdot``
+- ``strux_solve_scale``
+
+These keys are only written to ``input_new.nml`` when they were present in the original input.
 
 Caution: The f-electron treatment is not fully optimal yet so please double check occupations and core/valence electrons in the input is properly 
 described.
@@ -107,5 +143,4 @@ described.
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
 

@@ -200,6 +200,7 @@ The ``--setup`` flag processes lattice structures and calculates optimal Wigner-
 - ``--summary``: Print a summary of file changes after processing.
 - ``--backup``: Create .bak backups of input files before processing.
 - ``--in-place``: Replace input files with generated outputs (creates .bak backups).
+- ``--lmx``: Override maximum l-channel used in setup path (default: ``2``; supported range ``0..3``).
 
 **Example:**
 
@@ -227,6 +228,31 @@ Supercell Notes
 - Labels in input.nml are expanded into unique species (e.g., Fe1, N1, Fe2, N2).
 - ntype and ct(i) are expanded to match the unique labels.
 - Per-species .nml files are created by copying from the original label files.
+- ``lattice.nml`` and ``input.nml`` are updated in-place during supercell creation; keep clean backups.
+
+Setup Safety Workflow
+~~~~~~~~~~~~~~~~~~~~~
+
+For robust setup runs, prefer:
+
+.. code-block:: bash
+
+    # dry-style run with checks
+    rsutil --setup --validate --summary
+
+    # if happy with output, replace files and keep backups
+    rsutil --setup --in-place --backup
+
+Extended Lattice Key Compatibility
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The setup reader/writer supports selected extended ``&lattice`` keys used by RS-LMTO variants:
+
+- ``strux_backend``
+- ``strux_want_sdot``
+- ``strux_solve_scale``
+
+These keys are only written to output if present in the input.
 
 
 Visualization
@@ -330,6 +356,41 @@ The ``--export`` flag exports RS-LMTO inputs to the UppASD (Uppsala Atomistic Sp
            --out my_uppasd_output
 
 
+Export to LMTO47 CTRL
+---------------------
+
+The ``--lmto47`` flag exports RS-LMTO structure/input data into an LMTO47 ``CTRL`` file.
+
+**Flags:**
+
+- ``--lmto47``: Enable LMTO47 CTRL export.
+- ``--data``: Directory containing ``lattice.nml`` and ``input.nml``.
+- ``--out``: Output directory for generated ``CTRL`` file.
+- ``--nspin``: ``NSPIN`` value in LMTO47 output (default: ``2``).
+- ``--lmx``: ``LMX`` value written for each LMTO47 ``CLASS`` entry.
+
+**Example:**
+
+.. code-block:: bash
+
+    # Basic LMTO47 export
+    rsutil --lmto47 --data /path/to/simulation --out lmto47_out
+
+    # Explicit NSPIN/LMX
+    rsutil --lmto47 --data /path/to/simulation --nspin 2 --lmx 3 --out lmto47_out
+
+
+LMAX Semantics
+--------------
+
+The ``--lmx`` option has two contexts:
+
+- Setup context (``--setup``): overrides RS-LMTO generation ``lmax``.
+- LMTO47 context (``--lmto47``): writes LMTO47 ``LMX`` in ``CLASS`` entries.
+
+Current RS-LMTO backend support in this repository is ``0 <= lmax <= 3``.
+
+
 Quick Reference
 ----------------
 
@@ -342,4 +403,3 @@ Quick Reference
     rsutil --setup --empty_spheres
     rsutil --exchange --unique --cutoff 2.5
     rsutil --export --jij jijso.out
-

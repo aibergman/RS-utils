@@ -220,7 +220,7 @@ CLI examples
 .. code-block:: bash
 
     rsutil bands --lattice lattice.nml --hamiltonian rs2txt.dat --nk 100 \
-        --projections --projection spin --spin-mode expectation \
+        --projections --projection spin --projections-mode expectation \
         --output bands_spin.png
 
 **DOS with Fermi level and moments:**
@@ -229,6 +229,100 @@ CLI examples
 
     rsutil dos --lattice lattice.nml --hamiltonian rs2txt.dat \
         --mesh 6 6 6 --electrons 16 --moments --output dos.png
+
+Bands CLI option reference (synchronized with ``rsutil bands --help``)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Input and format options:
+
+- ``--lattice`` (default: ``lattice.nml``)
+- ``--hamiltonian`` (default: ``rs2txt.dat``)
+- ``--lattice-format``: ``rs-lmto``, ``paoflow``, ``kite``
+- ``--hamiltonian-format``: ``rs-lmto``, ``paoflow``, ``kite``
+
+Core band/projection options:
+
+- ``--nk`` number of k-points
+- ``--output`` output plot filename
+- ``--projections`` enable projected bands
+- ``--projection``: ``orbital``, ``site``, ``spin``, ``all``
+- ``--projections-mode``: ``expectation``, ``weight_up``, ``weight_down``, ``polarization``
+- ``--output-prefix``
+- ``--energy-range emin emax``
+
+Altermagnetic options:
+
+- ``--altermagnetic``
+- ``--mag-threshold``
+- ``--plot-splitting``
+- ``--plot-character``
+
+Berry/topology options:
+
+- ``--berry``
+- ``--fermi-energy``
+- ``--temperature``
+- ``--chern-bands``
+- ``--chern-tol``
+- ``--ahc``
+- ``--orbital-mag``
+- ``--num-bands``
+- ``--plot-berry``
+- ``--plot-chern``
+- ``--plot-bands``
+
+K-path and Brillouin-zone options:
+
+- ``--kpath-mode``: ``auto``, ``seekpath``, ``custom``, ``interactive``
+- ``--seekpath-symprec``
+- ``--seekpath-distance``
+- ``--custom-path``
+- ``--prime-points``
+- ``--stabilize-degenerate``: ``none``, ``block_average``, ``pair_cancel``
+- ``--plot-bz``
+- ``--export-kpath``
+
+Spin texture options:
+
+- ``--spin-texture``
+- ``--spin-band``
+- ``--spin-plane``: ``xy``, ``xz``, ``yz``
+- ``--spin-component``: ``x``, ``y``, ``z``, ``magnitude``
+- ``--rashba-analysis``
+- ``--plot-spin-fermi``
+
+Fat-band options:
+
+- ``--fat-bands``
+- ``--fat-type``: ``linewidth``, ``color``, ``spin``
+- ``--fat-orbitals``
+- ``--fat-orbital-groups`` (JSON mapping)
+- ``--fat-scale``
+
+Additional focused CLI examples
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Berry + Chern workflow**
+
+.. code-block:: bash
+
+    rsutil bands --lattice lattice.nml --hamiltonian rs2txt.dat --nk 150 \
+        --berry --chern-bands 0 1 2 --plot-chern --plot-bands
+
+**Spin texture workflow**
+
+.. code-block:: bash
+
+    rsutil bands --lattice lattice.nml --hamiltonian rs2txt.dat --nk 180 \
+        --spin-texture --spin-band 3 --spin-plane xy --spin-component z \
+        --rashba-analysis --plot-spin-fermi
+
+**Fat-band workflow**
+
+.. code-block:: bash
+
+    rsutil bands --lattice lattice.nml --hamiltonian rs2txt.dat --nk 160 \
+        --fat-bands --fat-type spin --output-prefix fatbands
 
 Programmatic Examples
 ~~~~~~~~~~~~~~~~~~~~~
