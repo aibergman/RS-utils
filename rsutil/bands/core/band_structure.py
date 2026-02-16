@@ -27,6 +27,14 @@ from scipy.linalg import eigh
 from ..readers import HamiltonianReader, LatticeReader
 from .hamiltonian import fourier_transform_hamiltonian, HamiltonianDumper
 from .plotting import plot_bands, plot_bands_collinear
+from .kpath_generator import (
+    setup_kpath,
+    setup_kpath_seekpath,
+    _setup_kpath_spglib,
+    _setup_kpath_pymatgen,
+    _setup_kpath_manual,
+    _generate_kpath,
+)
 
 try:
     import spglib
@@ -94,247 +102,56 @@ class BandStructureCalculator:
     def setup_kpath(
         self, num_points: int = 100
     ) -> Tuple[np.ndarray, List[str], np.ndarray]:
-        """Setup k-point path using structure analysis"""
-
-        # Import here to avoid circular imports
-        from ..analysis.structure_analysis import StructureAnalyzer
-
-        # Analyze structure and generate proper k-path
-        analyzer = StructureAnalyzer(self.lattice)
-
-        if analyzer.special_points and analyzer.band_path:
-            return analyzer.generate_kpath_points(num_points)
-        else:
-            # Fallback to manual method
-            return self._setup_kpath_manual(num_points)
+        """Setup k-point path using structure analysis.
+        
+        Delegates to kpath_generator.setup_kpath() for implementation.
+        """
+        return setup_kpath(self.lattice, num_points)
 
     def setup_kpath_seekpath(
         self, num_points: int = 100, interactive: bool = False
     ) -> Tuple[np.ndarray, List[str], np.ndarray]:
         """Setup k-point path using seekpath with optional interactive selection.
         
-        Provides automatic high-symmetry k-path via seekpath package, with options
-        for interactive selection between standard and custom paths.
-        
-        Parameters
-        ----------
-        num_points : int, default=100
-            Desired total number of k-points
-        interactive : bool, default=False
-            If True, prompt user to choose standard or custom path
-            If False, use standard seekpath k-path
-            
-        Returns
-        -------
-        tuple
-            (kpoints, klabels, kdistances)
-            -kpoints: Array of k-points (nk, 3)
-            - klabels: Labels for k-points (list of str)
-            - kdistances: Linear coordinates along path (nk,)
-            
-        Raises
-        ------
-        ImportError
-            If seekpath is not installed
-            
-        Notes
-        -----
-        Requires: pip install seekpath
-        
-        Author
-        ------
-        Ramon Cardias
+        Delegates to kpath_generator.setup_kpath_seekpath() for implementation.
         """
-        if not HAS_SEEKPATH:
-            raise ImportError("seekpath required. Install with: pip install seekpath")
-        
-        from ..paths import seekpath_kpath, build_custom_kpath
-        
-        # Get lattice info
-        lat_vec = self.lattice.lattice_vectors
-        pos_cart = np.array([[x, y, z] for x, y, z in self.lattice.atomic_positions], dtype=float)
-        
-        # Convert positions to fractional
-        inv_cell = np.linalg.inv(lat_vec)
-        pos_frac = pos_cart @ inv_cell
-        pos_frac = pos_frac - np.floor(pos_frac)
-        
-        # Generate paths with requested number of points
-        kpath_data = seekpath_kpath(
-            lat_vec, pos_frac, self.lattice.atomic_numbers,
-            num_points=num_points,
-            reference_distance=0.025, symprec=1e-5
-        )
-        
-        # Interactive selection if requested
-        if interactive:
-            ans = input("Use standard seekpath k-path? [Y/n]: ").strip().lower()
-            if ans == "" or ans.startswith("y"):
-                # Use fractional k-points (what band calculator expects)
-                kpoints = kpath_data['kpoints_frac']
-                klabels = kpath_data['klabels']
-                kdistances = kpath_data['xvals']
-            else:
-                # Custom path
-                print("\n" + "="*60)
-                print("AVAILABLE SYMMETRY POINTS")
-                print("="*60)
-                point_coords = kpath_data['point_coords']
-                available_points = sorted(point_coords.keys())
-                for point in available_points:
-                    coords = point_coords[point]
-                    print(f"  {point:6s}: ({coords[0]:7.4f}, {coords[1]:7.4f}, {coords[2]:7.4f})")
-                print("="*60)
-                
-                nk_s = input(f"\nTotal k-points for custom path? [default {num_points}]: ").strip()
-                total_k = num_points if nk_s == "" else int(nk_s)
-                
-                p = input("Enter k-path labels separated by '-' (e.g. K'-Γ-K): ").strip()
-                if not p:
-                    raise ValueError("Empty custom path")
-                labels_list = [x.strip() for x in p.split("-") if x.strip()]
-                if len(labels_list) < 2:
-                    raise ValueError("Need at least 2 symmetry points")
-                
-                kpoints, kdistances, xticks, xticklabels, metadata = build_custom_kpath(
-                    point_coords,
-                    kpath_data['reciprocal_lattice'],
-                    labels_list,
-                    total_k
-                )
-                klabels = [""] * len(kpoints)
-        else:
-            # Use fractional k-points (what band calculator expects)
-            kpoints = kpath_data['kpoints_frac']
-            klabels = kpath_data['klabels']
-            kdistances = kpath_data['xvals']
-        
-        # Print summary if available
-        print(f"\nK-path: {len(kpoints)} points")
-        
-        return kpoints, klabels, kdistances
+        return setup_kpath_seekpath(self.lattice, num_points, interactive)
 
     def _setup_kpath_spglib(
         self, num_points: int
     ) -> Tuple[np.ndarray, List[str], np.ndarray]:
-        """Setup k-path using spglib"""
-        cell = (
-            self.lattice.lattice_vectors.T,
-            self.lattice.atomic_positions,
-            self.lattice.atomic_numbers,
-        )
-
-        # Get the symmetry information
-        symmetry = spglib.get_symmetry_dataset(cell)
-
-        # Get the standardized cell
-        mapping, grid = spglib.get_ir_reciprocal_mesh([20, 20, 20], cell)
-
-        # Define high symmetry points (this is crystal system dependent)
-        # For now, use a simple path
-        lattice_type = symmetry["international"]
-
-        if "cubic" in lattice_type.lower() or "P" in lattice_type:
-            # Simple cubic path
-            special_points = {
-                "G": [0, 0, 0],  # Gamma
-                "X": [0.5, 0, 0],  # X
-                "M": [0.5, 0.5, 0],  # M
-                "R": [0.5, 0.5, 0.5],  # R
-            }
-            path = ["G", "X", "M", "G", "R", "X"]
-        else:
-            # Generic path
-            special_points = {
-                "G": [0, 0, 0],
-                "X": [0.5, 0, 0],
-                "Y": [0, 0.5, 0],
-                "Z": [0, 0, 0.5],
-            }
-            path = ["G", "X", "Y", "G", "Z"]
-
-        return self._generate_kpath(special_points, path, num_points)
+        """Setup k-path using spglib.
+        
+        Delegates to kpath_generator._setup_kpath_spglib() for implementation.
+        """
+        return _setup_kpath_spglib(self.lattice, num_points)
 
     def _setup_kpath_pymatgen(
         self, num_points: int
     ) -> Tuple[np.ndarray, List[str], np.ndarray]:
-        """Setup k-path using pymatgen"""
-        structure = Structure(
-            lattice=self.lattice.lattice_vectors.T,
-            species=self.lattice.atomic_numbers,
-            coords=self.lattice.atomic_positions,
-        )
-
-        kpath = HighSymmKpath(structure)
-        special_points = kpath.kpath["kpoints"]
-        path = kpath.kpath["path"][0]  # Take first path
-
-        return self._generate_kpath(special_points, path, num_points)
+        """Setup k-path using pymatgen.
+        
+        Delegates to kpath_generator._setup_kpath_pymatgen() for implementation.
+        """
+        return _setup_kpath_pymatgen(self.lattice, num_points)
 
     def _setup_kpath_manual(
         self, num_points: int
     ) -> Tuple[np.ndarray, List[str], np.ndarray]:
-        """Fallback manual k-path setup"""
-        warnings.warn(
-            "Using manual k-path. Install spglib or pymatgen for automatic detection."
-        )
-
-        special_points = {
-            "G": [0, 0, 0],
-            "X": [0.5, 0, 0],
-            "Y": [0, 0.5, 0],
-            "Z": [0, 0, 0.5],
-            "M": [0.5, 0.5, 0],
-        }
-        path = ["G", "X", "M", "G", "Z"]
-
-        return self._generate_kpath(special_points, path, num_points)
+        """Fallback manual k-path setup.
+        
+        Delegates to kpath_generator._setup_kpath_manual() for implementation.
+        """
+        return _setup_kpath_manual(self.lattice, num_points)
 
     def _generate_kpath(
         self, special_points: Dict, path: List[str], num_points: int
     ) -> Tuple[np.ndarray, List[str], np.ndarray]:
-        """Generate k-point path from special points"""
-        kpoints = []
-        klabels = []
-        kdistances = []
-        total_distance = 0
-
-        for i in range(len(path) - 1):
-            start = np.array(special_points[path[i]])
-            end = np.array(special_points[path[i + 1]])
-
-            # Calculate number of points for this segment
-            segment_length = np.linalg.norm(end - start)
-            segment_points = max(
-                2, int(num_points * segment_length / 3)
-            )  # Rough estimate
-
-            # Generate points along segment
-            for j in range(segment_points):
-                if j == 0 and i == 0:  # First point
-                    kpoints.append(start)
-                    klabels.append(path[i])
-                    kdistances.append(total_distance)
-                elif j == 0:  # Skip duplicate points
-                    klabels[-1] = f"{klabels[-1]}|{path[i]}"
-                else:
-                    t = j / (segment_points - 1)
-                    k = start + t * (end - start)
-                    kpoints.append(k)
-                    klabels.append("")
-                    total_distance += (
-                        np.linalg.norm(k - kpoints[-2]) if len(kpoints) > 1 else 0
-                    )
-                    kdistances.append(total_distance)
-
-            # Add end point
-            if i == len(path) - 2:  # Last segment
-                kpoints.append(end)
-                klabels.append(path[i + 1])
-                total_distance += np.linalg.norm(end - kpoints[-2])
-                kdistances.append(total_distance)
-
-        return np.array(kpoints), klabels, np.array(kdistances)
+        """Generate k-point path from special points.
+        
+        Delegates to kpath_generator._generate_kpath() for implementation.
+        """
+        return _generate_kpath(special_points, path, num_points)
 
     def extract_spin_blocks(self, H_full: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """Extract spin-up and spin-down blocks from full Hamiltonian

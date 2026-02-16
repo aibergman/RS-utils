@@ -36,6 +36,14 @@ With eigenvector storage for downstream analysis:
 from .band_structure import BandStructureCalculator
 from .hamiltonian import fourier_transform_hamiltonian, HamiltonianDumper
 from .plotting import plot_bands, plot_bands_collinear
+from .kpath_generator import (
+    setup_kpath,
+    setup_kpath_seekpath,
+    _setup_kpath_spglib,
+    _setup_kpath_pymatgen,
+    _setup_kpath_manual,
+    _generate_kpath,
+)
 
 __all__ = [
     'BandStructureCalculator',
@@ -43,4 +51,10 @@ __all__ = [
     'HamiltonianDumper',
     'plot_bands',
     'plot_bands_collinear',
+    'setup_kpath',
+    'setup_kpath_seekpath',
+    '_setup_kpath_spglib',
+    '_setup_kpath_pymatgen',
+    '_setup_kpath_manual',
+    '_generate_kpath',
 ]
