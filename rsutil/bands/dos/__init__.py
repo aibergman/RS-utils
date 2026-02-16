@@ -4,6 +4,20 @@ Density of States (DOS) calculation module.
 This module provides DOS calculation and analysis for TB electronic structures
 using the tetrahedron integration method with optional Gaussian smearing.
 
+Submodules
+----------
+integration : TetrahedronDOS
+    Tetrahedron method for accurate DOS integration
+
+mesh : FullBZCalculator
+    Full Brillouin zone k-point mesh generation with symmetry reduction
+
+calculator : DOSCalculator
+    Main DOS calculation engine with projections support
+
+dos_moments : DOSMomentsCalculator, analyze_dos_moments
+    DOS moments analysis and Fermi level determination
+
 Classes
 -------
 DOSCalculator
@@ -45,7 +59,9 @@ With DOS moments analysis:
     >>> analysis = analyze_dos_moments(dos_data, lattice)
 """
 
-from .dos import DOSCalculator, FullBZCalculator, TetrahedronDOS
+from .integration import TetrahedronDOS
+from .mesh import FullBZCalculator
+from .calculator import DOSCalculator
 from .dos_moments import DOSMomentsCalculator, analyze_dos_moments
 
 __all__ = [
