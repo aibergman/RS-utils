@@ -14,11 +14,11 @@ import matplotlib.pyplot as plt
 import argparse
 from pathlib import Path
 
-from .readers import LatticeReader, HamiltonianReader
-from .band_structure import BandStructureCalculator
-from .projections import ProjectedBandCalculator
-from .dos import FullBZCalculator, DOSCalculator
-from .spin_analysis import SpinAnalyzer
+from ..readers import LatticeReader, HamiltonianReader
+from ..core import BandStructureCalculator
+from ..projections import ProjectedBandCalculator
+from ..dos import FullBZCalculator, DOSCalculator
+from .spin import SpinAnalyzer
 from .structure_analysis import StructureAnalyzer
 
 

@@ -12,8 +12,8 @@ This module provides:
 import numpy as np
 import matplotlib.pyplot as plt
 # ConvexHull not used here; left out to avoid unused import
-from .projections import ProjectedBandCalculator
-from .readers import LatticeReader, HamiltonianReader
+from ..projections import ProjectedBandCalculator
+from ..readers import LatticeReader, HamiltonianReader
 from .dos_moments import DOSMomentsCalculator, analyze_dos_moments
 from typing import Dict, Tuple, Optional
 import time

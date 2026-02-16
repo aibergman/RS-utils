@@ -12,8 +12,8 @@ Where H0 is the charge part and Hx, Hy, Hz are the spin components.
 
 import numpy as np
 import matplotlib.pyplot as plt
-from .projections import ProjectedBandCalculator
-from .readers import LatticeReader, HamiltonianReader
+from ...projections import ProjectedBandCalculator
+from ...readers import LatticeReader, HamiltonianReader
 from typing import Dict, Tuple
 import argparse
 

@@ -24,7 +24,7 @@ import numpy as np
 from matplotlib.ticker import FixedFormatter, FixedLocator, NullLocator
 from scipy.linalg import eigh
 
-from .readers import HamiltonianReader, LatticeReader
+from ..readers import HamiltonianReader, LatticeReader
 
 try:
     import spglib
@@ -95,7 +95,7 @@ class BandStructureCalculator:
         """Setup k-point path using structure analysis"""
 
         # Import here to avoid circular imports
-        from .structure_analysis import StructureAnalyzer
+        from ..analysis.structure_analysis import StructureAnalyzer
 
         # Analyze structure and generate proper k-path
         analyzer = StructureAnalyzer(self.lattice)
@@ -146,7 +146,7 @@ class BandStructureCalculator:
         if not HAS_SEEKPATH:
             raise ImportError("seekpath required. Install with: pip install seekpath")
         
-        from .kpath_utils import seekpath_kpath, build_custom_kpath
+        from ..paths import seekpath_kpath, build_custom_kpath
         
         # Get lattice info
         lat_vec = self.lattice.lattice_vectors

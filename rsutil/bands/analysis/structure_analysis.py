@@ -18,7 +18,7 @@ except ImportError:
     HAS_SPGLIB = False
     warnings.warn("spglib not available. Structure analysis will be limited.")
 
-from .readers import LatticeReader
+from ..readers import LatticeReader
 
 
 class StructureAnalyzer:

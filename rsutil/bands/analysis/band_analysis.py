@@ -8,7 +8,7 @@ This module provides additional analysis tools for the TB-LMTO band structure re
 import numpy as np
 import matplotlib.pyplot as plt
 from typing import Tuple
-from .band_structure import BandStructureCalculator
+from ..core import BandStructureCalculator
 
 
 class BandAnalyzer:

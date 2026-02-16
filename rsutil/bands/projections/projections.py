@@ -27,8 +27,8 @@ The "polarization" mode matches standard solid-state physics definitions.
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.linalg import eigh
-from .band_structure import BandStructureCalculator
-from .readers import LatticeReader, HamiltonianReader
+from ..core import BandStructureCalculator
+from ..readers import LatticeReader, HamiltonianReader
 from .projection_utils import compute_quantity_from_sexp, get_projection_vrange
 from typing import Dict, List, Tuple, Literal
 import matplotlib.colors as mcolors
