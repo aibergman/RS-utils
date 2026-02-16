@@ -8,6 +8,9 @@ TB-LMTO Hamiltonians with the structure:
 [Hx-iHy  H0-Hz ]
 
 Where H0 is the charge part and Hx, Hy, Hz are the spin components.
+
+SpinMomentAnalyzer is the preferred public name; SpinAnalyzer is kept as a
+backward-compatible alias.
 """
 
 import numpy as np

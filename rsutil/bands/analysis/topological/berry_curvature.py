@@ -512,7 +512,7 @@ class BerryCurvatureCalculator:
         Decompose Berry curvature by orbital character.
         
         For each orbital α, calculate the contribution:
-            Ω^α(k) = ∑_n |⟨α|ψ_n(k)⟩|² Ω_n(k)
+            :math:`\\Omega^\\alpha(k) = \\sum_n |\\langle \\alpha|\\psi_n(k)\\rangle|^2 \\Omega_n(k)`
         
         Parameters
         ----------

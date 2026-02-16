@@ -167,10 +167,9 @@ class MagneticMomentCalculator:
         Returns
         -------
         polarization : float
-            Spin polarization in range [-1, 1]
-            -1: fully spin-down polarized
-             0: non-magnetic
-            +1: fully spin-up polarized
+            Spin polarization in range [-1, 1].
+            -1 means fully spin-down polarized, 0 is non-magnetic,
+            +1 means fully spin-up polarized.
         """
         n_up, n_down = self.calculate_occupations()
         n_total = n_up + n_down

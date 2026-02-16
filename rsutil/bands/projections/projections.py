@@ -161,6 +161,7 @@ class ProjectedBandCalculator(BandStructureCalculator):
             Projection data with keys:
             - 'orbital': Orbital group projections
             - 'site': Site projections
+            - 'spin': Spin-resolved projections with 'up' and 'down' keys
             - 'spin_expectation': Raw spin expectation values (not mode-dependent)
             - 'orbital_site': Combined orbital-site projections
         """
@@ -173,6 +174,7 @@ class ProjectedBandCalculator(BandStructureCalculator):
             "spin_expectation": np.zeros(
                 (num_kpoints, total_orbitals)
             ),  # Raw expectation
+            "spin": {},  # Spin-resolved projections for DOS
             "orbital_site": {},
         }
 
@@ -184,6 +186,10 @@ class ProjectedBandCalculator(BandStructureCalculator):
 
         for site in range(num_sites):
             projections["site"][site] = np.zeros((num_kpoints, total_orbitals))
+        
+        # Initialize spin projections for DOS calculation
+        projections["spin"]["up"] = np.zeros((num_kpoints, total_orbitals))
+        projections["spin"]["down"] = np.zeros((num_kpoints, total_orbitals))
 
         # Calculate projections for each k-point and band
         for k_idx in range(num_kpoints):
@@ -206,6 +212,10 @@ class ProjectedBandCalculator(BandStructureCalculator):
 
                     spin_up_weight = np.sum(np.abs(spin_up_coeffs) ** 2)
                     spin_down_weight = np.sum(np.abs(spin_down_coeffs) ** 2)
+
+                    # Store spin-resolved weights for DOS calculation
+                    projections["spin"]["up"][k_idx, band_idx] += spin_up_weight
+                    projections["spin"]["down"][k_idx, band_idx] += spin_down_weight
 
                     # Compute spin expectation: weight_up - weight_down = 2*<S_z> in standard units
                     # For spin-1/2, expectation ranges from -0.5 to +0.5

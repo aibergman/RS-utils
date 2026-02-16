@@ -16,7 +16,7 @@ class EffectiveMassCalculator:
     """Calculate effective masses from band structure
 
     Uses Taylor expansion around band extrema to calculate effective masses:
-    E(k) ≈ E_0 + (ħ²/2m*) |k - k_0|²
+    :math:`E(k) \\approx E_0 + (\\hbar^2 / (2 m^*)) \\|k - k_0\\|^2`
 
     Parameters
     ----------
@@ -67,7 +67,7 @@ class EffectiveMassCalculator:
     def _quadratic_fit(
         self, k_range: np.ndarray, E_range: np.ndarray
     ) -> Tuple[float, float, float]:
-        """Fit quadratic to energy vs |k|²
+        """Fit quadratic to energy vs k^2
 
         Parameters
         ----------

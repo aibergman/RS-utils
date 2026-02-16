@@ -73,7 +73,7 @@ Core Band Structure Classes
    :undoc-members:
 
 .. autoclass:: rsutil.bands.ProjectedBandCalculator
-   :members: calculate_projected_bands, calculate_spin_projections, calculate_orbital_projections
+   :members: calculate_projected_bands
    :undoc-members:
 
 Core DOS Classes
@@ -94,9 +94,14 @@ Core DOS Classes
 Advanced Analysis Classes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+.. autoclass:: rsutil.bands.SpinMomentAnalyzer
+    :members:
+    :undoc-members:
+
 .. autoclass:: rsutil.bands.SpinAnalyzer
-   :members:
-   :undoc-members:
+    :members:
+    :undoc-members:
+    :noindex:
 
 .. autoclass:: rsutil.bands.BandAnalyzer
    :members:
@@ -117,6 +122,17 @@ Advanced Analysis Classes
 .. autoclass:: rsutil.bands.AltermagneticAnalyzer
    :members:
    :undoc-members:
+
+Spin Plotting Helpers
+~~~~~~~~~~~~~~~~~~~~~
+
+.. autofunction:: rsutil.bands.analysis.spin.plot_spin_texture
+
+.. autofunction:: rsutil.bands.analysis.spin.plot_orbital_magnetism
+
+.. autofunction:: rsutil.bands.analysis.spin.plot_spin_texture_2d
+
+.. autofunction:: rsutil.bands.analysis.spin.plot_fermi_surface_spin_texture
 
 K-Path Utilities (Advanced)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

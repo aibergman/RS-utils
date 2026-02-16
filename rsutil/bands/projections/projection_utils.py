@@ -381,45 +381,41 @@ def stabilize_degenerate_projections(
     mag_tol: float = 5e-4,
 ) -> np.ndarray:
     """Stabilize projection values inside degenerate energy blocks.
-    
-    For degenerate bands, projection values can oscillate wildly between basis choices.
-    This function applies stabilization strategies to produce smooth, interpretable results.
-    
-Parameters
+
+    For degenerate bands, projection values can oscillate between basis choices.
+    This applies stabilization strategies to produce smooth, interpretable results.
+
+    Parameters
     ----------
     energies : np.ndarray
         Band energies at a single k-point (nbands,)
     numerators : np.ndarray
-        Numerator of projections (nbands,), typically :math:`\langle\psi|P O P|\psi\rangle`
+        Numerator values (nbands,), typically :math:`\\langle\\psi|P O P|\\psi\\rangle`
     denominators : np.ndarray
-        Denominator of projections (nbands,), typically :math:`\langle\psi|P|\psi\rangle`
+        Denominator values (nbands,), typically :math:`\\langle\\psi|P|\\psi\\rangle`
     mode : str, default="block_average"
-        Stabilization mode:
-
-        - "none": Return num/den (or num if not normalize)
-        - "block_average": Replace each degenerate block with subspace average
-        - "pair_cancel": Heuristic to zero near-opposite pairs in degenerate blocks
+        Stabilization mode. One of: "none", "block_average", "pair_cancel".
     energy_tol : float, default=1e-6
         Energy tolerance for grouping degenerate bands
     normalize : bool, default=True
         If True, return num/den; if False, return num
     min_abs_value : float, default=1e-5
-        For "pair_cancel": ignore values with :math:`|v| < \text{min\_abs\_value}` threshold
+        For "pair_cancel": ignore values with :math:`|v| < min\\_abs\\_value`
     sum_tol : float, default=5e-4
-        For "pair_cancel": require :math:`|v_i + v_j| < \text{sum\_tol}` for cancellation
+        For "pair_cancel": require :math:`|v_i + v_j| < sum\\_tol`
     mag_tol : float, default=5e-4
-        For "pair_cancel": require :math:`\bigl| |v_i| - |v_j| \bigr| < \text{mag\_tol}` for cancellation
+        For "pair_cancel": require :math:`||v_i| - |v_j|| < mag\\_tol`
 
     Returns
     -------
     np.ndarray
         Stabilized projections (nbands,)
-        
+
     Notes
     -----
-    - "block_average": Prevents oscillation by averaging within degenerate manifolds
-    - "pair_cancel": Heuristic that finds near-opposite pairs and zeros them (removes noise)
-    
+    - "block_average": average within degenerate manifolds
+    - "pair_cancel": zero near-opposite pairs to reduce noise
+
     Author
     ------
     Ramon Cardias
