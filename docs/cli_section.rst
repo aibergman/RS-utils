@@ -28,6 +28,11 @@ The ``--setup`` flag processes lattice structures and calculates optimal Wigner-
 - ``--empty_spheres``: Enable empty sphere calculations.
 - ``--min_empty_radius``: Minimum empty sphere radius (default: 1.2).
 - ``--max_empty_radius``: Maximum empty sphere radius (default: 2.5).
+- ``--supercell NX NY NZ``: Repeat the input unit cell along the lattice vectors.
+- ``--validate``: Validate output files after processing.
+- ``--summary``: Print a summary of file changes after processing.
+- ``--backup``: Create .bak backups of input files before processing.
+- ``--in-place``: Replace input files with generated outputs (creates .bak backups).
 
 **Example:**
 
@@ -41,6 +46,20 @@ The ``--setup`` flag processes lattice structures and calculates optimal Wigner-
 
     # Free cluster calculation
     rsutil --setup --cluster free
+
+    # Create a 1x1x2 supercell with broken symmetry labels
+    rsutil --setup --supercell 1 1 2
+
+    # Supercell plus empty spheres (use in-place updates and validation)
+    rsutil --setup --supercell 1 1 2 --empty_spheres --in-place --validate
+
+Supercell Notes
+~~~~~~~~~~~~~~~
+
+- Supercells are generated with broken symmetry indexing (arrays run 1..N).
+- Labels in input.nml are expanded into unique species (e.g., Fe1, N1, Fe2, N2).
+- ntype and ct(i) are expanded to match the unique labels.
+- Per-species .nml files are created by copying from the original label files.
 
 
 Visualization

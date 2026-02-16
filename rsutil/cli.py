@@ -230,6 +230,9 @@ def create_supercell(nx, ny, nz):
     
     Reads lattice.nml, creates supercell, and writes updated file.
     Coordinates in lattice.nml are Cartesian (normalized, lattice parameter = 1).
+    The supercell uses broken symmetry indexing (1..N) for index arrays, expands
+    input.nml labels into unique per-atom species, updates ntype/ct accordingly,
+    and creates per-species .nml files by copying from the original species files.
     
     Parameters
     ----------
