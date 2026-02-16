@@ -25,6 +25,7 @@ from matplotlib.ticker import FixedFormatter, FixedLocator, NullLocator
 from scipy.linalg import eigh
 
 from ..readers import HamiltonianReader, LatticeReader
+from .hamiltonian import fourier_transform_hamiltonian, HamiltonianDumper
 
 try:
     import spglib
@@ -406,139 +407,31 @@ class BandStructureCalculator:
         return H_up, H_down
 
     def fourier_transform_hamiltonian(self, k_point: np.ndarray) -> np.ndarray:
-        """Fourier transform the real-space Hamiltonian to k-space"""
-
-        # Get reciprocal lattice vectors
-        a = self.lattice.lattice_vectors
-        b = 2 * np.pi * np.linalg.inv(a.T)  # Reciprocal lattice vectors as columns
-
-        # Convert k-point to Cartesian coordinates
-        k_cart = b @ k_point
-
-        # Initialize k-space Hamiltonian
-        total_orbitals = self.lattice.nbas * self.hamiltonian.orbital_size
-        H_k = np.zeros((total_orbitals, total_orbitals), dtype=complex)
-
-        # Sum over all atoms and their neighbors
-        orbital_offset = 0
-        for ntype in self.hamiltonian.hamiltonian_data:
-            for neighbor, neighbor_data in self.hamiltonian.hamiltonian_data[
-                ntype
-            ].items():
-                displacement = neighbor_data["displacement"]
-                matrix = neighbor_data["matrix"]
-
-                # Calculate phase factor
-                phase = np.exp(1j * np.dot(k_cart, displacement))
-
-                # Add to k-space Hamiltonian
-                start_idx = orbital_offset
-                end_idx = start_idx + self.hamiltonian.orbital_size
-
-                H_k[start_idx:end_idx, start_idx:end_idx] += phase * matrix
-
-            orbital_offset += self.hamiltonian.orbital_size
-
-        return H_k
+        """Fourier transform the real-space Hamiltonian to k-space.
+        
+        Delegates to module function fourier_transform_hamiltonian() for implementation.
+        """
+        return fourier_transform_hamiltonian(k_point, self.lattice, self.hamiltonian)
 
     def dump_hamiltonian_at_points(self, output_prefix: str = "H_k"):
-        """Dump Hamiltonian matrices at Gamma and H points for BCC structure (temporary function)"""
-
-        # Define high-symmetry points for BCC
-        gamma_point = np.array([0.0, 0.0, 0.0])  # Gamma point
-        h_point = np.array([0.5, -0.5, 0.5])  # H point for BCC
-
-        print("High-symmetry points for BCC structure:")
-        print(
-            f"  Gamma: ({gamma_point[0]:.1f}, {gamma_point[1]:.1f}, {gamma_point[2]:.1f}) in units of 2π/a"
-        )
-        print(
-            f"  H: ({h_point[0]:.1f}, {h_point[1]:.1f}, {h_point[2]:.1f}) in units of 2π/a"
-        )
-        print()
-
-        # print("Computing H(k) at Gamma point...")
-        H_gamma = self.fourier_transform_hamiltonian(gamma_point)
-
-        # print("Computing H(k) at H point...")
-        H_h = self.fourier_transform_hamiltonian(h_point)
-
-        # Save to text files
-        self._write_hamiltonian_text(H_gamma, gamma_point, f"{output_prefix}_gamma.dat")
-        self._write_hamiltonian_text(H_h, h_point, f"{output_prefix}_h.dat")
-
-        # Also save numpy files for programmatic use
-        np.save(f"{output_prefix}_gamma.npy", H_gamma)
-        np.save(f"{output_prefix}_h.npy", H_h)
-
-        print(
-            f"Hamiltonian at Gamma point saved to {output_prefix}_gamma.dat and {output_prefix}_gamma.npy"
-        )
-        print(
-            f"Hamiltonian at H point saved to {output_prefix}_h.dat and {output_prefix}_h.npy"
-        )
-
-        # Print some basic info
-        print(f"Matrix size: {H_gamma.shape}")
-        print(
-            f"Gamma point matrix is Hermitian: {np.allclose(H_gamma, H_gamma.conj().T)}"
-        )
-        print(f"H point matrix is Hermitian: {np.allclose(H_h, H_h.conj().T)}")
-
-        return H_gamma, H_h
+        """Dump Hamiltonian matrices at Gamma and H points for BCC structure.
+        
+        Delegates to HamiltonianDumper for implementation.
+        """
+        dumper = HamiltonianDumper(self.lattice, self.hamiltonian)
+        return dumper.dump_at_points(output_prefix)
 
     def dump_hamiltonian_at_custom_points(
         self, k_points: List[Tuple[str, np.ndarray]], output_prefix: str = "H_k"
     ):
-        """Dump Hamiltonian matrices at custom k-points"""
+        """Dump Hamiltonian matrices at custom k-points.
+        
+        Delegates to HamiltonianDumper for implementation.
+        """
+        dumper = HamiltonianDumper(self.lattice, self.hamiltonian)
+        return dumper.dump_at_custom_points(k_points, output_prefix)
 
-        # print("Custom k-points:")
-        # for name, k_point in k_points:
-        #     print(f"  {name}: ({k_point[0]:.6f}, {k_point[1]:.6f}, {k_point[2]:.6f}) in units of 2π/a")
-        # print()
 
-        results = {}
-        for name, k_point in k_points:
-            # print(f"Computing H(k) at {name} point...")
-            H_k = self.fourier_transform_hamiltonian(k_point)
-            results[name] = H_k
-
-            # Save to text file
-            self._write_hamiltonian_text(
-                H_k, k_point, f"{output_prefix}_{name.lower()}.dat"
-            )
-
-            # Also save numpy file for programmatic use
-            np.save(f"{output_prefix}_{name.lower()}.npy", H_k)
-
-            print(
-                f"Hamiltonian at {name} point saved to {output_prefix}_{name.lower()}.dat and {output_prefix}_{name.lower()}.npy"
-            )
-
-        return results
-
-    def _write_hamiltonian_text(
-        self, H_matrix: np.ndarray, k_point: np.ndarray, filename: str
-    ):
-        """Write Hamiltonian matrix to text file in the specified format"""
-        n_rows, n_cols = H_matrix.shape
-
-        with open(filename, "w") as f:
-            f.write("# Complex matrix dump for debugging\n")
-            f.write(
-                f"# k-point: {k_point[0]:12.8f} {k_point[1]:12.8f} {k_point[2]:12.8f}\n"
-            )
-            f.write(f"# Matrix dimensions: {n_rows} x {n_cols}\n")
-            f.write("# Format: row, col, real_part, imag_part\n")
-            f.write("#\n")
-
-            for i in range(n_rows):
-                for j in range(n_cols):
-                    real_part = H_matrix[i, j].real
-                    imag_part = H_matrix[i, j].imag
-                    f.write(f"{i+1:5d}{j+1:5d}{real_part:23.12E}{imag_part:23.12E}\n")
-
-        # print(f"Text dump saved to {filename}")
 
     def calculate_bands(
         self, kpoints: np.ndarray, store_eigenvectors: bool = False

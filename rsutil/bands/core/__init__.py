@@ -34,7 +34,10 @@ With eigenvector storage for downstream analysis:
 """
 
 from .band_structure import BandStructureCalculator
+from .hamiltonian import fourier_transform_hamiltonian, HamiltonianDumper
 
 __all__ = [
     'BandStructureCalculator',
+    'fourier_transform_hamiltonian',
+    'HamiltonianDumper',
 ]
