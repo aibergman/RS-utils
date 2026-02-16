@@ -87,6 +87,130 @@ def run_bands_subcommand(args):
     print(f"Reading Hamiltonian from {args.hamiltonian}...")
     hamiltonian = load_hamiltonian(args.hamiltonian, format=args.hamiltonian_format)
 
+    # Helper function to setup k-path based on mode
+    def setup_kpath_from_args(calc, args):
+        """Setup k-path based on --kpath-mode and related arguments"""
+        kpath_mode = getattr(args, "kpath_mode", "auto")
+        
+        if kpath_mode == "seekpath":
+            print(f"Setting up k-path with seekpath (symprec={args.seekpath_symprec}, distance={args.seekpath_distance})...")
+            try:
+                kpoints, klabels, kdistances = calc.setup_kpath_seekpath(
+                    num_points=args.nk,
+                    interactive=False
+                )
+                return kpoints, klabels, kdistances
+            except ImportError:
+                print("Warning: seekpath not available, falling back to auto mode")
+                return calc.setup_kpath(args.nk)
+        
+        elif kpath_mode == "custom":
+            if not args.custom_path:
+                print("Error: --custom-path required with --kpath-mode custom")
+                raise ValueError("--custom-path not specified")
+            
+            from .bands import seekpath_kpath, build_custom_kpath
+            
+            print(f"Setting up seekpath data for custom path...")
+            kpath_data = seekpath_kpath(
+                lattice_vectors=lattice.lattice_vectors,
+                atomic_positions=lattice.atomic_positions,
+                atomic_numbers=lattice.atomic_numbers,
+                num_points=args.nk,
+                symprec=args.seekpath_symprec,
+                reference_distance=args.seekpath_distance
+            )
+            
+            # Show available symmetry points
+            print("\nAvailable symmetry points:")
+            point_coords = kpath_data['point_coords']
+            available_points = sorted(point_coords.keys())
+            for point in available_points:
+                coords = point_coords[point]
+                print(f"  {point:6s}: ({coords[0]:7.4f}, {coords[1]:7.4f}, {coords[2]:7.4f})")
+            
+            labels = args.custom_path.split('-')
+            print(f"\nBuilding custom k-path: {' -> '.join(labels)}")
+            kpoints_frac, xvals, xticks, xticklabels, metadata = build_custom_kpath(
+                point_coords=kpath_data['point_coords'],
+                reciprocal_lattice=kpath_data['reciprocal_lattice'],
+                labels_list=labels,
+                total_kpoints=args.nk
+            )
+            
+            # keep k-points in fractional coordinates for calculate_bands()
+            kpoints = kpoints_frac
+            kdistances = xvals
+            klabels_list = xticklabels
+            
+            # Store for later use (export, plotting)
+            calc._kpath_data = {
+                'metadata': metadata,
+                'reciprocal_lattice': kpath_data['reciprocal_lattice'],
+                'point_coords': kpath_data['point_coords']
+            }
+            
+            return kpoints, klabels_list, kdistances
+        
+        elif kpath_mode == "interactive":
+            print("Interactive k-path selection mode...")
+            try:
+                kpoints, klabels, kdistances = calc.setup_kpath_seekpath(
+                    num_points=args.nk,
+                    interactive=True
+                )
+                return kpoints, klabels, kdistances
+            except ImportError:
+                print("Warning: seekpath not available for interactive mode")
+                return calc.setup_kpath(args.nk)
+        
+        else:  # auto mode (default)
+            print(f"Generating k-path with {args.nk} points (auto mode)...")
+            return calc.setup_kpath(args.nk)
+
+    # Helper function to handle BZ plotting and k-path export
+    def handle_kpath_output(args, lattice, kpoints, klabels, kdistances, kpath_data=None):
+        """Plot Brillouin zone and export k-path if requested"""
+        if args.plot_bz:
+            try:
+                from .bands import seekpath_kpath, plot_brillouin_zone
+                
+                # Get BZ data if not provided
+                if kpath_data is None:
+                    kpath_data = seekpath_kpath(
+                        lattice_vectors=lattice.lattice_vectors,
+                        atomic_positions=lattice.atomic_positions,
+                        atomic_numbers=lattice.atomic_numbers,
+                        symprec=args.seekpath_symprec,
+                        reference_distance=args.seekpath_distance
+                    )
+                
+                print(f"Plotting Brillouin zone to {args.output_prefix}_bz.png...")
+                fig, ax = plot_brillouin_zone(
+                    reciprocal_lattice=kpath_data['reciprocal_lattice'],
+                    point_coords=kpath_data['point_coords'],
+                    label_hs_points=True,
+                    label_primes=args.prime_points,
+                    figsize=(10, 10)
+                )
+                fig.savefig(f"{args.output_prefix}_bz.png", dpi=300, bbox_inches='tight')
+                print("Brillouin zone plot saved.")
+            except ImportError as e:
+                print(f"Warning: Could not plot Brillouin zone: {e}")
+        
+        if args.export_kpath:
+            from .bands import export_kpath
+            
+            print(f"Exporting k-path to {args.export_kpath}...")
+            export_kpath(
+                filename=args.export_kpath,
+                kpath_x=kdistances,
+                kpoints_abs=kpoints,
+                kpoint_labels=klabels,
+                header='x_linearcoord  kx  ky  kz'
+            )
+            print(f"K-path exported to {args.export_kpath}")
+
     # Check for altermagnetic analysis
     if args.altermagnetic:
         from .bands.altermagnetic import AltermagneticAnalyzer
@@ -95,8 +219,7 @@ def run_bands_subcommand(args):
         print("Setting up band structure calculator (collinear)...")
         calc = BandStructureCalculator(lattice, hamiltonian, collinear=True)
 
-        print(f"Generating k-path with {args.nk} points...")
-        kpoints, klabels, kdistances = calc.setup_kpath(args.nk)
+        kpoints, klabels, kdistances = setup_kpath_from_args(calc, args)
 
         print("Calculating spin-polarized bands...")
         bands_up, bands_down = calc.calculate_bands_collinear(kpoints)
@@ -115,6 +238,9 @@ def run_bands_subcommand(args):
         # Print summary
         print()
         analyzer.print_altermagnetic_summary()
+
+        # Handle BZ plotting and k-path export
+        handle_kpath_output(args, lattice, kpoints, klabels, kdistances)
 
         # Generate plots if requested
         if args.plot_splitting:
@@ -144,8 +270,7 @@ def run_bands_subcommand(args):
         print("Setting up band structure calculator...")
         calc = BandStructureCalculator(lattice, hamiltonian)
 
-        print(f"Generating k-path with {args.nk} points...")
-        kpoints, klabels, kdistances = calc.setup_kpath(args.nk)
+        kpoints, klabels, kdistances = setup_kpath_from_args(calc, args)
 
         print("Calculating band structure with eigenvector storage...")
         energies = calc.calculate_bands(kpoints, store_eigenvectors=True)
@@ -210,6 +335,9 @@ def run_bands_subcommand(args):
                 )
                 print(f"  Band {band}: M_orb = {m_orb:.4e} μ_B")
 
+        # Handle BZ plotting and k-path export
+        handle_kpath_output(args, lattice, kpoints, klabels, kdistances)
+
         # Generate plots if requested
         if args.plot_berry:
             band = min(0, args.plot_berry - 1)  # Default to band 0
@@ -237,17 +365,21 @@ def run_bands_subcommand(args):
         print("Setting up band structure calculator with eigenvector storage...")
         calc = BandStructureCalculator(lattice, hamiltonian)
 
-        print(f"Generating k-path with {args.nk} points...")
-        kpoints, klabels, kdistances = calc.setup_kpath(args.nk)
+        kpoints, klabels, kdistances = setup_kpath_from_args(calc, args)
 
         print("Calculating band structure with eigenvector storage...")
         energies = calc.calculate_bands(kpoints, store_eigenvectors=True)
+
+        # Use real eigenvectors from Hamiltonian diagonalization (Phase 4)
         eigenvectors = calc.eigenvectors
+        print(f"Eigenvector shape: {eigenvectors.shape}")
 
         # Initialize spin texture calculator
-        print("Calculating spin texture...")
+        print("Computing spin texture...")
         a = lattice.lattice_vectors
-        reciprocal_lattice = 2 * np.pi * np.linalg.inv(a.T)
+        reciprocal_lattice = (
+            2 * np.pi * np.linalg.inv(a.T)
+        )  # Reciprocal lattice vectors as columns
 
         spin_calc = SpinTextureCalculator(
             energies,
@@ -303,6 +435,9 @@ def run_bands_subcommand(args):
                 except Exception as e:
                     print(f"  Rashba analysis failed: {e}")
 
+        # Handle BZ plotting and k-path export
+        handle_kpath_output(args, lattice, kpoints, klabels, kdistances)
+
         print("\nDone!")
 
     # Check for fat bands visualization (Phase 4)
@@ -312,8 +447,7 @@ def run_bands_subcommand(args):
         print("Setting up band structure calculator with eigenvector storage...")
         calc = BandStructureCalculator(lattice, hamiltonian)
 
-        print(f"Generating k-path with {args.nk} points...")
-        kpoints, klabels, kdistances = calc.setup_kpath(args.nk)
+        kpoints, klabels, kdistances = setup_kpath_from_args(calc, args)
 
         print("Calculating band structure with eigenvector storage...")
         energies = calc.calculate_bands(kpoints, store_eigenvectors=True)
@@ -376,6 +510,9 @@ def run_bands_subcommand(args):
                 energy_range=energy_range, output_file=output_file
             )
 
+        # Handle BZ plotting and k-path export
+        handle_kpath_output(args, lattice, kpoints, klabels, kdistances)
+
         print("\nDone!")
 
     # Regular projections or band structure
@@ -391,8 +528,7 @@ def run_bands_subcommand(args):
             spin_projection_mode=getattr(args, "projections_mode", "expectation"),
         )
 
-        print(f"Generating k-path with {args.nk} points...")
-        kpoints, klabels, kdistances = proj_calc.setup_kpath(args.nk)
+        kpoints, klabels, kdistances = setup_kpath_from_args(proj_calc, args)
 
         print("Calculating projected band structure...")
         band_energies, projections = proj_calc.calculate_projected_bands(kpoints)
@@ -411,17 +547,22 @@ def run_bands_subcommand(args):
             output_file,
         )
 
+        # Handle BZ plotting and k-path export
+        handle_kpath_output(args, lattice, kpoints, klabels, kdistances)
+
         print("Done!")
     else:
         # Run regular band structure
         print("Setting up band structure calculator...")
         calc = BandStructureCalculator(lattice, hamiltonian)
 
-        print(f"Generating k-path with {args.nk} points...")
-        kpoints, klabels, kdistances = calc.setup_kpath(args.nk)
+        kpoints, klabels, kdistances = setup_kpath_from_args(calc, args)
 
         print("Calculating band structure...")
         band_energies = calc.calculate_bands(kpoints)
+
+        # Handle BZ plotting and k-path export
+        handle_kpath_output(args, lattice, kpoints, klabels, kdistances)
 
         print(f"Plotting results to {args.output}...")
         calc.plot_bands(kdistances, band_energies, klabels, args.output)
@@ -692,6 +833,58 @@ def create_bands_parser(subparsers):
         help="Plot band structure (with --altermagnetic or --berry)",
     )
 
+    # Advanced K-path options (seekpath, custom paths, prime convention)
+    parser.add_argument(
+        "--kpath-mode",
+        choices=["auto", "seekpath", "custom", "interactive"],
+        default="auto",
+        help=(
+            "K-path generation mode: "
+            "auto: Simple path from pymatgen (fast); "
+            "seekpath: High-symmetry path with explicit points; "
+            "custom: User-specified path (requires --custom-path); "
+            "interactive: Prompt user to choose (default: auto)"
+        ),
+    )
+    parser.add_argument(
+        "--seekpath-symprec",
+        type=float,
+        default=1e-5,
+        help="Symmetry tolerance for seekpath (default: 1e-5)",
+    )
+    parser.add_argument(
+        "--seekpath-distance",
+        type=float,
+        default=0.025,
+        help="Reference distance for seekpath BZ sampling (default: 0.025 Å⁻¹)",
+    )
+    parser.add_argument(
+        "--custom-path",
+        type=str,
+        help="Custom k-path labels, e.g. 'K-Gamma-K' or 'X-Gamma-X-M' (requires --kpath-mode custom)",
+    )
+    parser.add_argument(
+        "--prime-points",
+        action="store_true",
+        help="Apply prime convention to k-points (K'=(-K_x,-K_y,K_z); useful for custom paths)",
+    )
+    parser.add_argument(
+        "--stabilize-degenerate",
+        choices=["none", "block_average", "pair_cancel"],
+        default="block_average",
+        help="Stabilization mode for degenerate bands in projections (default: block_average)",
+    )
+    parser.add_argument(
+        "--plot-bz",
+        action="store_true",
+        help="Plot Brillouin zone polyhedron with high-symmetry points (requires pymatgen)",
+    )
+    parser.add_argument(
+        "--export-kpath",
+        type=str,
+        help="Export k-path to file for reproducibility (e.g., 'kpath.dat')",
+    )
+
     # Spin texture options (Phase 4)
     parser.add_argument(
         "--spin-texture",
@@ -757,72 +950,6 @@ def create_bands_parser(subparsers):
     )
 
     parser.set_defaults(func=run_bands_subcommand)
-    return parser
-
-
-def create_dos_parser(subparsers):
-    """Create DOS subcommand parser"""
-    parser = subparsers.add_parser(
-        "dos",
-        parents=[_make_common_parser()],
-        help="Calculate density of states or DOS moments",
-    )
-    parser.add_argument(
-        "--mesh",
-        nargs=3,
-        type=int,
-        default=[6, 6, 6],
-        help="k-point mesh size (default: 6 6 6)",
-    )
-    parser.add_argument(
-        "--energy-range", nargs=2, type=float, help="Energy range (emin emax)"
-    )
-    parser.add_argument(
-        "--num-energies",
-        type=int,
-        default=1000,
-        help="Number of energy points (default: 1000)",
-    )
-    parser.add_argument(
-        "--fermi-energy",
-        type=float,
-        default=0.0,
-        help="Fermi energy for plots (default: 0.0)",
-    )
-    parser.add_argument(
-        "--electrons",
-        type=float,
-        help="Number of electrons (auto-determine Fermi level)",
-    )
-    parser.add_argument(
-        "--temperature",
-        type=float,
-        default=300.0,
-        help="Temperature in K (default: 300.0)",
-    )
-    parser.add_argument(
-        "--no-symmetry", action="store_true", help="Disable symmetry reduction"
-    )
-    parser.add_argument(
-        "--no-tetrahedron",
-        action="store_true",
-        help="Use Gaussian broadening instead of tetrahedron",
-    )
-    parser.add_argument(
-        "--gaussian-smearing",
-        type=float,
-        default=0.1,
-        help="Gaussian smearing width in eV (default: 0.1)",
-    )
-    parser.add_argument(
-        "--output-prefix", default="dos", help="Output file prefix (default: dos)"
-    )
-    parser.add_argument(
-        "--moments",
-        action="store_true",
-        help="Calculate DOS moments analysis instead of DOS plot",
-    )
-    parser.set_defaults(func=run_dos_subcommand)
     return parser
 
 

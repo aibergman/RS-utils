@@ -26,3 +26,24 @@ The package is organized into several submodules:
 - **``rsutil.exchange``**: Exchange interaction calculation and mapping
 - **``rsutil.export``**: Export functionality for other simulation formats
 
+- **``rsutil.cli``**: Command-line entry points and parsers for `rsutil` console commands
+
+
+Command-line Interface
+~~~~~~~~~~~~~~~~~~~~~~
+
+The package exposes console-oriented entrypoints and helpers in `rsutil.cli` for running `bands`, `dos` and visualization workflows from the shell.
+
+.. automodule:: rsutil.cli
+   :members:
+
+Exporters
+~~~~~~~~~
+
+Export utilities (e.g., UppASD exporters) are available under `rsutil.export`.
+
+.. automodule:: rsutil.export.uppasd
+   :members:
+   :noindex:
+
+

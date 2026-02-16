@@ -38,6 +38,151 @@ Band and DOS
                --electrons 16 --moments
 
 
+Advanced Band Structure Features
+---------------------------------
+
+**K-Path Generation Modes**
+
+The ``--kpath-mode`` option controls how high-symmetry k-paths are generated:
+
+.. code-block:: bash
+
+    # Auto mode (simple, fast; default)
+    rsutil bands --lattice lattice.nml --hamiltonian rs2txt.dat --nk 200
+
+    # Seekpath mode (explicit high-symmetry path)
+    rsutil bands --lattice lattice.nml --hamiltonian rs2txt.dat --nk 200 \
+                 --kpath-mode seekpath
+
+    # Custom path with specific labels
+    rsutil bands --lattice lattice.nml --hamiltonian rs2txt.dat --nk 300 \
+                 --kpath-mode custom --custom-path "K-Gamma-K"
+
+    # Interactive mode: prompts for seekpath vs custom
+    rsutil bands --lattice lattice.nml --hamiltonian rs2txt.dat --nk 200 \
+                 --kpath-mode interactive
+
+**Seekpath Configuration**
+
+Fine-tune seekpath behavior:
+
+.. code-block:: bash
+
+    # Stricter symmetry tolerance
+    rsutil bands --lattice lattice.nml --hamiltonian rs2txt.dat --nk 200 \
+                 --kpath-mode seekpath --seekpath-symprec 1e-6
+
+    # Finer Brillouin zone sampling
+    rsutil bands --lattice lattice.nml --hamiltonian rs2txt.dat --nk 200 \
+                 --kpath-mode seekpath --seekpath-distance 0.01
+
+**Custom K-Paths with Prime Convention**
+
+Define custom paths and optionally apply the prime convention (K' = -K):
+
+.. code-block:: bash
+
+    # Simple custom path (K → Γ → M)
+    rsutil bands --lattice lattice.nml --hamiltonian rs2txt.dat --nk 300 \
+                 --kpath-mode custom --custom-path "K-Gamma-M"
+
+    # With prime points (K' is K with in-plane flip)
+    rsutil bands --lattice lattice.nml --hamiltonian rs2txt.dat --nk 300 \
+                 --kpath-mode custom --custom-path "K-Prime-Gamma-K" --prime-points
+
+**Degenerate Band Stabilization**
+
+For materials with degenerate bands, choose a stabilization strategy for smooth color projections:
+
+.. code-block:: bash
+
+    # Block average (recommended; default)
+    rsutil bands --lattice lattice.nml --hamiltonian rs2txt.dat --nk 200 \
+                 --projections --projection spin \
+                 --stabilize-degenerate block_average
+
+    # Pair cancellation (heuristic; useful for many degeneracies)
+    rsutil bands --lattice lattice.nml --hamiltonian rs2txt.dat --nk 200 \
+                 --projections --projection spin \
+                 --stabilize-degenerate pair_cancel
+
+    # No stabilization (raw values; for debugging)
+    rsutil bands --lattice lattice.nml --hamiltonian rs2txt.dat --nk 200 \
+                 --projections --projection spin \
+                 --stabilize-degenerate none
+
+**Brillouin Zone Visualization**
+
+Plot the 3D Brillouin zone polyhedron with high-symmetry points labeled:
+
+.. code-block:: bash
+
+    # Plot BZ alongside bands
+    rsutil bands --lattice lattice.nml --hamiltonian rs2txt.dat --nk 200 \
+                 --plot-bz
+
+    # With prime points labeled
+    rsutil bands --lattice lattice.nml --hamiltonian rs2txt.dat --nk 200 \
+                 --kpath-mode custom --custom-path "K-Gamma-M" \
+                 --plot-bz --prime-points
+
+**K-Path Export for Reproducibility**
+
+Save the exact k-path used for future reference or use with other tools:
+
+.. code-block:: bash
+
+    # Export k-path to file
+    rsutil bands --lattice lattice.nml --hamiltonian rs2txt.dat --nk 200 \
+                 --export-kpath kpath_band_structure.dat
+
+Output file format (space-separated columns):
+
+::
+
+    x_linearcoord  kx  ky  kz
+    0.000000e+00   0.000000e+00   0.000000e+00   0.000000e+00
+    1.234567e-02  -1.234567e-02   2.345678e-03   0.000000e+00
+    ...
+
+**Complete Workflow Example**
+
+Combine seekpath, spin projections, degenerate stabilization, BZ plot, and k-path export:
+
+.. code-block:: bash
+
+    rsutil bands --lattice lattice.nml --hamiltonian rs2txt.dat --nk 250 \
+                 --projections --projection spin \
+                 --projections-mode expectation \
+                 --kpath-mode seekpath \
+                 --stabilize-degenerate block_average \
+                 --plot-bz \
+                 --export-kpath kpath_seekpath.dat \
+                 --output-prefix band_analysis_spin
+
+This command:
+1. Generates a seekpath k-path with 250 points
+2. Computes spin projections with ⟨S_z⟩ expectation values
+3. Stabilizes degenerate manifolds using block averaging
+4. Plots the Brillouin zone
+5. Saves the k-path to ``kpath_seekpath.dat``
+6. Outputs plots to ``band_analysis_spin_*.png``
+
+**Available Options Summary**
+
+=================================  ============================================  ================================================================
+Option                             Values                                        Description
+=================================  ============================================  ================================================================
+``--kpath-mode``                   auto, seekpath, custom, interactive           K-path generation method (default: auto)
+``--seekpath-symprec``             float [0.00001, 0.1]                          Symmetry tolerance for seekpath (default: 1e-5)
+``--seekpath-distance``            float [0.001, 0.1]                            Reference distance for BZ sampling in Å^-1 (default: 0.025)
+``--custom-path``                  string (e.g., "K-Gamma-K")                    Labels for custom k-path (required with --kpath-mode custom)
+``--prime-points``                 flag                                          Apply prime convention to k-points
+``--stabilize-degenerate``         none, block_average, pair_cancel               Degenerate band handling (default: block_average)
+``--plot-bz``                      flag                                          Plot Brillouin zone polyhedron (requires pymatgen)
+``--export-kpath``                 filename                                      Export k-path to file for reproducibility
+=================================  ============================================  ================================================================
+
 Lattice Processing
 -------------------
 

@@ -33,6 +33,5 @@ html_static_path = ['_static']
 
 html_theme_options = {
     'collapse_navigation': False,  # Expand the navigation by default
-    'display_version': True,       # Show version in the header
 }
 

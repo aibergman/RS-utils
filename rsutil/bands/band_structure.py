@@ -10,7 +10,8 @@ This program reads TB-LMTO Hamiltonian data and lattice information to:
 5. Diagonalize and calculate the band structure
 6. Plot the results
 
-Author: Created for rslmto_official
+Authors: Original code by rslmto_official
+         KPath enhancements by Ramon Cardias
 """
 
 import argparse
@@ -41,6 +42,12 @@ try:
 except ImportError:
     HAS_PYMATGEN = False
     warnings.warn("pymatgen not found. Install with: pip install pymatgen")
+
+try:
+    import seekpath
+    HAS_SEEKPATH = True
+except ImportError:
+    HAS_SEEKPATH = False
 
 
 class BandStructureCalculator:
@@ -98,6 +105,112 @@ class BandStructureCalculator:
         else:
             # Fallback to manual method
             return self._setup_kpath_manual(num_points)
+
+    def setup_kpath_seekpath(
+        self, num_points: int = 100, interactive: bool = False
+    ) -> Tuple[np.ndarray, List[str], np.ndarray]:
+        """Setup k-point path using seekpath with optional interactive selection.
+        
+        Provides automatic high-symmetry k-path via seekpath package, with options
+        for interactive selection between standard and custom paths.
+        
+        Parameters
+        ----------
+        num_points : int, default=100
+            Desired total number of k-points
+        interactive : bool, default=False
+            If True, prompt user to choose standard or custom path
+            If False, use standard seekpath k-path
+            
+        Returns
+        -------
+        tuple
+            (kpoints, klabels, kdistances)
+            -kpoints: Array of k-points (nk, 3)
+            - klabels: Labels for k-points (list of str)
+            - kdistances: Linear coordinates along path (nk,)
+            
+        Raises
+        ------
+        ImportError
+            If seekpath is not installed
+            
+        Notes
+        -----
+        Requires: pip install seekpath
+        
+        Author
+        ------
+        Ramon Cardias
+        """
+        if not HAS_SEEKPATH:
+            raise ImportError("seekpath required. Install with: pip install seekpath")
+        
+        from .kpath_utils import seekpath_kpath, build_custom_kpath
+        
+        # Get lattice info
+        lat_vec = self.lattice.lattice_vectors
+        pos_cart = np.array([[x, y, z] for x, y, z in self.lattice.atomic_positions], dtype=float)
+        
+        # Convert positions to fractional
+        inv_cell = np.linalg.inv(lat_vec)
+        pos_frac = pos_cart @ inv_cell
+        pos_frac = pos_frac - np.floor(pos_frac)
+        
+        # Generate paths with requested number of points
+        kpath_data = seekpath_kpath(
+            lat_vec, pos_frac, self.lattice.atomic_numbers,
+            num_points=num_points,
+            reference_distance=0.025, symprec=1e-5
+        )
+        
+        # Interactive selection if requested
+        if interactive:
+            ans = input("Use standard seekpath k-path? [Y/n]: ").strip().lower()
+            if ans == "" or ans.startswith("y"):
+                # Use fractional k-points (what band calculator expects)
+                kpoints = kpath_data['kpoints_frac']
+                klabels = kpath_data['klabels']
+                kdistances = kpath_data['xvals']
+            else:
+                # Custom path
+                print("\n" + "="*60)
+                print("AVAILABLE SYMMETRY POINTS")
+                print("="*60)
+                point_coords = kpath_data['point_coords']
+                available_points = sorted(point_coords.keys())
+                for point in available_points:
+                    coords = point_coords[point]
+                    print(f"  {point:6s}: ({coords[0]:7.4f}, {coords[1]:7.4f}, {coords[2]:7.4f})")
+                print("="*60)
+                
+                nk_s = input(f"\nTotal k-points for custom path? [default {num_points}]: ").strip()
+                total_k = num_points if nk_s == "" else int(nk_s)
+                
+                p = input("Enter k-path labels separated by '-' (e.g. K'-Γ-K): ").strip()
+                if not p:
+                    raise ValueError("Empty custom path")
+                labels_list = [x.strip() for x in p.split("-") if x.strip()]
+                if len(labels_list) < 2:
+                    raise ValueError("Need at least 2 symmetry points")
+                
+                kpoints, kdistances, xticks, xticklabels, metadata = build_custom_kpath(
+                    point_coords,
+                    kpath_data['reciprocal_lattice'],
+                    labels_list,
+                    total_k
+                )
+                klabels = [""] * len(kpoints)
+        else:
+            # Use fractional k-points (what band calculator expects)
+            kpoints = kpath_data['kpoints_frac']
+            klabels = kpath_data['klabels']
+            kdistances = kpath_data['xvals']
+        
+        # Print summary if available
+        print(f"\nK-path: {len(kpoints)} points")
+        
+        return kpoints, klabels, kdistances
 
     def _setup_kpath_spglib(
         self, num_points: int

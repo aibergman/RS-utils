@@ -367,3 +367,157 @@ def compute_quantity_from_sexp(sexp: np.ndarray, mode: str) -> np.ndarray:
         return 2.0 * sexp
     else:
         raise ValueError(f"Unknown projection mode: {mode}")
+
+
+def stabilize_degenerate_projections(
+    energies: np.ndarray,
+    numerators: np.ndarray,
+    denominators: np.ndarray,
+    mode: str = "block_average",
+    energy_tol: float = 1e-6,
+    normalize: bool = True,
+    min_abs_value: float = 1e-5,
+    sum_tol: float = 5e-4,
+    mag_tol: float = 5e-4,
+) -> np.ndarray:
+    """Stabilize projection values inside degenerate energy blocks.
+    
+    For degenerate bands, projection values can oscillate wildly between basis choices.
+    This function applies stabilization strategies to produce smooth, interpretable results.
+    
+Parameters
+    ----------
+    energies : np.ndarray
+        Band energies at a single k-point (nbands,)
+    numerators : np.ndarray
+        Numerator of projections (nbands,), typically :math:`\langle\psi|P O P|\psi\rangle`
+    denominators : np.ndarray
+        Denominator of projections (nbands,), typically :math:`\langle\psi|P|\psi\rangle`
+    mode : str, default="block_average"
+        Stabilization mode:
+
+        - "none": Return num/den (or num if not normalize)
+        - "block_average": Replace each degenerate block with subspace average
+        - "pair_cancel": Heuristic to zero near-opposite pairs in degenerate blocks
+    energy_tol : float, default=1e-6
+        Energy tolerance for grouping degenerate bands
+    normalize : bool, default=True
+        If True, return num/den; if False, return num
+    min_abs_value : float, default=1e-5
+        For "pair_cancel": ignore values with :math:`|v| < \text{min\_abs\_value}` threshold
+    sum_tol : float, default=5e-4
+        For "pair_cancel": require :math:`|v_i + v_j| < \text{sum\_tol}` for cancellation
+    mag_tol : float, default=5e-4
+        For "pair_cancel": require :math:`\bigl| |v_i| - |v_j| \bigr| < \text{mag\_tol}` for cancellation
+
+    Returns
+    -------
+    np.ndarray
+        Stabilized projections (nbands,)
+        
+    Notes
+    -----
+    - "block_average": Prevents oscillation by averaging within degenerate manifolds
+    - "pair_cancel": Heuristic that finds near-opposite pairs and zeros them (removes noise)
+    
+    Author
+    ------
+    Ramon Cardias
+    """
+    mode = mode.lower().strip()
+    
+    if mode == "none":
+        if normalize:
+            expv = np.where(
+                np.abs(denominators) > 1e-14,
+                numerators / denominators,
+                np.nan
+            )
+        else:
+            expv = numerators.copy()
+        return expv
+    
+    # Compute base expectation value
+    if normalize:
+        expv = np.where(
+            np.abs(denominators) > 1e-14,
+            numerators / denominators,
+            np.nan
+        )
+    else:
+        expv = numerators.copy()
+    
+    # Find degenerate groups
+    groups = degeneracy_groups(energies, tol=energy_tol)
+    out = expv.copy()
+    
+    if mode == "block_average":
+        for i0, i1 in groups:
+            m = i1 - i0
+            if m <= 1:
+                continue
+            
+            # Replace entire block with subspace average
+            if normalize:
+                sden = np.nansum(denominators[i0:i1])
+                if sden > 1e-14:
+                    block_val = np.nansum(numerators[i0:i1]) / sden
+                else:
+                    block_val = np.nan
+            else:
+                block_val = np.nanmean(numerators[i0:i1])
+            
+            out[i0:i1] = block_val
+        
+        return out
+    
+    elif mode == "pair_cancel":
+        for i0, i1 in groups:
+            m = i1 - i0
+            if m <= 1:
+                continue
+            
+            idxs = list(range(i0, i1))
+            used = set()
+            
+            for i in idxs:
+                if i in used:
+                    continue
+                
+                qi = out[i]
+                if not np.isfinite(qi) or abs(qi) < min_abs_value:
+                    continue
+                
+                # Find best cancellation partner
+                best_j = None
+                best_score = None
+                
+                for j in idxs:
+                    if j <= i or j in used:
+                        continue
+                    
+                    qj = out[j]
+                    if not np.isfinite(qj) or abs(qj) < min_abs_value:
+                        continue
+                    
+                    # Check if qi ≈ -qj (near-opposite)
+                    if (abs(qi + qj) < sum_tol and 
+                        abs(abs(qi) - abs(qj)) < mag_tol):
+                        score = abs(qi + qj)
+                        if best_score is None or score < best_score:
+                            best_score = score
+                            best_j = j
+                
+                if best_j is not None:
+                    out[i] = 0.0
+                    out[best_j] = 0.0
+                    used.add(i)
+                    used.add(best_j)
+        
+        return out
+    
+    else:
+        raise ValueError(
+            f"Unknown stabilization mode: {mode}. "
+            "Must be 'none', 'block_average', or 'pair_cancel'."
+        )
