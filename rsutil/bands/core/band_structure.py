@@ -15,16 +15,17 @@ Authors: Original code by rslmto_official
 """
 
 import argparse
-import warnings
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.ticker import FixedFormatter, FixedLocator, NullLocator
-from scipy.linalg import eigh
 
 from ..readers import HamiltonianReader, LatticeReader
+from .band_calculations import (
+    extract_spin_blocks as extract_spin_blocks_fn,
+    calculate_bands as calculate_bands_fn,
+    calculate_bands_collinear as calculate_bands_collinear_fn,
+)
 from .hamiltonian import fourier_transform_hamiltonian, HamiltonianDumper
 from .plotting import plot_bands, plot_bands_collinear
 from .kpath_generator import (
@@ -35,29 +36,6 @@ from .kpath_generator import (
     _setup_kpath_manual,
     _generate_kpath,
 )
-
-try:
-    import spglib
-
-    HAS_SPGLIB = True
-except ImportError:
-    HAS_SPGLIB = False
-    warnings.warn("spglib not found. Install with: pip install spglib")
-
-try:
-    from pymatgen.core import Structure
-    from pymatgen.symmetry.bandstructure import HighSymmKpath
-
-    HAS_PYMATGEN = True
-except ImportError:
-    HAS_PYMATGEN = False
-    warnings.warn("pymatgen not found. Install with: pip install pymatgen")
-
-try:
-    import seekpath
-    HAS_SEEKPATH = True
-except ImportError:
-    HAS_SEEKPATH = False
 
 
 class BandStructureCalculator:
@@ -154,75 +132,11 @@ class BandStructureCalculator:
         return _generate_kpath(special_points, path, num_points)
 
     def extract_spin_blocks(self, H_full: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        """Extract spin-up and spin-down blocks from full Hamiltonian
+        """Extract spin-up and spin-down blocks from full Hamiltonian.
 
-        The full Hamiltonian has structure (for each atom, 18×18 total):
-        - Indices 0-8: spin-up orbitals (9 orbitals)
-        - Indices 9-17: spin-down orbitals (9 orbitals)
-
-        For collinear magnetism, we extract:
-        - H_up: diagonal block [0:9, 0:9] for all atoms
-        - H_down: diagonal block [9:18, 9:18] for all atoms
-
-        Off-diagonal blocks represent spin-flip terms (SOC, non-collinear),
-        which are ignored in collinear approximation.
-
-        Parameters
-        ----------
-        H_full : np.ndarray
-            Full Hamiltonian matrix (nbas*18 × nbas*18)
-
-        Returns
-        -------
-        H_up : np.ndarray
-            Spin-up Hamiltonian (nbas*9 × nbas*9)
-        H_down : np.ndarray
-            Spin-down Hamiltonian (nbas*9 × nbas*9)
+        Delegates to band_calculations.extract_spin_blocks() for implementation.
         """
-        n_atoms = self.lattice.nbas
-        n_orb_per_spin = 9  # 9 orbitals per spin channel
-        n_up = n_atoms * n_orb_per_spin
-        n_down = n_atoms * n_orb_per_spin
-
-        # Initialize spin-resolved Hamiltonians
-        H_up = np.zeros((n_up, n_up), dtype=complex)
-        H_down = np.zeros((n_down, n_down), dtype=complex)
-
-        # Extract blocks for each atom
-        for iatom in range(n_atoms):
-            # Indices in full Hamiltonian
-            full_start = iatom * 18
-            up_start_full = full_start
-            up_end_full = full_start + 9
-            down_start_full = full_start + 9
-            down_end_full = full_start + 18
-
-            # Indices in spin-resolved Hamiltonians
-            spin_start = iatom * 9
-            spin_end = spin_start + 9
-
-            # Extract spin-up block
-            for jatom in range(n_atoms):
-                jfull_start = jatom * 18
-                jup_start_full = jfull_start
-                jup_end_full = jfull_start + 9
-                jdown_start_full = jfull_start + 9
-                jdown_end_full = jfull_start + 18
-
-                jspin_start = jatom * 9
-                jspin_end = jspin_start + 9
-
-                # Copy spin-up to spin-up block
-                H_up[spin_start:spin_end, jspin_start:jspin_end] = H_full[
-                    up_start_full:up_end_full, jup_start_full:jup_end_full
-                ]
-
-                # Copy spin-down to spin-down block
-                H_down[spin_start:spin_end, jspin_start:jspin_end] = H_full[
-                    down_start_full:down_end_full, jdown_start_full:jdown_end_full
-                ]
-
-        return H_up, H_down
+        return extract_spin_blocks_fn(H_full, self.lattice.nbas)
 
     def fourier_transform_hamiltonian(self, k_point: np.ndarray) -> np.ndarray:
         """Fourier transform the real-space Hamiltonian to k-space.
@@ -254,30 +168,9 @@ class BandStructureCalculator:
     def calculate_bands(
         self, kpoints: np.ndarray, store_eigenvectors: bool = False
     ) -> np.ndarray:
-        """Calculate band structure for given k-points
+        """Calculate band structure for given k-points.
 
-        For collinear=False (default): Returns all bands from full 18×18 Hamiltonian
-        For collinear=True: Use calculate_bands_collinear() instead
-
-        Parameters
-        ----------
-        kpoints : np.ndarray
-            Array of k-points in crystal coordinates (nk × 3)
-        store_eigenvectors : bool, optional
-            If True, store eigenvectors in self.eigenvectors for Berry curvature
-            calculations. Eigenvectors are stored as (nk, nbands, nbands) complex array.
-            Default is False for backward compatibility.
-
-        Returns
-        -------
-        band_energies : np.ndarray
-            Band energies at each k-point (nk × nbands)
-
-        Notes
-        -----
-        When store_eigenvectors=True, the eigenvectors can be accessed via
-        self.eigenvectors after calling this method. This is required for
-        Berry curvature and topological property calculations.
+        Delegates to band_calculations.calculate_bands() for implementation.
         """
         if self.collinear:
             raise ValueError(
@@ -285,23 +178,13 @@ class BandStructureCalculator:
                 "which returns separate up and down bands"
             )
 
-        num_kpoints = len(kpoints)
-        total_orbitals = self.lattice.nbas * self.hamiltonian.orbital_size
-
-        band_energies = np.zeros((num_kpoints, total_orbitals))
-
-        if store_eigenvectors:
-            eigenvectors = np.zeros(
-                (num_kpoints, total_orbitals, total_orbitals), dtype=complex
-            )
-
-        for i, k in enumerate(kpoints):
-            H_k = self.fourier_transform_hamiltonian(k)
-            eigenvalues, eigvecs = eigh(H_k)
-            band_energies[i, :] = np.real(eigenvalues)  # Take real part
-
-            if store_eigenvectors:
-                eigenvectors[i, :, :] = eigvecs
+        band_energies, eigenvectors = calculate_bands_fn(
+            kpoints,
+            self.lattice,
+            self.hamiltonian,
+            self.fourier_transform_hamiltonian,
+            store_eigenvectors=store_eigenvectors,
+        )
 
         if store_eigenvectors:
             self.eigenvectors = eigenvectors
@@ -311,34 +194,9 @@ class BandStructureCalculator:
     def calculate_bands_collinear(
         self, kpoints: np.ndarray, store_eigenvectors: bool = False
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """Calculate spin-polarized band structure for collinear magnetism
+        """Calculate spin-polarized band structure for collinear magnetism.
 
-        Extracts spin-up and spin-down Hamiltonians from the full 18×18 matrix
-        and diagonalizes them separately. This gives two sets of band energies
-        that can differ due to exchange splitting in magnetic materials.
-
-        Parameters
-        ----------
-        kpoints : np.ndarray
-            Array of k-points in crystal coordinates (nk × 3)
-        store_eigenvectors : bool, optional
-            If True, store eigenvectors in self.eigenvectors_up and self.eigenvectors_down
-            for spin-resolved Berry curvature calculations. Default is False.
-
-        Returns
-        -------
-        band_energies_up : np.ndarray
-            Spin-up band energies (nk × 9*nbas)
-        band_energies_down : np.ndarray
-            Spin-down band energies (nk × 9*nbas)
-
-        Notes
-        -----
-        - Only valid for collinear magnetic calculations
-        - Ignores spin-flip terms (SOC, non-collinear magnetism)
-        - Each spin channel has 9*nbas bands (9 orbitals per atom)
-        - When store_eigenvectors=True, eigenvectors are accessible via
-          self.eigenvectors_up and self.eigenvectors_down
+        Delegates to band_calculations.calculate_bands_collinear() for implementation.
         """
         if not self.collinear:
             raise ValueError(
@@ -346,39 +204,15 @@ class BandStructureCalculator:
                 "Use calculate_bands() for non-collinear calculations."
             )
 
-        num_kpoints = len(kpoints)
-        n_orb_per_spin = self.lattice.nbas * 9  # 9 orbitals per atom per spin
-
-        band_energies_up = np.zeros((num_kpoints, n_orb_per_spin))
-        band_energies_down = np.zeros((num_kpoints, n_orb_per_spin))
-
-        if store_eigenvectors:
-            eigenvectors_up = np.zeros(
-                (num_kpoints, n_orb_per_spin, n_orb_per_spin), dtype=complex
+        band_energies_up, band_energies_down, eigenvectors_up, eigenvectors_down = (
+            calculate_bands_collinear_fn(
+                kpoints,
+                self.lattice,
+                self.fourier_transform_hamiltonian,
+                store_eigenvectors=store_eigenvectors,
             )
-            eigenvectors_down = np.zeros(
-                (num_kpoints, n_orb_per_spin, n_orb_per_spin), dtype=complex
-            )
+        )
 
-        for i, k in enumerate(kpoints):
-            # Get full Hamiltonian at this k-point
-            H_k = self.fourier_transform_hamiltonian(k)
-
-            # Extract spin-resolved Hamiltonians
-            H_up, H_down = self.extract_spin_blocks(H_k)
-
-            # Diagonalize each spin channel
-            eigs_up, eigvecs_up = eigh(H_up)
-            eigs_down, eigvecs_down = eigh(H_down)
-
-            band_energies_up[i, :] = np.real(eigs_up)
-            band_energies_down[i, :] = np.real(eigs_down)
-
-            if store_eigenvectors:
-                eigenvectors_up[i, :, :] = eigvecs_up
-                eigenvectors_down[i, :, :] = eigvecs_down
-
-        # Store for later access
         self.band_energies_up = band_energies_up
         self.band_energies_down = band_energies_down
 

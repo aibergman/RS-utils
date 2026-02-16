@@ -35,6 +35,11 @@ With eigenvector storage for downstream analysis:
 
 from .band_structure import BandStructureCalculator
 from .hamiltonian import fourier_transform_hamiltonian, HamiltonianDumper
+from .band_calculations import (
+    extract_spin_blocks,
+    calculate_bands,
+    calculate_bands_collinear,
+)
 from .plotting import plot_bands, plot_bands_collinear
 from .kpath_generator import (
     setup_kpath,
@@ -49,6 +54,9 @@ __all__ = [
     'BandStructureCalculator',
     'fourier_transform_hamiltonian',
     'HamiltonianDumper',
+    'extract_spin_blocks',
+    'calculate_bands',
+    'calculate_bands_collinear',
     'plot_bands',
     'plot_bands_collinear',
     'setup_kpath',
