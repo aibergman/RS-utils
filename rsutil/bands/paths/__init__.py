@@ -52,17 +52,16 @@ Custom k-path:
     >>> kpts, labels, distances = custom_path.generate(npoints=150)
 """
 
-from .kpath_utils import (
-    seekpath_kpath,
-    build_custom_kpath,
+from .coordinates import (
     get_reciprocal_lattice,
     cartesian_to_fractional,
     fractional_to_cartesian,
-    apply_prime_convention,
-    normalize_label,
-    tex_format_label,
-    allocate_points_per_segment,
 )
+from .symmetry import apply_prime_convention
+from .labels import normalize_label, tex_format_label
+from .point_allocation import allocate_points_per_segment
+from .seekpath_interface import seekpath_kpath
+from .custom_paths import build_custom_kpath
 
 __all__ = [
     'seekpath_kpath',
