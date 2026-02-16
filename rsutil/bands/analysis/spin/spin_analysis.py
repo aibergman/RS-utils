@@ -11,11 +11,10 @@ Where H0 is the charge part and Hx, Hy, Hz are the spin components.
 """
 
 import numpy as np
-import matplotlib.pyplot as plt
-from ...projections import ProjectedBandCalculator
-from ...readers import LatticeReader, HamiltonianReader
 from typing import Dict, Tuple
-import argparse
+
+from ...projections import ProjectedBandCalculator
+from .plotting import plot_orbital_magnetism, plot_spin_texture
 
 
 class SpinAnalyzer:
@@ -113,60 +112,14 @@ class SpinAnalyzer:
                          spin_moments: Dict, klabels: list, band_indices: list = None,
                          output_file: str = None):
         """Plot spin texture for selected bands"""
-        
-        if band_indices is None:
-            # Find bands near Fermi level (assuming E_F = 0)
-            fermi_bands = []
-            for band in range(band_energies.shape[1]):
-                if np.any(np.abs(band_energies[:, band]) < 0.5):  # Within 0.5 eV of Fermi
-                    fermi_bands.append(band)
-            band_indices = fermi_bands[:5]  # Take first 5 bands near Fermi
-        
-        fig, axes = plt.subplots(len(band_indices), 1, figsize=(12, 3*len(band_indices)))
-        if len(band_indices) == 1:
-            axes = [axes]
-        
-        for idx, band in enumerate(band_indices):
-            ax = axes[idx]
-            
-            # Plot band structure
-            ax.plot(kdistances, band_energies[:, band], 'k-', linewidth=2, label='Band')
-            
-            # Color by spin polarization
-            spin_z = spin_moments['z'][:, band]
-            scatter = ax.scatter(kdistances, band_energies[:, band], 
-                               c=spin_z, cmap='RdBu', s=50, alpha=0.8)
-            
-            # Set up k-point labels
-            tick_positions = []
-            tick_labels = []
-            for i, label in enumerate(klabels):
-                if label:
-                    tick_positions.append(kdistances[i])
-                    tick_labels.append(label)
-            
-            ax.set_xticks(tick_positions)
-            ax.set_xticklabels(tick_labels)
-            
-            for pos in tick_positions:
-                ax.axvline(x=pos, color='gray', linestyle='--', alpha=0.3)
-            
-            ax.set_ylabel('Energy (eV)')
-            ax.set_title(f'Band {band+1} - Spin Texture (z-component)')
-            ax.grid(True, alpha=0.3)
-            
-            # Add colorbar
-            cbar = plt.colorbar(scatter, ax=ax)
-            cbar.set_label('Spin z-component')
-        
-        axes[-1].set_xlabel('k-path')
-        plt.tight_layout()
-        
-        if output_file:
-            plt.savefig(output_file, dpi=300, bbox_inches='tight')
-            print(f"Spin texture plot saved to {output_file}")
-        
-        plt.show()
+        return plot_spin_texture(
+            kdistances,
+            band_energies,
+            spin_moments,
+            klabels,
+            band_indices=band_indices,
+            output_file=output_file,
+        )
     
     def analyze_magnetic_anisotropy(self, kpoints: np.ndarray, 
                                    sample_points: int = 10) -> Dict:
@@ -203,56 +156,13 @@ class SpinAnalyzer:
     def plot_orbital_magnetism(self, kdistances: np.ndarray, band_energies: np.ndarray,
                               projections: Dict, klabels: list, output_file: str = None):
         """Plot orbital-resolved magnetic moments"""
-        
-        fig, axes = plt.subplots(3, 1, figsize=(12, 10))
-        
-        orbital_groups = ['s', 'p', 'd']
-        colors = ['red', 'blue', 'green']
-        
-        for orbital_idx, (orbital, color) in enumerate(zip(orbital_groups, colors)):
-            ax = axes[orbital_idx]
-            
-            # Calculate orbital-resolved spin polarization
-            spin_up_proj = projections['orbital'][orbital]
-            # For spin down, we need to sum over the second spin channel
-            # This is simplified - in practice you'd separate the projections
-            spin_polarization = spin_up_proj  # Simplified
-            
-            # Plot bands colored by orbital magnetism
-            for band in range(band_energies.shape[1]):
-                weights = spin_polarization[:, band]
-                if np.max(weights) > 0.05:  # Only plot if significant weight
-                    sizes = weights * 50
-                    ax.scatter(kdistances, band_energies[:, band], 
-                             s=sizes, c=color, alpha=0.6, label=f'{orbital}' if band == 0 else "")
-            
-            # Set up k-point labels
-            tick_positions = []
-            tick_labels = []
-            for i, label in enumerate(klabels):
-                if label:
-                    tick_positions.append(kdistances[i])
-                    tick_labels.append(label)
-            
-            ax.set_xticks(tick_positions)
-            ax.set_xticklabels(tick_labels)
-            
-            for pos in tick_positions:
-                ax.axvline(x=pos, color='gray', linestyle='--', alpha=0.3)
-            
-            ax.set_ylabel('Energy (eV)')
-            ax.set_title(f'{orbital.upper()}-orbital Magnetic Contributions')
-            ax.grid(True, alpha=0.3)
-            ax.legend()
-        
-        axes[-1].set_xlabel('k-path')
-        plt.tight_layout()
-        
-        if output_file:
-            plt.savefig(output_file, dpi=300, bbox_inches='tight')
-            print(f"Orbital magnetism plot saved to {output_file}")
-
-        plt.show()
+        return plot_orbital_magnetism(
+            kdistances,
+            band_energies,
+            projections,
+            klabels,
+            output_file=output_file,
+        )
 
 
 class SpinMomentAnalyzer(SpinAnalyzer):
@@ -260,58 +170,7 @@ class SpinMomentAnalyzer(SpinAnalyzer):
     pass
 
 
-def main():
-    """Main function for spin analysis"""
-
-    parser = argparse.ArgumentParser(description='Analyze non-collinear TB-LMTO spin structure')
-    parser.add_argument('--lattice', default='lattice.nml', 
-                       help='Lattice file (default: lattice.nml)')
-    parser.add_argument('--hamiltonian', default='rs2txt.dat',
-                       help='Hamiltonian file (default: rs2txt.dat)')
-    parser.add_argument('--output-prefix', default='spin_analysis',
-                       help='Output file prefix (default: spin_analysis)')
-    parser.add_argument('--nk', type=int, default=50,
-                       help='Number of k-points (default: 50)')
-    
-    args = parser.parse_args()
-    
-    print("Setting up projected band calculator...")
-    lattice_reader = LatticeReader(args.lattice)
-    hamiltonian_reader = HamiltonianReader(args.hamiltonian)
-    calculator = ProjectedBandCalculator(lattice_reader, hamiltonian_reader)
-    
-    print("Generating k-path...")
-    kpoints, klabels, kdistances = calculator.setup_kpath(args.nk)
-    
-    print("Calculating projected bands...")
-    band_energies, projections = calculator.calculate_projected_bands(kpoints)
-    
-    print("Analyzing spin structure...")
-    spin_analyzer = SpinMomentAnalyzer(calculator)
-    
-    # Calculate spin moments
-    spin_moments = spin_analyzer.calculate_spin_moments(band_energies, projections, kpoints)
-    
-    # Plot spin texture
-    spin_analyzer.plot_spin_texture(kdistances, band_energies, spin_moments, klabels,
-                                   output_file=f"{args.output_prefix}_texture.png")
-    
-    # Plot orbital magnetism
-    spin_analyzer.plot_orbital_magnetism(kdistances, band_energies, projections, klabels,
-                                        output_file=f"{args.output_prefix}_orbital_mag.png")
-    
-    # Analyze magnetic anisotropy
-    print("Analyzing magnetic anisotropy...")
-    anisotropy = spin_analyzer.analyze_magnetic_anisotropy(kpoints)
-    
-    print("Magnetic anisotropy analysis:")
-    print(f"Average H0 trace: {np.mean(anisotropy['H0_trace']):.6f}")
-    print(f"Average Hz trace: {np.mean(anisotropy['Hz_trace']):.6f}")
-    print(f"Average Hx trace: {np.mean(anisotropy['Hx_trace']):.6f}")
-    print(f"Average Hy trace: {np.mean(anisotropy['Hy_trace']):.6f}")
-    
-    print("Done!")
-
-
 if __name__ == "__main__":
+    from .cli import main
+
     main()

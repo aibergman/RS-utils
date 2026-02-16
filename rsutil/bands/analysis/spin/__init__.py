@@ -53,9 +53,18 @@ K-space spin structure (using SpinTextureCalculator):
 
 from .spin_analysis import SpinAnalyzer, SpinMomentAnalyzer
 from .spin_texture import SpinTextureCalculator
+from .plotting import plot_spin_texture, plot_orbital_magnetism
+from .texture_plotting import (
+    plot_spin_texture_2d,
+    plot_fermi_surface_spin_texture,
+)
 
 __all__ = [
     'SpinMomentAnalyzer',
     'SpinAnalyzer',
     'SpinTextureCalculator',
+    'plot_spin_texture',
+    'plot_orbital_magnetism',
+    'plot_spin_texture_2d',
+    'plot_fermi_surface_spin_texture',
 ]
