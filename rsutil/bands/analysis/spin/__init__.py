@@ -3,10 +3,12 @@ Spin analysis module.
 
 Two complementary approaches for spin analysis:
 
-1. **SpinAnalyzer** (Hamiltonian-based):
+1. **SpinMomentAnalyzer** (Hamiltonian-based):
    - Input: ProjectedBandCalculator with H(k) decomposition
    - Output: Spin moments on atoms/orbitals
    - Use case: Magnetic structure analysis, skyrmions
+
+    (SpinAnalyzer is kept as a backward-compatible alias.)
 
 2. **SpinTextureCalculator** (Eigenvector-based):
    - Input: BandStructureCalculator with eigenvectors
@@ -15,9 +17,12 @@ Two complementary approaches for spin analysis:
 
 Classes
 -------
-SpinAnalyzer
+SpinMomentAnalyzer
     Hamiltonian block-based spin analysis.
     Computes magnetic moments and spin anisotropy energy.
+
+SpinAnalyzer
+    Backward-compatible alias for SpinMomentAnalyzer.
 
 SpinTextureCalculator
     Eigenvector-based spin texture calculation.
@@ -25,13 +30,13 @@ SpinTextureCalculator
 
 Typical Usage
 -------------
-Magnetic structure (using SpinAnalyzer):
+Magnetic structure (using SpinMomentAnalyzer):
 
-    >>> from rsutil.bands.analysis.spin import SpinAnalyzer
+    >>> from rsutil.bands.analysis.spin import SpinMomentAnalyzer
     >>> from rsutil.bands.projections import ProjectedBandCalculator
     >>> proj_calc = ProjectedBandCalculator(lattice, hamiltonian)
     >>> proj_calc.calculate_projected_bands(kpoints)
-    >>> spin = SpinAnalyzer(proj_calc)
+    >>> spin = SpinMomentAnalyzer(proj_calc)
     >>> moments = spin.calculate_spin_moments()
     >>> spin.plot_spin_texture()
 
@@ -46,10 +51,11 @@ K-space spin structure (using SpinTextureCalculator):
     >>> spin_tex.plot_fermi_surface_spin_texture()
 """
 
-from .spin_analysis import SpinAnalyzer
+from .spin_analysis import SpinAnalyzer, SpinMomentAnalyzer
 from .spin_texture import SpinTextureCalculator
 
 __all__ = [
+    'SpinMomentAnalyzer',
     'SpinAnalyzer',
     'SpinTextureCalculator',
 ]

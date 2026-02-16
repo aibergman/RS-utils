@@ -251,13 +251,18 @@ class SpinAnalyzer:
         if output_file:
             plt.savefig(output_file, dpi=300, bbox_inches='tight')
             print(f"Orbital magnetism plot saved to {output_file}")
-        
+
         plt.show()
+
+
+class SpinMomentAnalyzer(SpinAnalyzer):
+    """Alias for SpinAnalyzer (kept for clarity in magnetic moment workflows)."""
+    pass
 
 
 def main():
     """Main function for spin analysis"""
-    
+
     parser = argparse.ArgumentParser(description='Analyze non-collinear TB-LMTO spin structure')
     parser.add_argument('--lattice', default='lattice.nml', 
                        help='Lattice file (default: lattice.nml)')
@@ -282,7 +287,7 @@ def main():
     band_energies, projections = calculator.calculate_projected_bands(kpoints)
     
     print("Analyzing spin structure...")
-    spin_analyzer = SpinAnalyzer(calculator)
+    spin_analyzer = SpinMomentAnalyzer(calculator)
     
     # Calculate spin moments
     spin_moments = spin_analyzer.calculate_spin_moments(band_energies, projections, kpoints)

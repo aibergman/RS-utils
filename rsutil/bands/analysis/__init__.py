@@ -37,6 +37,7 @@ Subpackages
 spin
     Spin texture analysis and magnetic moment calculations.
     - SpinMomentAnalyzer: Hamiltonian-based spin analysis
+    - SpinAnalyzer: Backward-compatible alias
     - SpinTextureCalculator: Eigenvector-based spin analysis
 
 topological

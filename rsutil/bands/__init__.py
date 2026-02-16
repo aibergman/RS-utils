@@ -149,6 +149,7 @@ from .analysis.spin import (
     SpinAnalyzer,
     SpinTextureCalculator,
 )
+from .analysis.spin import SpinMomentAnalyzer
 
 # Import from analysis.topological submodule
 from .analysis.topological import (
@@ -193,7 +194,7 @@ __all__ = [
     "BandAnalyzer",
     "MagneticMomentCalculator",
     "EffectiveMassCalculator",
-    "AltermagneticAnalyzer",
+        "SpinMomentAnalyzer",
     "BerryCurvatureCalculator",
     "StructureAnalyzer",
     "SpinTextureCalculator",
