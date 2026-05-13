@@ -26,6 +26,10 @@ Flags
     Run visualizer for clust file.
 --exchange, -J
     Create exchange input files.
+--export, -E
+    Export to UppASD format.
+--lmto47, -T
+    Export to LMTO47 CTRL file.
 --data
     Directory for data files to be visualized (default: current directory).
 """
@@ -35,6 +39,7 @@ from . import process_lattice
 from .viz.rs_visualizer import rs_visualizer
 from .exchange.exchange_map import exchange_map
 from .export.uppasd import export_from_files
+from .export.lmto47 import export_ctrl
 import os
 
 
@@ -117,6 +122,18 @@ def main():
         help='Output directory for exported UppASD files (relative to --data)'
     )
     parser.add_argument(
+        '--lmto47', '-T', action='store_true', default=False,
+        help='Export to LMTO47 CTRL file'
+    )
+    parser.add_argument(
+        '--nspin', type=int, default=2,
+        help='Number of spin channels for LMTO47 (default: 2 for spin-polarized)'
+    )
+    parser.add_argument(
+        '--lmx', type=int, default=None,
+        help='Maximum L quantum number for all atoms in LMTO47 (default: None = use LMTO47 default)'
+    )
+    parser.add_argument(
         '--cluster', type=str, default='periodic', choices=['periodic', 'free'],
         help='Cluster type: periodic (default) or free'
     )
@@ -159,6 +176,14 @@ def main():
         out_dir = os.path.join(args.data, args.out) if args.data else args.out
         export_from_files(lattice_nml=lattice_path, input_nml=None, clust=None,
                           out_dir=out_dir, jij_file=args.jij, dij_file=args.dmi)
+    # Export to LMTO47 CTRL if requested
+    elif args.lmto47:
+        lattice_path = os.path.join(args.data, 'lattice.nml')
+        input_path = os.path.join(args.data, 'input.nml')
+        out_dir = os.path.join(args.data, args.out) if args.data else args.out
+        ctrl_path = export_ctrl(("rs_lmto", lattice_path, input_path), out_dir=out_dir,
+                               nspin=args.nspin, lmx=args.lmx)
+        print(f"CTRL file written to: {ctrl_path}")
     # Print help message if no valid flag is provided
     else:
         parser.print_help()
