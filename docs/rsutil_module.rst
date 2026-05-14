@@ -16,6 +16,12 @@ Core Functions
 .. automodule:: rsutil
    :members:
 
+Notes:
+
+- ``process_lattice(..., lmx=2)`` exposes setup-side ``lmax`` override from Python.
+- Current backend support in this repository is ``0 <= lmax <= 3``.
+- Extended lattice keys ``strux_backend``, ``strux_want_sdot``, and ``strux_solve_scale`` are preserved when present.
+
 Submodules
 ~~~~~~~~~~
 
@@ -45,5 +51,4 @@ Export utilities (e.g., UppASD exporters) are available under `rsutil.export`.
 .. automodule:: rsutil.export.uppasd
    :members:
    :noindex:
-
 

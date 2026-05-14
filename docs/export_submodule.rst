@@ -3,7 +3,10 @@
 The `export` submodule
 ----------------------
 
-The **`export`** submodule provides functionality to convert RS-LMTO-ASA simulation data into formats compatible with other simulation packages. Currently, it supports export to UppASD (Uppsala Atomistic Spin Dynamics) format.
+The **`export`** submodule provides functionality to convert RS-LMTO-ASA simulation data into formats compatible with other simulation packages. It currently supports export to:
+
+- UppASD (Uppsala Atomistic Spin Dynamics)
+- LMTO47 CTRL format
 
 **Features:**
 
@@ -12,6 +15,7 @@ The **`export`** submodule provides functionality to convert RS-LMTO-ASA simulat
 - Optional DM vector (Dzyaloshinsky-Moriya) interactions
 - Spin-orbit coupling support
 - Automatic handling of different cluster types (periodic and free)
+- LMTO47 CTRL generation with configurable ``NSPIN`` and ``LMX``
 
 **Submodules:**
 
@@ -53,3 +57,28 @@ The ``uppasd`` module handles conversion to the UppASD format, which is widely u
            --jij /path/to/jijso.out \
            --dmi /path/to/dmi \
            --out uppasd_output
+
+.. _lmto47_export:
+
+LMTO47 CTRL Export
+~~~~~~~~~~~~~~~~~~
+
+The ``lmto47`` module exports RS-LMTO lattice/input data to an LMTO47 ``CTRL`` file.
+
+.. automodule:: rsutil.export.lmto47
+   :members:
+
+**From the Command Line:**
+
+.. code-block:: bash
+
+    # Basic CTRL export
+    rsutil --lmto47 --data /path/to/simulation --out lmto47_out
+
+    # Explicit spin and l-channel settings
+    rsutil --lmto47 --data /path/to/simulation --nspin 2 --lmx 3 --out lmto47_out
+
+Notes:
+
+- ``--nspin`` controls ``NSPIN`` in the LMTO47 ``OPTIONS`` block.
+- ``--lmx`` writes ``LMX`` for all ``CLASS`` entries in CTRL export.
