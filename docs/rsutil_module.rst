@@ -6,6 +6,7 @@ The `rsutil` module
 The **`rsutil`** module is the core of the RS-utils package. It provides utilities for processing lattice structures in RS-LMTO-ASA calculations, including:
 
 - **Lattice Processing**: The main ``process_lattice()`` function calculates optimal Wigner-Seitz radii and generates starting parameters for atomic calculations.
+- **Disorder Workflow**: Supercell construction plus optional all-site SQS assignment for substitutional alloys.
 - **Data Visualization**: Interactive 3D visualization of atomic structures and magnetic properties.
 - **Exchange Interactions**: Generation of exchange interaction files (J_ij) for spin dynamics simulations.
 - **Format Conversion**: Export to UppASD format and other simulation engines.
@@ -22,6 +23,7 @@ Notes:
 - ``process_lattice`` also supports ``lattice_dist``, ``basis_dist``, ``alat_scale``, and ``seed`` for reproducible geometric perturbations.
 - Current backend support in this repository is ``0 <= lmax <= 3``.
 - Extended lattice keys ``strux_backend``, ``strux_want_sdot``, and ``strux_solve_scale`` are preserved when present.
+- CLI-level SQS controls (``--sqs``, ``--sqs-shells``, ``--sqs-steps``, ``--sqs-seed``) can be combined with ``--supercell`` for both ``--setup`` and ``--lmto47`` workflows.
 
 Submodules
 ~~~~~~~~~~

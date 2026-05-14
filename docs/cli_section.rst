@@ -205,6 +205,10 @@ The ``--setup`` flag processes lattice structures and calculates optimal Wigner-
 - ``--basis-dist``: Gaussian std.dev for basis-vector distortion in units of ``alat``.
 - ``--alat-scale``: Scalar factor applied to ``alat`` before distortion.
 - ``--seed``: Integer seed for reproducible random distortions.
+- ``--sqs``: Enable SQS assignment on all sites, e.g. ``"Fe=0.5,Ni=0.5"`` (requires ``--supercell``).
+- ``--sqs-shells``: Number of pair-distance shells in the SQS objective.
+- ``--sqs-steps``: Number of MC swap steps for SQS optimization.
+- ``--sqs-seed``: Integer seed for reproducible SQS optimization.
 
 **Example:**
 
@@ -227,6 +231,10 @@ The ``--setup`` flag processes lattice structures and calculates optimal Wigner-
 
     # Distort lattice/basis vectors reproducibly and scale alat
     rsutil --setup --lattice-dist 0.01 --basis-dist 0.02 --alat-scale 1.01 --seed 1234
+
+    # SQS on all supercell sites
+    rsutil --setup --supercell 2 2 2 --sqs "Fe=0.5,Ni=0.3,Co=0.2" \
+           --sqs-shells 3 --sqs-steps 5000 --sqs-seed 1234
 
 Supercell Notes
 ~~~~~~~~~~~~~~~
@@ -383,6 +391,8 @@ The ``--lmto47`` flag exports RS-LMTO structure/input data into an LMTO47 ``CTRL
 - ``--alat-scale``: Scalar factor applied to ``alat`` before distortion.
 - ``--seed``: Integer seed for reproducible random distortions.
 - ``--supercell NX NY NZ``: Build CTRL from a repeated supercell input.
+- ``--sqs``: Enable SQS assignment on all sites (requires ``--supercell``).
+- ``--sqs-shells`` / ``--sqs-steps`` / ``--sqs-seed``: SQS optimization controls.
 
 **Example:**
 
@@ -400,6 +410,11 @@ The ``--lmto47`` flag exports RS-LMTO structure/input data into an LMTO47 ``CTRL
 
     # Supercell-aware LMTO47 export (non-destructive unless --in-place is set)
     rsutil --lmto47 --data /path/to/simulation --supercell 2 2 2 --out lmto47_out
+
+    # LMTO47 export from SQS supercell
+    rsutil --lmto47 --data /path/to/simulation --supercell 2 2 2 \
+           --sqs "Fe=0.5,Ni=0.5" --sqs-shells 3 --sqs-steps 5000 --sqs-seed 1234 \
+           --out lmto47_out
 
 
 LMAX Semantics

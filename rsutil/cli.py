@@ -1102,6 +1102,23 @@ def validate_setup_parameters(min_radius, max_radius, lmx, lattice_dist, basis_d
     return True
 
 
+def validate_sqs_parameters(sqs, sqs_shells, sqs_steps):
+    if sqs is None:
+        return True
+    try:
+        parse_sqs_spec(sqs)
+    except Exception as exc:
+        print(f"ERROR: invalid --sqs specification: {exc}", file=sys.stderr)
+        return False
+    if sqs_shells < 1:
+        print(f"ERROR: --sqs-shells must be >= 1, got {sqs_shells}", file=sys.stderr)
+        return False
+    if sqs_steps < 0:
+        print(f"ERROR: --sqs-steps must be >= 0, got {sqs_steps}", file=sys.stderr)
+        return False
+    return True
+
+
 def validate_output_files():
     """
     Validate that output files were created and are readable.
@@ -1222,6 +1239,163 @@ def apply_in_place_updates():
     return updated
 
 
+def parse_sqs_spec(sqs_spec: str):
+    """
+    Parse SQS composition spec like "Fe=0.5,Ni=0.3,Co=0.2".
+
+    Returns
+    -------
+    tuple[list[str], np.ndarray]
+        Species labels and normalized concentrations.
+    """
+    parts = [p.strip() for p in sqs_spec.split(",") if p.strip()]
+    if not parts:
+        raise ValueError("Empty --sqs specification")
+
+    species = []
+    conc = []
+    for part in parts:
+        if "=" not in part:
+            raise ValueError(f"Invalid --sqs token '{part}', expected Label=fraction")
+        label, value = [x.strip() for x in part.split("=", 1)]
+        if not label:
+            raise ValueError(f"Invalid --sqs token '{part}', missing label")
+        frac = float(value)
+        if frac < 0:
+            raise ValueError(f"Invalid --sqs fraction for {label}: {frac} (must be >= 0)")
+        species.append(label)
+        conc.append(frac)
+
+    conc = np.array(conc, dtype=float)
+    s = conc.sum()
+    if s <= 0:
+        raise ValueError("Sum of --sqs fractions must be > 0")
+    conc /= s
+    return species, conc
+
+
+def _allocate_species_counts(concentrations: np.ndarray, n_sites: int):
+    """Allocate integer species counts matching target concentrations."""
+    raw = concentrations * n_sites
+    counts = np.floor(raw).astype(int)
+    remainder = n_sites - counts.sum()
+    if remainder > 0:
+        order = np.argsort(raw - counts)[::-1]
+        for i in range(remainder):
+            counts[order[i % len(order)]] += 1
+    elif remainder < 0:
+        order = np.argsort(raw - counts)
+        for i in range(-remainder):
+            idx = order[i % len(order)]
+            if counts[idx] > 0:
+                counts[idx] -= 1
+    return counts
+
+
+def _build_shell_pairs(positions: np.ndarray, n_shells: int, distance_tol: float = 1e-5):
+    """Build pair lists grouped by increasing distance shells (i<j)."""
+    n = positions.shape[0]
+    pairs = []
+    dists = []
+    for i in range(n):
+        for j in range(i + 1, n):
+            d = float(np.linalg.norm(positions[i] - positions[j]))
+            pairs.append((i, j))
+            dists.append(d)
+
+    if not pairs:
+        return []
+
+    order = np.argsort(dists)
+    shells = []
+    current = [pairs[order[0]]]
+    dref = dists[order[0]]
+    for idx in order[1:]:
+        d = dists[idx]
+        if abs(d - dref) <= distance_tol:
+            current.append(pairs[idx])
+        else:
+            shells.append(current)
+            if len(shells) >= n_shells:
+                break
+            current = [pairs[idx]]
+            dref = d
+    if len(shells) < n_shells and current:
+        shells.append(current)
+    return shells[:n_shells]
+
+
+def _sqs_objective(assignment: np.ndarray, n_species: int, shells, concentrations: np.ndarray):
+    """Simple pair-correlation mismatch objective for unordered pair probabilities."""
+    target = np.zeros((n_species, n_species), dtype=float)
+    for a in range(n_species):
+        for b in range(a, n_species):
+            if a == b:
+                target[a, b] = concentrations[a] * concentrations[a]
+            else:
+                target[a, b] = 2.0 * concentrations[a] * concentrations[b]
+
+    total = 0.0
+    for shell_pairs in shells:
+        obs = np.zeros((n_species, n_species), dtype=float)
+        for i, j in shell_pairs:
+            a = int(assignment[i])
+            b = int(assignment[j])
+            if a <= b:
+                obs[a, b] += 1.0
+            else:
+                obs[b, a] += 1.0
+        obs /= max(len(shell_pairs), 1)
+        diff = obs - target
+        total += float(np.sum(diff * diff))
+    return total
+
+
+def build_sqs_assignment(positions: np.ndarray, species: list[str], concentrations: np.ndarray,
+                         n_shells: int = 3, n_steps: int = 5000, seed: int | None = None):
+    """
+    Build a simple SQS-like assignment by MC swaps minimizing pair-shell mismatch.
+    """
+    n_sites = positions.shape[0]
+    n_species = len(species)
+    counts = _allocate_species_counts(concentrations, n_sites)
+    if counts.sum() != n_sites:
+        raise RuntimeError("Internal error: SQS counts do not sum to n_sites")
+
+    rng = np.random.default_rng(seed)
+    assignment = np.empty(n_sites, dtype=int)
+    start = 0
+    for ispec, c in enumerate(counts):
+        assignment[start:start + c] = ispec
+        start += c
+    rng.shuffle(assignment)
+
+    shells = _build_shell_pairs(positions, n_shells=n_shells)
+    if not shells:
+        raise ValueError("Could not construct SQS pair shells from structure")
+
+    best = assignment.copy()
+    best_obj = _sqs_objective(best, n_species, shells, concentrations)
+    curr = best.copy()
+    curr_obj = best_obj
+
+    for _ in range(max(n_steps, 0)):
+        i, j = rng.integers(0, n_sites, size=2)
+        if i == j or curr[i] == curr[j]:
+            continue
+        curr[i], curr[j] = curr[j], curr[i]
+        new_obj = _sqs_objective(curr, n_species, shells, concentrations)
+        if new_obj <= curr_obj:
+            curr_obj = new_obj
+            if new_obj < best_obj:
+                best_obj = new_obj
+                best = curr.copy()
+        else:
+            curr[i], curr[j] = curr[j], curr[i]
+
+    return best, counts, best_obj
+
+
 def create_supercell(
     nx, ny, nz,
     lattice_path: str = "lattice.nml",
@@ -1229,6 +1403,10 @@ def create_supercell(
     output_lattice_path: str = "lattice.nml",
     output_input_path: str = "input.nml",
     in_place: bool = True,
+    sqs_spec: str | None = None,
+    sqs_shells: int = 3,
+    sqs_steps: int = 5000,
+    sqs_seed: int | None = None,
 ):
     """
     Create a supercell by repeating the unit cell nx×ny×nz times.
@@ -1458,16 +1636,41 @@ def create_supercell(
                 super_labels = []
                 super_ct = []
                 source_labels = []
-                for _ in range(nx * ny * nz):
-                    for idx, key in enumerate(orig_label_keys):
-                        base, start_num, src_label = label_meta[idx]
+
+                if sqs_spec:
+                    sqs_species, sqs_conc = parse_sqs_spec(sqs_spec)
+                    assign, counts, sqs_obj = build_sqs_assignment(
+                        positions=np.array(supercell_positions, dtype=float),
+                        species=sqs_species,
+                        concentrations=sqs_conc,
+                        n_shells=sqs_shells,
+                        n_steps=sqs_steps,
+                        seed=sqs_seed,
+                    )
+                    print(f"  SQS enabled: {sqs_spec}")
+                    print(f"  SQS shells={sqs_shells}, steps={sqs_steps}, seed={sqs_seed}")
+                    print(f"  SQS objective={sqs_obj:.6e}")
+
+                    for isite, ispec in enumerate(assign):
+                        base = sqs_species[int(ispec)]
                         if base not in label_counts:
-                            label_counts[base] = start_num - 1 if start_num > 0 else 0
+                            label_counts[base] = 0
                         label_counts[base] += 1
                         super_labels.append(f"{base}{label_counts[base]}")
-                        source_labels.append(src_label)
+                        source_labels.append(base)
                         if orig_ct_values:
-                            super_ct.append(orig_ct_values[idx])
+                            super_ct.append(orig_ct_values[0])
+                else:
+                    for _ in range(nx * ny * nz):
+                        for idx, key in enumerate(orig_label_keys):
+                            base, start_num, src_label = label_meta[idx]
+                            if base not in label_counts:
+                                label_counts[base] = start_num - 1 if start_num > 0 else 0
+                            label_counts[base] += 1
+                            super_labels.append(f"{base}{label_counts[base]}")
+                            source_labels.append(src_label)
+                            if orig_ct_values:
+                                super_ct.append(orig_ct_values[idx])
                 new_ntype = len(super_labels)
                 
                 # Find label section and replace
@@ -1771,6 +1974,30 @@ Examples:
         help="Random seed for reproducible lattice/basis distortions (default: random)",
     )
     parser.add_argument(
+        "--sqs",
+        type=str,
+        default=None,
+        help='Enable SQS assignment on all sites, e.g. --sqs "Fe=0.5,Ni=0.5"',
+    )
+    parser.add_argument(
+        "--sqs-shells",
+        type=int,
+        default=3,
+        help="Number of pair distance shells in SQS objective (default: 3)",
+    )
+    parser.add_argument(
+        "--sqs-steps",
+        type=int,
+        default=5000,
+        help="Number of MC swap steps for SQS optimization (default: 5000)",
+    )
+    parser.add_argument(
+        "--sqs-seed",
+        type=int,
+        default=None,
+        help="Random seed for SQS optimizer (default: random)",
+    )
+    parser.add_argument(
         "--cluster",
         type=str,
         default="periodic",
@@ -1851,6 +2078,11 @@ Examples:
             args.alat_scale,
         ):
             sys.exit(1)
+        if not validate_sqs_parameters(args.sqs, args.sqs_shells, args.sqs_steps):
+            sys.exit(1)
+        if args.sqs is not None and args.supercell is None:
+            print("ERROR: --sqs currently requires --supercell", file=sys.stderr)
+            sys.exit(1)
         
         # Display configuration
         print(f"\nConfiguration:")
@@ -1865,6 +2097,12 @@ Examples:
         print(f"  Alat scale:        {args.alat_scale}")
         if args.seed is not None:
             print(f"  Seed:              {args.seed}")
+        if args.sqs is not None:
+            print(f"  SQS spec:          {args.sqs}")
+            print(f"  SQS shells:        {args.sqs_shells}")
+            print(f"  SQS steps:         {args.sqs_steps}")
+            if args.sqs_seed is not None:
+                print(f"  SQS seed:          {args.sqs_seed}")
         if args.supercell:
             nx, ny, nz = args.supercell
             print(f"  Supercell:         {nx}×{ny}×{nz}")
@@ -1897,7 +2135,11 @@ Examples:
                 sys.exit(1)
 
             if args.in_place:
-                ok_sc = create_supercell(nx, ny, nz, in_place=True)
+                ok_sc = create_supercell(
+                    nx, ny, nz, in_place=True,
+                    sqs_spec=args.sqs, sqs_shells=args.sqs_shells,
+                    sqs_steps=args.sqs_steps, sqs_seed=args.sqs_seed,
+                )
             else:
                 ok_sc = create_supercell(
                     nx, ny, nz,
@@ -1906,6 +2148,8 @@ Examples:
                     output_lattice_path=staged_lattice,
                     output_input_path=staged_input,
                     in_place=False,
+                    sqs_spec=args.sqs, sqs_shells=args.sqs_shells,
+                    sqs_steps=args.sqs_steps, sqs_seed=args.sqs_seed,
                 )
                 staged_supercell = ok_sc
 
@@ -2054,6 +2298,11 @@ Examples:
         if args.alat_scale <= 0:
             print(f"ERROR: --alat-scale must be > 0, got {args.alat_scale}", file=sys.stderr)
             sys.exit(1)
+        if not validate_sqs_parameters(args.sqs, args.sqs_shells, args.sqs_steps):
+            sys.exit(1)
+        if args.sqs is not None and args.supercell is None:
+            print("ERROR: --sqs currently requires --supercell", file=sys.stderr)
+            sys.exit(1)
         lattice_path = os.path.join(args.data, "lattice.nml")
         input_path = os.path.join(args.data, "input.nml")
         out_dir = os.path.join(args.data, args.out) if args.data else args.out
@@ -2076,6 +2325,8 @@ Examples:
                     output_lattice_path=lattice_path,
                     output_input_path=input_path,
                     in_place=True,
+                    sqs_spec=args.sqs, sqs_shells=args.sqs_shells,
+                    sqs_steps=args.sqs_steps, sqs_seed=args.sqs_seed,
                 )
             else:
                 ok_sc = create_supercell(
@@ -2085,6 +2336,8 @@ Examples:
                     output_lattice_path=staged_lattice,
                     output_input_path=staged_input,
                     in_place=False,
+                    sqs_spec=args.sqs, sqs_shells=args.sqs_shells,
+                    sqs_steps=args.sqs_steps, sqs_seed=args.sqs_seed,
                 )
                 staged_supercell = ok_sc
 
