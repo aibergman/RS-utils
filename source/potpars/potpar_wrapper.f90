@@ -53,12 +53,20 @@ contains
     lm%wsr(1) = lat_data%ws(iatom)
     lm%avw = lat_input%wav
 
-    ! Initialization (one atom at a time, hard wired to Lmax=2)
+    ! Initialization (one atom at a time, configurable up to Lmax=3)
     lm%nclass = 1
-    lm%nl = 3
+    lm%nl = lat_input%lmax + 1
+    if (lat_input%lmax < 0 .or. lat_input%lmax > 3) then
+      print *, "Error: requested lmax=", lat_input%lmax, " but this phase supports 0..3."
+      stop 1
+    end if
     lm%nsp = 2
     lm%lafm = .false.
     lm%lfree = .false.
+    allocate(lm%pnu(0:lm%nl-1, lm%nsp, lm%nclass))
+    allocate(lm%qnu(0:2, 0:lm%nl-1, lm%nsp, lm%nclass))
+    allocate(lm%pp(6, 0:lm%nl-1, lm%nsp, lm%nclass))
+    allocate(lm%pdum(0:lm%nl-1, lm%nsp, lm%nclass))
 
     ! Transform and compute moments (defcnf & defmom)
     call perform_transformations(lm%konfig, lm%lmx, lm%nclass, lm%nl, lm%nsp, lm%pnu, lm%qnu, lm%z, lm%lafm, lm%lfree)
@@ -99,13 +107,13 @@ contains
     integer, intent(inout) :: konfig(0:3, 1)
     integer, intent(inout) :: lmx(1)
     integer, intent(in) :: nclass, nl, nsp
-    real(kind=8), intent(inout) :: pnu(0:3-1, 2, 1)
-    real(kind=8), intent(inout) :: qnu(0:2, 0:3-1, 2, 1)
+    real(kind=8), intent(inout) :: pnu(0:, :, :)
+    real(kind=8), intent(inout) :: qnu(0:, 0:, :, :)
     real(kind=8), intent(in) :: z(1)
     logical, intent(inout) :: lafm, lfree
 
     call defcnf(konfig, lmx(1), z(1))
-    lmx(1) = 2
+    lmx(1) = min(nl - 1, 3)
     ! print *, 'Calling defmom', lfree
     ! lfree = .true.
     call defmom(konfig, lafm, lfree, lmx, nclass, nl, nsp, pnu, qnu, z)
@@ -118,9 +126,9 @@ contains
     ! Calls defpp from lm47_utils and then reorders and transforms the potential parameters.
     real(kind=8), intent(in) :: avw
     integer, intent(in) :: nclass, nl, nsp
-    real(kind=8), intent(inout) :: pp(6, 0:3-1, 2, 1)
+    real(kind=8), intent(inout) :: pp(:, 0:, :, :)
     real(kind=8), intent(in) :: wsr(1), z(1)
-    real(kind=8), intent(inout) :: pdum(0:3-1, 2, 1)
+    real(kind=8), intent(inout) :: pdum(0:, :, :)
     ! print *, 'Calling defpp'
     call defpp(avw, nclass, nl, nsp, pp, wsr, z)
     ! Transform from LMTO47 to RS-LMTO convention:
@@ -133,9 +141,9 @@ contains
 
   subroutine print_results(pnu, qnu, pp)
     ! Prints the computed moments and potential parameters.
-    real(kind=8), intent(in) :: pnu(0:3-1, 2, 1)
-    real(kind=8), intent(in) :: qnu(0:2, 0:3-1, 2, 1)
-    real(kind=8), intent(in) :: pp(6, 0:3-1, 2, 1)
+    real(kind=8), intent(in) :: pnu(0:, :, :)
+    real(kind=8), intent(in) :: qnu(0:, 0:, :, :)
+    real(kind=8), intent(in) :: pp(:, 0:, :, :)
 
     print *, 'The result of defmom is:'
     print '(a, 6f10.6)', 'PNU up:', pnu(:, 1, 1)
@@ -167,7 +175,8 @@ contains
 
     integer :: i, j, k, nf
 
-    potential%lmax = 2
+    potential%lmax = lm%nl - 1
+    call allocate_potential_arrays(potential, potential%lmax)
 
     ! Potential function
     potential%pl = lm%pnu(:,:,1)
@@ -197,8 +206,10 @@ contains
     !print *,'AB core:', element%atomic_number, element%valence
 
     element%num_quant_s = int(potential%pl(1,1))
-    element%num_quant_p = int(potential%pl(2,1))
-    element%num_quant_d = int(potential%pl(3,1))
+    element%num_quant_p = 0
+    element%num_quant_d = 0
+    if (size(potential%pl, 1) >= 2) element%num_quant_p = int(potential%pl(2,1))
+    if (size(potential%pl, 1) >= 3) element%num_quant_d = int(potential%pl(3,1))
     ! Add small values to moments for empty spheres
     if(element%atomic_number==0)  then
       call random_number(potential%ql)

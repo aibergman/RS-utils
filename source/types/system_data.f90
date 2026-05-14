@@ -51,11 +51,11 @@ module system_data
   !----------------------------------------------------------------
   type :: potential_t
     integer :: lmax                  ! Maximum angular momentum
-    real(rp) :: pl(3, 2)             ! Potential parameters
-    real(rp) :: ql(3, 3, 2)          ! Quadrupole moments
-    real(rp) :: center_band(3, 2)    ! Center of the band
-    real(rp) :: shifted_band(3, 2)   ! Shifted band parameters
-    real(rp) :: width_band(3, 2)     ! Width of the band
+    real(rp), allocatable :: pl(:, :)             ! (l, spin) Potential parameters
+    real(rp), allocatable :: ql(:, :, :)          ! (moment, l, spin) Moments
+    real(rp), allocatable :: center_band(:, :)    ! (l, spin) Center of the band
+    real(rp), allocatable :: shifted_band(:, :)   ! (l, spin) Shifted band parameters
+    real(rp), allocatable :: width_band(:, :)     ! (l, spin) Width of the band
     real(rp) :: ws_r                 ! Wigner-Seitz radius
     real(rp) :: sumec                ! Sum of core energies
     real(rp) :: sumev                ! Sum of valence energies
@@ -64,13 +64,13 @@ module system_data
     real(rp) :: ekin                 ! Kinetic energy
     real(rp) :: rhoeps               ! Electron density energy
     real(rp) :: vmad                 ! Madelung potential
-    real(rp) :: enu(3, 2)            ! Orthogonal potential parameters
-    real(rp) :: c(3, 2)              ! Coefficients for potential
-    real(rp) :: srdel(3, 2)          ! Screening parameters
-    real(rp) :: qpar(3, 2)           ! Quadrupole parameters
-    real(rp) :: ppar(3, 2)           ! Potential parameters
-    real(rp) :: obar(3, 2)           ! Overlap parameters
-    real(rp) :: vl(3, 2)             ! Local potential parameters
+    real(rp), allocatable :: enu(:, :)            ! (l, spin) Orthogonal potential parameters
+    real(rp), allocatable :: c(:, :)              ! (l, spin) Coefficients for potential
+    real(rp), allocatable :: srdel(:, :)          ! (l, spin) Screening parameters
+    real(rp), allocatable :: qpar(:, :)           ! (l, spin) Quadrupole parameters
+    real(rp), allocatable :: ppar(:, :)           ! (l, spin) Potential parameters
+    real(rp), allocatable :: obar(:, :)           ! (l, spin) Overlap parameters
+    real(rp), allocatable :: vl(:, :)             ! (l, spin) Local potential parameters
   end type potential_t
 
   !-------------------------------------------------------------------
@@ -92,6 +92,7 @@ module system_data
     integer :: ndim                  ! Rough atom estimate
     real(rp), allocatable :: ct(:)   ! Cutoff radius per site
     real(rp) :: r2                   ! Max cutoff radius (squared)
+    integer :: lmax = 2              ! Target maximum angular momentum for RS output
   end type lattice_inp
 
   !-------------------------------------------------------------------
@@ -106,13 +107,13 @@ module system_data
   type :: lmto_t
     integer :: konfig(0:3, 1)
     integer :: nclass, lmx(1), nl, nsp
-    real(kind=8) :: pnu(0:3-1, 2, 1)
-    real(kind=8) :: qnu(0:2, 0:3-1, 2, 1)
+    real(kind=8), allocatable :: pnu(:, :, :)
+    real(kind=8), allocatable :: qnu(:, :, :, :)
     real(kind=8) :: z(1)
     real(kind=8) :: avw
     real(kind=8) :: wsr(1)
-    real(kind=8) :: pp(6, 0:3-1, 2, 1)
-    real(kind=8) :: pdum(0:3-1, 2, 1)
+    real(kind=8), allocatable :: pp(:, :, :, :)
+    real(kind=8), allocatable :: pdum(:, :, :)
     logical :: lafm, lfree
   end type lmto_t
 end module system_data

@@ -52,12 +52,13 @@ else:
 
 if _rsutil is not None:
     # Define process_lattice() signature with multiple arguments
-    _rsutil.process_lattice.argtypes = [ctypes.c_char_p, ctypes.c_int, ctypes.c_double, ctypes.c_double]
+    _rsutil.process_lattice.argtypes = [ctypes.c_char_p, ctypes.c_int, ctypes.c_double, ctypes.c_double, ctypes.c_int]
     _rsutil.process_lattice.restype = None
 
 
 def process_lattice(cluster_type: str = "periodic", empty_spheres: bool = False,
-                   min_empty_radius: float = 1.2, max_empty_radius: float = 2.5) -> None:
+                   min_empty_radius: float = 1.2, max_empty_radius: float = 2.5,
+                   lmx: Optional[int] = None) -> None:
     """
     Python wrapper for the process_lattice() Fortran routine.
 
@@ -73,6 +74,8 @@ def process_lattice(cluster_type: str = "periodic", empty_spheres: bool = False,
         Minimum empty sphere radius (default: 1.2).
     max_empty_radius : float, optional
         Maximum empty sphere radius (default: 2.5).
+    lmx : Optional[int], optional
+        Override LMAX for RS output (0..3). If None, use value from input.nml.
     """
     if _rsutil is None:
         raise RuntimeError(
@@ -87,6 +90,7 @@ def process_lattice(cluster_type: str = "periodic", empty_spheres: bool = False,
     empty_spheres_int = ctypes.c_int(1 if empty_spheres else 0)
     min_radius_dbl = ctypes.c_double(min_empty_radius)
     max_radius_dbl = ctypes.c_double(max_empty_radius)
+    lmx_int = ctypes.c_int(-1 if lmx is None else int(lmx))
 
     # Call the Fortran routine with separate arguments
-    _rsutil.process_lattice(cluster_type.encode('utf-8'), empty_spheres_int, min_radius_dbl, max_radius_dbl)
+    _rsutil.process_lattice(cluster_type.encode('utf-8'), empty_spheres_int, min_radius_dbl, max_radius_dbl, lmx_int)

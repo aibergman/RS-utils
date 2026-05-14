@@ -131,7 +131,7 @@ def main():
     )
     parser.add_argument(
         '--lmx', type=int, default=None,
-        help='Maximum L quantum number for all atoms in LMTO47 (default: None = use LMTO47 default)'
+        help='Maximum L quantum number override. For --setup: overrides input.nml lmax (0..3). For --lmto47: sets CTRL LMX.'
     )
     parser.add_argument(
         '--cluster', type=str, default='periodic', choices=['periodic', 'free'],
@@ -155,7 +155,8 @@ def main():
     # Process lattice if --setup flag is provided
     if args.setup:
         process_lattice(cluster_type=args.cluster, empty_spheres=args.empty_spheres, 
-                       min_empty_radius=args.min_empty_radius, max_empty_radius=args.max_empty_radius)
+                       min_empty_radius=args.min_empty_radius, max_empty_radius=args.max_empty_radius,
+                       lmx=args.lmx)
     # Run visualizer for lattice or clust file if --lattice or --clust flag is provided
     elif args.lattice or args.clust:
         rs_visualizer(args.data, clust=args.clust)

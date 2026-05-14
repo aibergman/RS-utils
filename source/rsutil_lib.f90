@@ -36,6 +36,14 @@ subroutine process_lattice_impl()
   !-----------------------------------------------------------------
   call read_input_namelists("input.nml", lat_input, atm_input, lat_data)
 
+  if (lmax_override >= 0) then
+     if (lmax_override > 3) then
+        print *, "Error: --lmx override supports values 0..3 for RS output, got", lmax_override
+        stop 1
+     end if
+     lat_input%lmax = lmax_override
+  end if
+
   !-----------------------------------------------------------------
   ! Set PBC based on cluster type from config
   !-----------------------------------------------------------------

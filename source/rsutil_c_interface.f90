@@ -8,12 +8,13 @@ module rsutil_c_interface
 
 contains
 
-subroutine process_lattice(cluster_type_str, empty_spheres_flag, min_radius, max_radius) bind(c,name='process_lattice')
+subroutine process_lattice(cluster_type_str, empty_spheres_flag, min_radius, max_radius, lmax_override_flag) bind(c,name='process_lattice')
    implicit none
    character(kind=c_char), intent(in) :: cluster_type_str(*)
    integer(c_int), intent(in), value :: empty_spheres_flag
    real(c_double), intent(in), value :: min_radius
    real(c_double), intent(in), value :: max_radius
+   integer(c_int), intent(in), value :: lmax_override_flag
    character(len=20) :: cluster_type
    integer :: i, slen
 
@@ -30,6 +31,7 @@ subroutine process_lattice(cluster_type_str, empty_spheres_flag, min_radius, max
    enable_empty_spheres = (empty_spheres_flag == 1)
    min_empty_sphere_radius = real(min_radius)
    max_empty_sphere_radius = real(max_radius)
+   lmax_override = lmax_override_flag
 
    ! Print settings
    if (trim(cluster_type) == "free") then
@@ -44,6 +46,9 @@ subroutine process_lattice(cluster_type_str, empty_spheres_flag, min_radius, max
       print *, "  Max radius = ", max_empty_sphere_radius
    else
       print *, "Empty spheres DISABLED"
+   end if
+   if (lmax_override >= 0) then
+      print *, "LMAX override from CLI enabled:", lmax_override
    end if
 
    ! Call the main processing routine

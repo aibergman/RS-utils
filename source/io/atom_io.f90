@@ -8,9 +8,9 @@ module atom_io
 
     ! Screening parameters
     !> Original screening (From Jepsen)
-    real(rp), dimension(3), parameter :: qm_canonical = [.348485d0, .053030d0, .010714d0]
+    real(rp), dimension(4), parameter :: qm_canonical = [.348485d0, .053030d0, .010714d0, .002000d0]
     !> Screening from LMTO47 (RWS = average WS for all)
-    real(rp), dimension(3), parameter :: qm_lmto47 = [0.3500000d0, 0.0571667d0, 0.0168070d0]
+    real(rp), dimension(4), parameter :: qm_lmto47 = [0.3500000d0, 0.0571667d0, 0.0168070d0, 0.002000d0]
     ! !----------------------------------------------------------------
     ! ! Derived type for the &element block
     ! !----------------------------------------------------------------
@@ -95,11 +95,17 @@ contains
       element_data%num_quant_p  = num_quant_p
       element_data%num_quant_d  = num_quant_d
 
-      par_data%lmax         = lmax
-      par_data%pl           = pl
-      par_data%ql           = ql
-      par_data%center_band  = center_band
-      par_data%width_band   = width_band
+      par_data%lmax = lmax
+      if (par_data%lmax < 0 .or. par_data%lmax > 3) then
+         print *, "Error: read_atom found unsupported lmax=", par_data%lmax, " (supported 0..3)"
+         stop 1
+      end if
+      call allocate_potential_arrays(par_data, par_data%lmax)
+      par_data%pl           = pl(1:par_data%lmax+1, :)
+      par_data%ql           = ql(:, 1:par_data%lmax+1, :)
+      par_data%center_band  = center_band(1:par_data%lmax+1, :)
+      par_data%shifted_band = shifted_band(1:par_data%lmax+1, :)
+      par_data%width_band   = width_band(1:par_data%lmax+1, :)
       par_data%ws_r         = ws_r
       par_data%sumec        = sumec
       par_data%sumev        = sumev
@@ -108,13 +114,13 @@ contains
       par_data%ekin         = ekin
       par_data%rhoeps       = rhoeps
       par_data%vmad         = vmad
-      par_data%enu          = enu
-      par_data%c            = c
-      par_data%obar         = obar
-      par_data%srdel        = srdel
-      par_data%qpar         = qpar
-      par_data%ppar         = ppar
-      par_data%vl           = vl
+      par_data%enu          = enu(1:par_data%lmax+1, :)
+      par_data%c            = c(1:par_data%lmax+1, :)
+      par_data%obar         = obar(1:par_data%lmax+1, :)
+      par_data%srdel        = srdel(1:par_data%lmax+1, :)
+      par_data%qpar         = qpar(1:par_data%lmax+1, :)
+      par_data%ppar         = ppar(1:par_data%lmax+1, :)
+      par_data%vl           = vl(1:par_data%lmax+1, :)
 
 
     end subroutine read_atom
@@ -123,7 +129,7 @@ contains
       character(len=*), intent(in) :: filename
       type(element_t), intent(in) :: element
       type(potential_t), intent(in) :: par
-      integer :: unit, i, j, k, ioerr
+      integer :: unit, i, j, k, ioerr, nl
   
       ! Open the output file with a new unit.
       open(newunit=unit, file=filename, status='replace', action='write', iostat=ioerr)
@@ -131,6 +137,7 @@ contains
          print *, "Error opening file: ", filename
          stop
       end if
+      nl = par%lmax + 1
   
       !---------------------------
       ! Write the &element namelist
@@ -155,8 +162,8 @@ contains
       write(unit, '(4X,A)') "! Charge (Q0)"
       do k = 1, 2
          write(unit, '(4X,A,I0,A)', advance='no') "ql(1, :, ", k, ") = "
-         do i = 1, 3
-            if (i < 3) then
+         do i = 1, nl
+            if (i < nl) then
                write(unit, '(F12.10,A)', advance='no') par%ql(1,i,k), ", "
             else
                write(unit, '(F12.10)') par%ql(1,i,k)
@@ -167,8 +174,8 @@ contains
       write(unit, '(4X,A)') "! Second-order moments (Q2)"
       do k = 1, 2
          write(unit, '(4X,A,I0,A)', advance='no') "ql(3, :, ", k, ") = "
-         do i = 1, 3
-            if (i < 3) then
+         do i = 1, nl
+            if (i < nl) then
                write(unit, '(F12.10,A)', advance='no') par%ql(3,i,k), ", "
             else
                write(unit, '(F12.10)') par%ql(3,i,k)
@@ -214,19 +221,18 @@ contains
     end subroutine write_atom
   
     !-------------------------------------------------------------------
-    ! Helper subroutine to write a 3x2 real array in the format:
-    !   name(:, j) = val1, val2, val3
+    ! Helper subroutine to write a (nl)x2 real array.
     !-------------------------------------------------------------------
     subroutine write_2d_array(unit, name, arr)
       integer, intent(in) :: unit
       character(len=*), intent(in) :: name
-      real(kind=8), intent(in) :: arr(3,2)
+      real(kind=8), intent(in) :: arr(:, :)
       integer :: i, j
   
-      do j = 1, 2
+      do j = 1, size(arr, 2)
         write(unit, '(4X,A,A,I0,A)', advance='no') trim(name), "(:, ", j, ") = "
-        do i = 1, 3
-           if (i < 3) then
+        do i = 1, size(arr, 1)
+           if (i < size(arr, 1)) then
               write(unit, '(G20.14,A)', advance='no') arr(i,j), ", "
            else
               write(unit, '(G20.14)') arr(i,j)
@@ -244,12 +250,15 @@ subroutine screen_ort(potential, wsm)
     type(potential_t), intent(inout) :: potential   !< Potential parameters and other info
     real(rp) :: wsm !< Average WS radius
     real(rp) :: x, y, wow
-    real(rp), dimension(potential%lmax + 1, 2) :: dele, qi, c, enu, del, q
-    real(rp), dimension(3) :: qm
+    real(rp), dimension(:, :), allocatable :: dele, qi, c, enu, del, q
+    real(rp), dimension(4) :: qm
     integer :: i, j, lmax
 
     wow = wsm/potential%ws_r
     lmax = potential%lmax
+    allocate(dele(potential%lmax + 1, 2), qi(potential%lmax + 1, 2))
+    allocate(c(potential%lmax + 1, 2), enu(potential%lmax + 1, 2))
+    allocate(del(potential%lmax + 1, 2), q(potential%lmax + 1, 2))
     enu(:, :) = potential%enu(:, :)
     c(:, :) = potential%c(:, :)
     qm(:) = qm_canonical(:)
@@ -270,5 +279,38 @@ subroutine screen_ort(potential, wsm)
        end do
     end do
  end subroutine screen_ort
+
+ subroutine allocate_potential_arrays(par_data, lmax)
+   type(potential_t), intent(inout) :: par_data
+   integer, intent(in) :: lmax
+   integer :: nl
+
+   nl = lmax + 1
+   if (allocated(par_data%pl)) deallocate(par_data%pl)
+   if (allocated(par_data%ql)) deallocate(par_data%ql)
+   if (allocated(par_data%center_band)) deallocate(par_data%center_band)
+   if (allocated(par_data%shifted_band)) deallocate(par_data%shifted_band)
+   if (allocated(par_data%width_band)) deallocate(par_data%width_band)
+   if (allocated(par_data%enu)) deallocate(par_data%enu)
+   if (allocated(par_data%c)) deallocate(par_data%c)
+   if (allocated(par_data%srdel)) deallocate(par_data%srdel)
+   if (allocated(par_data%qpar)) deallocate(par_data%qpar)
+   if (allocated(par_data%ppar)) deallocate(par_data%ppar)
+   if (allocated(par_data%obar)) deallocate(par_data%obar)
+   if (allocated(par_data%vl)) deallocate(par_data%vl)
+
+   allocate(par_data%pl(nl, 2))
+   allocate(par_data%ql(3, nl, 2))
+   allocate(par_data%center_band(nl, 2))
+   allocate(par_data%shifted_band(nl, 2))
+   allocate(par_data%width_band(nl, 2))
+   allocate(par_data%enu(nl, 2))
+   allocate(par_data%c(nl, 2))
+   allocate(par_data%srdel(nl, 2))
+   allocate(par_data%qpar(nl, 2))
+   allocate(par_data%ppar(nl, 2))
+   allocate(par_data%obar(nl, 2))
+   allocate(par_data%vl(nl, 2))
+ end subroutine allocate_potential_arrays
 
 end module atom_io

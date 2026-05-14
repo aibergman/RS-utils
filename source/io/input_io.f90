@@ -23,7 +23,7 @@ contains
         ! Temporary variables for reading the lattice namelist.
         ! The names here must match the variable names in the input file.
         !-------------------------------------------------------------------
-        integer :: rc, ndim=10000
+        integer :: rc, ndim=10000, lmax=2
         real(kind=8) :: alat
         character(len=8) :: crystal_sym
         real(kind=8) :: wav
@@ -35,7 +35,7 @@ contains
         real(rp) :: r2
 
         namelist /lattice/ rc, alat, crystal_sym, wav, pbc, b1, b2, b3, n1, n2, n3, ndim, &
-            ntype, ct, r2
+            ntype, ct, r2, lmax
 
         !-------------------------------------------------------------------
         ! Temporary variables for reading the atoms namelist.
@@ -110,6 +110,7 @@ contains
         lat%ntype = ntype
         lat%ndim = ndim
         lat%r2 = r2
+        lat%lmax = lmax
         allocate(lat%ct(lat%ntype))
         lat%ct = ct
 
@@ -177,6 +178,7 @@ contains
             write(unit, '(A, I0)') "ndim = ", lat%ndim
           end if
           write(unit, '(A, I0)') "ntype = ", lat%ntype
+          write(unit, '(A, I0)') "lmax = ", lat%lmax
           write(unit, '(A, F10.4)') "ct(:) = ", lat%ct(1)
           write(unit, '(A, F12.6)') "r2 = ", lat%r2
           write(unit, '(A)') "/"
