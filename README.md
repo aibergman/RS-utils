@@ -91,6 +91,9 @@ rsutil --help
 # Process lattice inputs (same as the Fortran driver)
 rsutil --setup
 
+# Create a 1x1x2 supercell (unique labels and per-species .nml files)
+rsutil --setup --supercell 1 1 2
+
 # Run exchange mapping and write a human-readable R_ij table
 rsutil --exchange --cutoff 3.0 --unique --rij-out rij_map.txt --rij-format txt
 
