@@ -102,32 +102,75 @@ subroutine apply_setup_geometry_transforms(lat_inp, lat_dat)
   implicit none
   type(lattice_inp), intent(inout) :: lat_inp
   type(lattice_t), intent(inout) :: lat_dat
-  real(rp) :: sigma_l_norm, sigma_b_norm
-  integer :: iatom
+  real(rp) :: sigma_l_norm, sigma_b_norm, det_latt
 
   if (alat_scale_factor <= 0.0_rp) error stop "alat-scale must be > 0"
   if (lattice_dist_sigma < 0.0_rp) error stop "lattice-dist must be >= 0"
   if (basis_dist_sigma < 0.0_rp) error stop "basis-dist must be >= 0"
+  if (z_iso_factor == 0.0_rp) error stop "z-iso-factor must be > 0 when provided"
 
   if (use_fixed_seed) call set_seed_from_integer(random_seed_value)
 
   lat_inp%alat = lat_inp%alat * alat_scale_factor
   if (lat_inp%alat <= 0.0_rp) error stop "Scaled alat became non-positive"
 
+  if (use_2d_mode) call apply_2d_cell_mode(lat_inp, lat_dat)
+
   sigma_l_norm = lattice_dist_sigma / lat_inp%alat
   sigma_b_norm = basis_dist_sigma / lat_inp%alat
 
   if (sigma_l_norm > 0.0_rp) then
     call add_gaussian_noise_matrix(lat_dat%a, sigma_l_norm)
-    if (abs(det3(lat_dat%a)) < 1.0e-8_rp) error stop "Distorted lattice is near-singular"
+    det_latt = lat_dat%a(1,1)*(lat_dat%a(2,2)*lat_dat%a(3,3)-lat_dat%a(2,3)*lat_dat%a(3,2)) - &
+               lat_dat%a(1,2)*(lat_dat%a(2,1)*lat_dat%a(3,3)-lat_dat%a(2,3)*lat_dat%a(3,1)) + &
+               lat_dat%a(1,3)*(lat_dat%a(2,1)*lat_dat%a(3,2)-lat_dat%a(2,2)*lat_dat%a(3,1))
+    if (abs(det_latt) < 1.0e-8_rp) error stop "Distorted lattice is near-singular"
   end if
 
   if (sigma_b_norm > 0.0_rp) then
-    do iatom = 1, size(lat_dat%crd, 2)
-      call add_gaussian_noise_vector(lat_dat%crd(:, iatom), sigma_b_norm)
+    do i = 1, size(lat_dat%crd, 2)
+      call add_gaussian_noise_vector(lat_dat%crd(:, i), sigma_b_norm)
     end do
   end if
 end subroutine apply_setup_geometry_transforms
+
+subroutine apply_2d_cell_mode(lat_inp, lat_dat)
+  implicit none
+  type(lattice_inp), intent(in) :: lat_inp
+  type(lattice_t), intent(inout) :: lat_dat
+  integer :: nsites, i, n_bottom, n_top
+  real(rp) :: zmin, zmax, zspan, lz_ang, lz_norm, area_xy
+  real(rp), parameter :: ztol = 1.0e-6_rp
+
+  nsites = size(lat_dat%crd, 2)
+  if (nsites <= 0) error stop "2d mode requires at least one site"
+
+  zmin = minval(lat_dat%crd(3, :))
+  zmax = maxval(lat_dat%crd(3, :))
+  zspan = zmax - zmin
+
+  if (z_iso_factor > 0.0_rp) then
+    n_bottom = 0
+    n_top = 0
+    do i = 1, nsites
+      if (abs(lat_dat%crd(3, i) - zmin) <= ztol) n_bottom = n_bottom + 1
+      if (abs(lat_dat%crd(3, i) - zmax) <= ztol) n_top = n_top + 1
+    end do
+    if (n_bottom <= 0 .or. n_top <= 0) error stop "2d layer detection failed"
+    area_xy = sqrt(sum(cross3(lat_dat%a(:, 1), lat_dat%a(:, 2))**2))
+    if (area_xy <= 0.0_rp) error stop "Invalid in-plane area in 2d mode"
+    lz_norm = zspan + z_iso_factor*sqrt(area_xy/real(n_bottom, rp)) + &
+              z_iso_factor*sqrt(area_xy/real(n_top, rp))
+  else
+    lz_ang = zspan*lat_inp%alat + lat_inp%alat
+    lz_norm = lz_ang/lat_inp%alat
+  end if
+
+  if (lz_norm <= 0.0_rp) error stop "Computed 2d z-length is non-positive"
+
+  lat_dat%a(:, 3) = 0.0_rp
+  lat_dat%a(3, 3) = lz_norm
+end subroutine apply_2d_cell_mode
 
 subroutine set_seed_from_integer(seed_value)
   implicit none
@@ -175,12 +218,13 @@ real(rp) function gaussian_rand()
   gaussian_rand = sqrt(-2.0_rp*log(u1))*cos(2.0_rp*acos(-1.0_rp)*u2)
 end function gaussian_rand
 
-real(rp) function det3(a)
+pure function cross3(v1, v2) result(v3)
   implicit none
-  real(rp), intent(in) :: a(3, 3)
-  det3 = a(1,1)*(a(2,2)*a(3,3)-a(2,3)*a(3,2)) - &
-         a(1,2)*(a(2,1)*a(3,3)-a(2,3)*a(3,1)) + &
-         a(1,3)*(a(2,1)*a(3,2)-a(2,2)*a(3,1))
-end function det3
+  real(rp), intent(in) :: v1(3), v2(3)
+  real(rp) :: v3(3)
+  v3(1) = v1(2)*v2(3) - v1(3)*v2(2)
+  v3(2) = v1(3)*v2(1) - v1(1)*v2(3)
+  v3(3) = v1(1)*v2(2) - v1(2)*v2(1)
+end function cross3
 
 end module rsutil_lib

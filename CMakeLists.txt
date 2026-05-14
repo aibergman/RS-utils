@@ -56,6 +56,7 @@ if(PYTHON_BINDINGS)
     add_custom_command(
         OUTPUT ${F90WRAP_OUTPUT}
         COMMAND ${Python3_EXECUTABLE} -m f90wrap ${SOURCE_DIR}/rsutil_lib.f90
+        DEPENDS ${SOURCE_DIR}/rsutil_lib.f90
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
         COMMENT "Generating Fortran-Python bindings with f90wrap..."
         VERBATIM
