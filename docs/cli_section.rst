@@ -10,7 +10,37 @@ Top-level usage:
 .. code-block:: bash
 
     rsutil {bands,dos} [options]
-    rsutil [--setup|--exchange|--export|--lattice|--clust] [options]
+    rsutil [--setup|--exchange|--export|--lmto47|--lattice|--clust] [options]
+
+Common Tasks
+------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 66
+
+   * - Task
+     - Command
+   * - Setup from ``input.nml`` + ``lattice.nml``
+     - ``rsutil --setup``
+   * - Setup and validate generated files
+     - ``rsutil --setup --validate --summary``
+   * - Supercell setup (non-destructive default)
+     - ``rsutil --setup --supercell 2 2 2``
+   * - 2D slab setup with isotropic margin
+     - ``rsutil --setup --2d --z-iso-factor 0.5``
+   * - Override recursion controls in ``&control``
+     - ``rsutil --setup --rec-method chebyshev --rec-steps 200``
+   * - Build exchange map
+     - ``rsutil --exchange --cutoff 2.5 --unique``
+   * - Export UppASD input set
+     - ``rsutil --export --jij jijso.out --out uppasd_out``
+   * - Export LMTO47 CTRL
+     - ``rsutil --lmto47 --nspin 2 --lmx 3 --out lmto47_out``
+   * - Plot band structure
+     - ``rsutil bands --lattice lattice.nml --hamiltonian rs2txt.dat --nk 100 --output bands.png``
+   * - Compute DOS + moments
+     - ``rsutil dos --lattice lattice.nml --hamiltonian rs2txt.dat --mesh 6 6 6 --electrons 16 --moments``
 
 Band and DOS
 ------------
@@ -257,9 +287,9 @@ Supercell Notes
 - Labels in input.nml are expanded into unique species (e.g., Fe1, N1, Fe2, N2).
 - ntype and ct(i) are expanded to match the unique labels.
 - Per-species .nml files are created by copying from the original label files.
-- ``lattice.nml`` and ``input.nml`` are updated in-place during supercell creation; keep clean backups.
 - By default, ``--supercell`` is staged internally and original input files are restored after setup.
 - Use ``--in-place`` if you explicitly want to replace ``lattice.nml``/``input.nml``.
+- In ``--in-place`` mode, backups with ``.bak`` extension are created first.
 - The same staged supercell behavior also applies when using ``--lmto47``.
 
 2D Notes

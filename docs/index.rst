@@ -31,6 +31,12 @@ Getting Started
     rsutil --setup --supercell 2 2 2 --sqs "Fe=0.5,Ni=0.5" \
         --sqs-shells 3 --sqs-steps 5000 --sqs-seed 1234
 
+    # Optional: 2D slab mode
+    rsutil --setup --2d --z-iso-factor 0.5
+
+    # Optional: recursion control overrides
+    rsutil --setup --rec-method chebyshev
+
 **Band structure & DOS workflow:**
 
 .. code-block:: bash
@@ -65,6 +71,7 @@ Getting Started
    :caption: Command-Line Interface:
 
    cli_section
+   band_structure_guide
 
 .. toctree::
    :maxdepth: 2
@@ -74,7 +81,6 @@ Getting Started
    bands_submodule
    viz_submodule
    exchange_submodule
-   exchange_map_module
    export_submodule
 
 Indices and tables

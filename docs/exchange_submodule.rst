@@ -5,6 +5,9 @@ The `exchange` submodule
 
 The **`exchange`** submodule provides utilities for calculating and managing exchange interactions (magnetic couplings) between atoms in a crystal structure. This is essential for setting up spin dynamics simulations.
 
+For most users, this page is the primary exchange documentation.  
+If you need implementation-level API details, see :ref:`exchange_map_module`.
+
 **Key Features:**
 
 - **Exchange Mapping**: Identifies and calculates magnetic exchange interactions (J_ij) between atomic sites
