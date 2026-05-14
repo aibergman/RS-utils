@@ -21,7 +21,7 @@
 
   integer :: i
 
-  contains 
+  contains
 subroutine process_lattice_impl()
    implicit none
   !-----------------------------------------------------------------
@@ -175,12 +175,12 @@ real(rp) function gaussian_rand()
   gaussian_rand = sqrt(-2.0_rp*log(u1))*cos(2.0_rp*acos(-1.0_rp)*u2)
 end function gaussian_rand
 
-real(rp) function det3(a)
+real(rp) function det3(amat)
   implicit none
-  real(rp), intent(in) :: a(3, 3)
-  det3 = a(1,1)*(a(2,2)*a(3,3)-a(2,3)*a(3,2)) - &
-         a(1,2)*(a(2,1)*a(3,3)-a(2,3)*a(3,1)) + &
-         a(1,3)*(a(2,1)*a(3,2)-a(2,2)*a(3,1))
+  real(rp), intent(in) :: amat(3, 3)
+  det3 = amat(1,1)*(amat(2,2)*amat(3,3)-amat(2,3)*amat(3,2)) - &
+         amat(1,2)*(amat(2,1)*amat(3,3)-amat(2,3)*amat(3,1)) + &
+         amat(1,3)*(amat(2,1)*amat(3,2)-amat(2,2)*amat(3,1))
 end function det3
 
 end module rsutil_lib
