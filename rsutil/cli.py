@@ -1049,7 +1049,7 @@ def validate_setup_inputs():
     return True
 
 
-def validate_setup_parameters(min_radius, max_radius):
+def validate_setup_parameters(min_radius, max_radius, lmx, lattice_dist, basis_dist, alat_scale):
     """
     Validate setup parameter ranges.
     
@@ -1082,6 +1082,22 @@ def validate_setup_parameters(min_radius, max_radius):
     
     if min_radius < 0.5:
         print(f"WARNING: --min_empty_radius ({min_radius}) is very small. Typical values are 1.0-1.5.", file=sys.stderr)
+
+    if lmx < 0 or lmx > 3:
+        print(f"ERROR: --lmx must be in [0,3], got {lmx}", file=sys.stderr)
+        return False
+
+    if lattice_dist < 0:
+        print(f"ERROR: --lattice-dist must be >= 0, got {lattice_dist}", file=sys.stderr)
+        return False
+
+    if basis_dist < 0:
+        print(f"ERROR: --basis-dist must be >= 0, got {basis_dist}", file=sys.stderr)
+        return False
+
+    if alat_scale <= 0:
+        print(f"ERROR: --alat-scale must be > 0, got {alat_scale}", file=sys.stderr)
+        return False
     
     return True
 
@@ -1206,7 +1222,14 @@ def apply_in_place_updates():
     return updated
 
 
-def create_supercell(nx, ny, nz):
+def create_supercell(
+    nx, ny, nz,
+    lattice_path: str = "lattice.nml",
+    input_path: str = "input.nml",
+    output_lattice_path: str = "lattice.nml",
+    output_input_path: str = "input.nml",
+    in_place: bool = True,
+):
     """
     Create a supercell by repeating the unit cell nx×ny×nz times.
     
@@ -1232,7 +1255,7 @@ def create_supercell(nx, ny, nz):
     
     print(f"\nCreating {nx}×{ny}×{nz} supercell...")
     
-    lattice_file = Path('lattice.nml')
+    lattice_file = Path(lattice_path)
     if not lattice_file.exists():
         print("ERROR: lattice.nml not found", file=sys.stderr)
         return False
@@ -1373,17 +1396,22 @@ def create_supercell(nx, ny, nz):
                 
                 new_content = new_content[:array_section_start] + new_array_section + new_content[array_section_end:]
         
-        # Backup and write lattice.nml
-        backup_file = Path('lattice_original.nml.bak')
-        shutil.copy2('lattice.nml', backup_file)
-        
-        with open('lattice.nml', 'w') as f:
+        output_lattice_file = Path(output_lattice_path)
+        if in_place:
+            backup_file = Path('lattice_original.nml.bak')
+            shutil.copy2(lattice_file, backup_file)
+            print(f"  ✓ Backup lattice file: {backup_file}")
+
+        with open(output_lattice_file, 'w') as f:
             f.write(new_content)
-        
-        print(f"  ✓ Updated lattice.nml with supercell (backup: {backup_file})")
+
+        if in_place:
+            print(f"  ✓ Updated {output_lattice_file} with supercell")
+        else:
+            print(f"  ✓ Wrote staged supercell lattice to {output_lattice_file}")
         
         # === Update input.nml to replicate labels ===
-        input_file = Path('input.nml')
+        input_file = Path(input_path)
         if input_file.exists():
             with open(input_file, 'r') as f:
                 input_content = f.read()
@@ -1493,21 +1521,27 @@ def create_supercell(nx, ny, nz):
                                 new_btxt = re.sub(r'/\s*$', insert_ct + "/", btxt, flags=re.MULTILINE)
                                 input_content = input_content[:block.start()] + new_btxt + input_content[block.end():]
                     
-                    # Backup and write
-                    input_backup = Path('input_original.nml.bak')
-                    shutil.copy2('input.nml', input_backup)
-                    
-                    with open('input.nml', 'w') as f:
+                    output_input_file = Path(output_input_path)
+                    if in_place:
+                        input_backup = Path('input_original.nml.bak')
+                        shutil.copy2(input_file, input_backup)
+                        print(f"  ✓ Backup input file: {input_backup}")
+
+                    with open(output_input_file, 'w') as f:
                         f.write(input_content)
+
+                    if in_place:
+                        print(f"  ✓ Updated {output_input_file} with replicated labels")
+                    else:
+                        print(f"  ✓ Wrote staged supercell input to {output_input_file}")
                     
-                    print(f"  ✓ Updated input.nml with replicated labels (backup: {input_backup})")
-                    
-                    # Create per-species .nml files for unique labels
-                    for new_label, src_label in zip(super_labels, source_labels):
-                        src_file = Path(f"{src_label}.nml")
-                        dest_file = Path(f"{new_label}.nml")
-                        if src_file.exists() and not dest_file.exists():
-                            shutil.copy2(src_file, dest_file)
+                    # Create per-species .nml files for unique labels only for in-place mode
+                    if in_place:
+                        for new_label, src_label in zip(super_labels, source_labels):
+                            src_file = Path(f"{src_label}.nml")
+                            dest_file = Path(f"{new_label}.nml")
+                            if src_file.exists() and not dest_file.exists():
+                                shutil.copy2(src_file, dest_file)
         
         print(f"  ✓ Supercell creation complete")
         
@@ -1713,6 +1747,30 @@ Examples:
         help="Maximum L channel override (default: 2; spd)",
     )
     parser.add_argument(
+        "--lattice-dist",
+        type=float,
+        default=0.0,
+        help="Std.dev of Gaussian lattice-vector distortion in units of alat (default: 0.0)",
+    )
+    parser.add_argument(
+        "--basis-dist",
+        type=float,
+        default=0.0,
+        help="Std.dev of Gaussian basis-vector distortion in units of alat (default: 0.0)",
+    )
+    parser.add_argument(
+        "--alat-scale",
+        type=float,
+        default=1.0,
+        help="Scale factor applied to alat before setup/export transforms (default: 1.0)",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="Random seed for reproducible lattice/basis distortions (default: random)",
+    )
+    parser.add_argument(
         "--cluster",
         type=str,
         default="periodic",
@@ -1784,7 +1842,14 @@ Examples:
             sys.exit(1)
         
         # Validate parameter ranges
-        if not validate_setup_parameters(args.min_empty_radius, args.max_empty_radius):
+        if not validate_setup_parameters(
+            args.min_empty_radius,
+            args.max_empty_radius,
+            args.lmx,
+            args.lattice_dist,
+            args.basis_dist,
+            args.alat_scale,
+        ):
             sys.exit(1)
         
         # Display configuration
@@ -1794,6 +1859,12 @@ Examples:
         if args.empty_spheres:
             print(f"  Min radius:        {args.min_empty_radius}")
             print(f"  Max radius:        {args.max_empty_radius}")
+        print(f"  LMAX override:     {args.lmx}")
+        print(f"  Lattice dist:      {args.lattice_dist} alat")
+        print(f"  Basis dist:        {args.basis_dist} alat")
+        print(f"  Alat scale:        {args.alat_scale}")
+        if args.seed is not None:
+            print(f"  Seed:              {args.seed}")
         if args.supercell:
             nx, ny, nz = args.supercell
             print(f"  Supercell:         {nx}×{ny}×{nz}")
@@ -1816,13 +1887,29 @@ Examples:
             print()
         
         # Create supercell if requested (do this BEFORE processing)
+        staged_supercell = False
+        staged_lattice = ".rsutil_supercell_lattice.nml"
+        staged_input = ".rsutil_supercell_input.nml"
         if args.supercell:
             nx, ny, nz = args.supercell
             if nx < 1 or ny < 1 or nz < 1:
                 print("ERROR: Supercell dimensions must be positive integers", file=sys.stderr)
                 sys.exit(1)
-            
-            if not create_supercell(nx, ny, nz):
+
+            if args.in_place:
+                ok_sc = create_supercell(nx, ny, nz, in_place=True)
+            else:
+                ok_sc = create_supercell(
+                    nx, ny, nz,
+                    lattice_path="lattice.nml",
+                    input_path="input.nml",
+                    output_lattice_path=staged_lattice,
+                    output_input_path=staged_input,
+                    in_place=False,
+                )
+                staged_supercell = ok_sc
+
+            if not ok_sc:
                 print("ERROR: Failed to create supercell", file=sys.stderr)
                 sys.exit(1)
             print()
@@ -1832,13 +1919,45 @@ Examples:
             if args.verbose:
                 print("Starting lattice processing...")
             
-            process_lattice(
-                cluster_type=args.cluster, 
-                empty_spheres=args.empty_spheres,
-                min_empty_radius=args.min_empty_radius, 
-                max_empty_radius=args.max_empty_radius,
-                lmx=args.lmx,
-            )
+            if staged_supercell:
+                import shutil
+                orig_lat_tmp = ".rsutil_original_lattice.nml"
+                orig_inp_tmp = ".rsutil_original_input.nml"
+                shutil.move("lattice.nml", orig_lat_tmp)
+                shutil.move("input.nml", orig_inp_tmp)
+                shutil.copy2(staged_lattice, "lattice.nml")
+                shutil.copy2(staged_input, "input.nml")
+                try:
+                    process_lattice(
+                        cluster_type=args.cluster,
+                        empty_spheres=args.empty_spheres,
+                        min_empty_radius=args.min_empty_radius,
+                        max_empty_radius=args.max_empty_radius,
+                        lmx=args.lmx,
+                        lattice_dist=args.lattice_dist,
+                        basis_dist=args.basis_dist,
+                        alat_scale=args.alat_scale,
+                        seed=args.seed,
+                    )
+                finally:
+                    shutil.move(orig_lat_tmp, "lattice.nml")
+                    shutil.move(orig_inp_tmp, "input.nml")
+                    if Path(staged_lattice).exists():
+                        Path(staged_lattice).unlink()
+                    if Path(staged_input).exists():
+                        Path(staged_input).unlink()
+            else:
+                process_lattice(
+                    cluster_type=args.cluster,
+                    empty_spheres=args.empty_spheres,
+                    min_empty_radius=args.min_empty_radius,
+                    max_empty_radius=args.max_empty_radius,
+                    lmx=args.lmx,
+                    lattice_dist=args.lattice_dist,
+                    basis_dist=args.basis_dist,
+                    alat_scale=args.alat_scale,
+                    seed=args.seed,
+                )
             
             if args.verbose:
                 print("Lattice processing completed.")
@@ -1926,6 +2045,15 @@ Examples:
         )
     # Export to LMTO47 CTRL if requested
     elif args.lmto47:
+        if args.lmx < 0 or args.lmx > 3:
+            print(f"ERROR: --lmx must be in [0,3], got {args.lmx}", file=sys.stderr)
+            sys.exit(1)
+        if args.lattice_dist < 0 or args.basis_dist < 0:
+            print("ERROR: --lattice-dist and --basis-dist must be >= 0", file=sys.stderr)
+            sys.exit(1)
+        if args.alat_scale <= 0:
+            print(f"ERROR: --alat-scale must be > 0, got {args.alat_scale}", file=sys.stderr)
+            sys.exit(1)
         lattice_path = os.path.join(args.data, "lattice.nml")
         input_path = os.path.join(args.data, "input.nml")
         out_dir = os.path.join(args.data, args.out) if args.data else args.out
@@ -1935,6 +2063,10 @@ Examples:
             header="RS-tools export",
             nspin=args.nspin,
             lmx=args.lmx,
+            lattice_dist=args.lattice_dist,
+            basis_dist=args.basis_dist,
+            alat_scale=args.alat_scale,
+            seed=args.seed,
         )
         print(f"LMTO47 CTRL written to: {ctrl_file}")
     # Export to UppASD if requested

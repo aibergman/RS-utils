@@ -82,3 +82,6 @@ Notes:
 
 - ``--nspin`` controls ``NSPIN`` in the LMTO47 ``OPTIONS`` block.
 - ``--lmx`` writes ``LMX`` for all ``CLASS`` entries in CTRL export.
+- ``--lattice-dist`` and ``--basis-dist`` apply Gaussian distortions in units of ``alat``.
+- ``--alat-scale`` scales ``alat`` before distortion.
+- ``--seed`` makes distortions reproducible.

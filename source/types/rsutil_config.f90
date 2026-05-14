@@ -9,5 +9,10 @@ module rsutil_config
   real(rp) :: min_empty_sphere_radius = 1.2_rp
   real(rp) :: max_empty_sphere_radius = 2.5_rp
   integer :: lmax_override = -1
+  real(rp) :: lattice_dist_sigma = 0.0_rp
+  real(rp) :: basis_dist_sigma = 0.0_rp
+  real(rp) :: alat_scale_factor = 1.0_rp
+  integer :: random_seed_value = 0
+  logical :: use_fixed_seed = .false.
 
 end module rsutil_config

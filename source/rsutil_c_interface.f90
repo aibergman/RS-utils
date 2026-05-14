@@ -8,13 +8,18 @@ module rsutil_c_interface
 
 contains
 
-subroutine process_lattice(cluster_type_str, empty_spheres_flag, min_radius, max_radius, lmax_flag) bind(c,name='process_lattice')
+subroutine process_lattice(cluster_type_str, empty_spheres_flag, min_radius, max_radius, lmax_flag, lattice_dist, basis_dist, alat_scale, seed_flag, seed_value) bind(c,name='process_lattice')
    implicit none
    character(kind=c_char), intent(in) :: cluster_type_str(*)
    integer(c_int), intent(in), value :: empty_spheres_flag
    real(c_double), intent(in), value :: min_radius
    real(c_double), intent(in), value :: max_radius
    integer(c_int), intent(in), value :: lmax_flag
+   real(c_double), intent(in), value :: lattice_dist
+   real(c_double), intent(in), value :: basis_dist
+   real(c_double), intent(in), value :: alat_scale
+   integer(c_int), intent(in), value :: seed_flag
+   integer(c_int), intent(in), value :: seed_value
    character(len=20) :: cluster_type
    integer :: i, slen
 
@@ -32,6 +37,11 @@ subroutine process_lattice(cluster_type_str, empty_spheres_flag, min_radius, max
    min_empty_sphere_radius = real(min_radius)
    max_empty_sphere_radius = real(max_radius)
    lmax_override = int(lmax_flag)
+   lattice_dist_sigma = real(lattice_dist, rp)
+   basis_dist_sigma = real(basis_dist, rp)
+   alat_scale_factor = real(alat_scale, rp)
+   use_fixed_seed = (seed_flag == 1)
+   random_seed_value = int(seed_value)
 
    ! Print settings
    if (trim(cluster_type) == "free") then

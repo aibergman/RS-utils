@@ -201,6 +201,10 @@ The ``--setup`` flag processes lattice structures and calculates optimal Wigner-
 - ``--backup``: Create .bak backups of input files before processing.
 - ``--in-place``: Replace input files with generated outputs (creates .bak backups).
 - ``--lmx``: Override maximum l-channel used in setup path (default: ``2``; supported range ``0..3``).
+- ``--lattice-dist``: Gaussian std.dev for lattice-vector distortion in units of ``alat``.
+- ``--basis-dist``: Gaussian std.dev for basis-vector distortion in units of ``alat``.
+- ``--alat-scale``: Scalar factor applied to ``alat`` before distortion.
+- ``--seed``: Integer seed for reproducible random distortions.
 
 **Example:**
 
@@ -221,6 +225,9 @@ The ``--setup`` flag processes lattice structures and calculates optimal Wigner-
     # Supercell plus empty spheres (use in-place updates and validation)
     rsutil --setup --supercell 1 1 2 --empty_spheres --in-place --validate
 
+    # Distort lattice/basis vectors reproducibly and scale alat
+    rsutil --setup --lattice-dist 0.01 --basis-dist 0.02 --alat-scale 1.01 --seed 1234
+
 Supercell Notes
 ~~~~~~~~~~~~~~~
 
@@ -229,6 +236,8 @@ Supercell Notes
 - ntype and ct(i) are expanded to match the unique labels.
 - Per-species .nml files are created by copying from the original label files.
 - ``lattice.nml`` and ``input.nml`` are updated in-place during supercell creation; keep clean backups.
+- By default, ``--supercell`` is staged internally and original input files are restored after setup.
+- Use ``--in-place`` if you explicitly want to replace ``lattice.nml``/``input.nml``.
 
 Setup Safety Workflow
 ~~~~~~~~~~~~~~~~~~~~~
@@ -368,6 +377,10 @@ The ``--lmto47`` flag exports RS-LMTO structure/input data into an LMTO47 ``CTRL
 - ``--out``: Output directory for generated ``CTRL`` file.
 - ``--nspin``: ``NSPIN`` value in LMTO47 output (default: ``2``).
 - ``--lmx``: ``LMX`` value written for each LMTO47 ``CLASS`` entry.
+- ``--lattice-dist``: Gaussian std.dev for lattice-vector distortion in units of ``alat``.
+- ``--basis-dist``: Gaussian std.dev for basis-vector distortion in units of ``alat``.
+- ``--alat-scale``: Scalar factor applied to ``alat`` before distortion.
+- ``--seed``: Integer seed for reproducible random distortions.
 
 **Example:**
 
@@ -378,6 +391,10 @@ The ``--lmto47`` flag exports RS-LMTO structure/input data into an LMTO47 ``CTRL
 
     # Explicit NSPIN/LMX
     rsutil --lmto47 --data /path/to/simulation --nspin 2 --lmx 3 --out lmto47_out
+
+    # Distorted/scaled LMTO47 export with reproducible seed
+    rsutil --lmto47 --data /path/to/simulation --lattice-dist 0.01 --basis-dist 0.02 \
+           --alat-scale 1.01 --seed 1234 --out lmto47_out
 
 
 LMAX Semantics

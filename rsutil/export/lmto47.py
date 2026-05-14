@@ -104,6 +104,48 @@ def build_ctrl_payload(structure: Structure, alat_angstrom: Optional[float] = No
     }
 
 
+def _apply_geometry_transforms(
+    structure: Structure,
+    alat_angstrom: float,
+    alat_scale: float = 1.0,
+    lattice_dist: float = 0.0,
+    basis_dist: float = 0.0,
+    seed: Optional[int] = None,
+) -> float:
+    if alat_scale <= 0:
+        raise ValueError(f"alat_scale must be > 0, got {alat_scale}")
+    if lattice_dist < 0:
+        raise ValueError(f"lattice_dist must be >= 0, got {lattice_dist}")
+    if basis_dist < 0:
+        raise ValueError(f"basis_dist must be >= 0, got {basis_dist}")
+
+    rng = np.random.default_rng(seed)
+
+    # Apply isotropic scaling first.
+    structure.unit_cell = np.array(structure.unit_cell, dtype=float) * alat_scale
+    for atom in structure.atoms_uc:
+        atom.position = np.array(atom.position, dtype=float) * alat_scale
+    alat_angstrom = float(alat_angstrom * alat_scale)
+
+    # Apply Gaussian noise in units of alat to Cartesian vectors.
+    if lattice_dist > 0:
+        sigma_l = lattice_dist * alat_angstrom
+        structure.unit_cell = np.array(structure.unit_cell, dtype=float) + rng.normal(
+            loc=0.0, scale=sigma_l, size=(3, 3)
+        )
+        if abs(np.linalg.det(structure.unit_cell)) < 1e-10:
+            raise ValueError("Distorted lattice became near-singular")
+
+    if basis_dist > 0:
+        sigma_b = basis_dist * alat_angstrom
+        for atom in structure.atoms_uc:
+            atom.position = np.array(atom.position, dtype=float) + rng.normal(
+                loc=0.0, scale=sigma_b, size=3
+            )
+
+    return alat_angstrom
+
+
 def write_ctrl(payload: Dict, out_path: Union[str, Path], header: str = "RS-tools export") -> None:
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -156,6 +198,10 @@ def export_ctrl(
     header: str = "RS-tools export",
     nspin: int = 2,
     lmx: Optional[int] = None,
+    lattice_dist: float = 0.0,
+    basis_dist: float = 0.0,
+    alat_scale: float = 1.0,
+    seed: Optional[int] = None,
     **kwargs
 ) -> str:
     alat_angstrom = None
@@ -191,6 +237,18 @@ def export_ctrl(
 
     if structure is None:
         raise ValueError("Failed to parse input structure")
+
+    if alat_angstrom is None:
+        alat_angstrom = float(np.linalg.norm(structure.unit_cell[0]))
+
+    alat_angstrom = _apply_geometry_transforms(
+        structure,
+        alat_angstrom=alat_angstrom,
+        alat_scale=alat_scale,
+        lattice_dist=lattice_dist,
+        basis_dist=basis_dist,
+        seed=seed,
+    )
 
     payload = build_ctrl_payload(structure, alat_angstrom=alat_angstrom, nspin=nspin, lmx=lmx)
 

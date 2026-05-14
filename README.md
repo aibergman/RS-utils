@@ -95,6 +95,9 @@ rsutil --setup
 # Create a 1x1x2 supercell (unique labels and per-species .nml files)
 rsutil --setup --supercell 1 1 2
 
+# Explicitly replace input files (otherwise setup is non-destructive)
+rsutil --setup --supercell 1 1 2 --in-place
+
 # Run exchange mapping and write a human-readable R_ij table
 rsutil --exchange --cutoff 3.0 --unique --rij-out rij_map.txt --rij-format txt
 
@@ -103,6 +106,9 @@ rsutil --export --jij jijso.out --dmi dmi --out uppasd_export
 
 # Export to LMTO47 CTRL format
 rsutil --lmto47 --nspin 2 --lmx 3 --out lmto47_out
+
+# Apply reproducible random distortions and scale alat
+rsutil --setup --lattice-dist 0.01 --basis-dist 0.02 --alat-scale 1.01 --seed 1234
 ```
 
 LMAX notes
@@ -112,6 +118,9 @@ LMAX notes
   - Setup path (``--setup``): overrides RS-LMTO generation ``lmax`` (default ``2`` = spd).
   - LMTO47 path (``--lmto47``): writes ``LMX`` in LMTO47 ``CLASS`` entries.
 - Current backend support is ``0 <= lmax <= 3`` (spdf); larger values are rejected.
+- ``--lattice-dist`` and ``--basis-dist`` are Gaussian std.dev values in units of ``alat``.
+- ``--alat-scale`` scales ``alat`` before applying distortions.
+- ``--seed`` makes distortions reproducible across runs.
 
 Setup safety workflow
 ---------------------
@@ -143,4 +152,3 @@ described.
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-

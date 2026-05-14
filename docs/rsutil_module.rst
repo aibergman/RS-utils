@@ -19,6 +19,7 @@ Core Functions
 Notes:
 
 - ``process_lattice(..., lmx=2)`` exposes setup-side ``lmax`` override from Python.
+- ``process_lattice`` also supports ``lattice_dist``, ``basis_dist``, ``alat_scale``, and ``seed`` for reproducible geometric perturbations.
 - Current backend support in this repository is ``0 <= lmax <= 3``.
 - Extended lattice keys ``strux_backend``, ``strux_want_sdot``, and ``strux_solve_scale`` are preserved when present.
 
@@ -51,4 +52,3 @@ Export utilities (e.g., UppASD exporters) are available under `rsutil.export`.
 .. automodule:: rsutil.export.uppasd
    :members:
    :noindex:
-
