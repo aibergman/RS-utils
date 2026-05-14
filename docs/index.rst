@@ -27,6 +27,10 @@ Getting Started
     # 3) Export to UppASD
     rsutil --export --data . --jij jijso.out --out uppasd_out
 
+    # Optional: all-site SQS on supercell before setup
+    rsutil --setup --supercell 2 2 2 --sqs "Fe=0.5,Ni=0.5" \
+        --sqs-shells 3 --sqs-steps 5000 --sqs-seed 1234
+
 **Band structure & DOS workflow:**
 
 .. code-block:: bash

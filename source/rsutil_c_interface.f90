@@ -8,7 +8,9 @@ module rsutil_c_interface
 
 contains
 
-subroutine process_lattice(cluster_type_str, empty_spheres_flag, min_radius, max_radius, lmax_flag, lattice_dist, basis_dist, alat_scale, seed_flag, seed_value) bind(c,name='process_lattice')
+subroutine process_lattice(cluster_type_str, empty_spheres_flag, min_radius, max_radius, &
+                           lmax_flag, lattice_dist, basis_dist, alat_scale, &
+                           seed_flag, seed_value) bind(c,name='process_lattice')
    implicit none
    character(kind=c_char), intent(in) :: cluster_type_str(*)
    integer(c_int), intent(in), value :: empty_spheres_flag
