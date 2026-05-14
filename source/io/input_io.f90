@@ -248,15 +248,18 @@ contains
         ! Reads the input file line by line and writes it to the output file,
         ! replacing the &lattice and &atoms blocks with updated versions.
         !-------------------------------------------------------------------
-        subroutine update_namelists(in_file, out_file, new_lat, new_atm)
+        subroutine update_namelists(in_file, out_file, new_lat, new_atm, rec_steps, rec_method)
           implicit none
           character(len=*), intent(in) :: in_file
           character(len=*), intent(in) :: out_file
           type(lattice_inp), intent(in) :: new_lat
           type(atoms_inp), intent(in)   :: new_atm
+          integer, intent(in) :: rec_steps
+          character(len=*), intent(in) :: rec_method
       
           integer :: in_unit, out_unit, ios
-          character(len=1024) :: line
+          character(len=1024) :: line, lower_line
+          logical :: control_found, wrote_lld, wrote_recur
       
           ! Open the input and output files.
           open(newunit=in_unit, file=in_file, status='old', action='read', iostat=ios)
@@ -270,6 +273,8 @@ contains
             stop
           end if
       
+          control_found = .false.
+
           do
             read(in_unit, '(A)', iostat=ios) line
             if (ios < 0) exit  ! End-of-file reached.
@@ -301,10 +306,50 @@ contains
                end do
                cycle
             end if
+
+            ! Check if this line begins the &control block.
+            lower_line = lower_string(trim(adjustl(line)))
+            if (index(lower_line, "&control") == 1) then
+               control_found = .true.
+               wrote_lld = .false.
+               wrote_recur = .false.
+               write(out_unit, '(A)') "&control"
+               do
+                  read(in_unit, '(A)', iostat=ios) line
+                  if (ios < 0) exit
+                  lower_line = lower_string(trim(adjustl(line)))
+                  if (trim(adjustl(line)) == "/") then
+                     if (.not. wrote_lld) write(out_unit, '(A, I0)') "lld = ", rec_steps
+                     if (.not. wrote_recur) write(out_unit, '(A, A, A)') "recur = '", trim(rec_method), "'"
+                     write(out_unit, '(A)') "/"
+                     exit
+                  end if
+                  if (index(lower_line, "lld") == 1) then
+                     write(out_unit, '(A, I0)') "lld = ", rec_steps
+                     wrote_lld = .true.
+                     cycle
+                  end if
+                  if (index(lower_line, "recur") == 1) then
+                     write(out_unit, '(A, A, A)') "recur = '", trim(rec_method), "'"
+                     wrote_recur = .true.
+                     cycle
+                  end if
+                  write(out_unit, '(A)') trim(line)
+               end do
+               cycle
+            end if
       
             ! Otherwise, copy the line unchanged.
             write(out_unit, '(A)') trim(line)
           end do
+
+          if (.not. control_found) then
+             write(out_unit, '(A)') ""
+             write(out_unit, '(A)') "&control"
+             write(out_unit, '(A, A, A)') "recur = '", trim(rec_method), "'"
+             write(out_unit, '(A, I0)') "lld = ", rec_steps
+             write(out_unit, '(A)') "/"
+          end if
       
           close(in_unit)
           close(out_unit)

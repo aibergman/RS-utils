@@ -1050,7 +1050,7 @@ def validate_setup_inputs():
 
 
 def validate_setup_parameters(min_radius, max_radius, lmx, lattice_dist, basis_dist, alat_scale,
-                              mode_2d, z_iso_factor):
+                              mode_2d, z_iso_factor, rec_steps):
     """
     Validate setup parameter ranges.
     
@@ -1106,6 +1106,10 @@ def validate_setup_parameters(min_radius, max_radius, lmx, lattice_dist, basis_d
 
     if z_iso_factor is not None and not mode_2d:
         print("ERROR: --z-iso-factor requires --2d", file=sys.stderr)
+        return False
+
+    if rec_steps <= 0:
+        print(f"ERROR: --rec-steps must be > 0, got {rec_steps}", file=sys.stderr)
         return False
     
     return True
@@ -1959,6 +1963,19 @@ Examples:
         help="Maximum L channel override (default: 2; spd)",
     )
     parser.add_argument(
+        "--rec-method",
+        type=str,
+        choices=["block", "chebyshev", "lanczos"],
+        default="block",
+        help="Recursion method for &control recur in setup output (default: block)",
+    )
+    parser.add_argument(
+        "--rec-steps",
+        type=int,
+        default=None,
+        help="Recursion steps for &control lld in setup output (default: 20, or 200 for chebyshev)",
+    )
+    parser.add_argument(
         "--lattice-dist",
         type=float,
         default=0.0,
@@ -2086,6 +2103,10 @@ Examples:
         print("RS-utils Lattice Setup")
         print("=" * 70)
         
+        rec_steps = args.rec_steps
+        if rec_steps is None:
+            rec_steps = 200 if args.rec_method == "chebyshev" else 20
+
         # Validate input files exist
         if not validate_setup_inputs():
             sys.exit(1)
@@ -2100,6 +2121,7 @@ Examples:
             args.alat_scale,
             args.mode_2d,
             args.z_iso_factor,
+            rec_steps,
         ):
             sys.exit(1)
         if not validate_sqs_parameters(args.sqs, args.sqs_shells, args.sqs_steps):
@@ -2116,6 +2138,8 @@ Examples:
             print(f"  Min radius:        {args.min_empty_radius}")
             print(f"  Max radius:        {args.max_empty_radius}")
         print(f"  LMAX override:     {args.lmx}")
+        print(f"  Rec method:        {args.rec_method}")
+        print(f"  Rec steps:         {rec_steps}")
         print(f"  Lattice dist:      {args.lattice_dist} alat")
         print(f"  Basis dist:        {args.basis_dist} alat")
         print(f"  Alat scale:        {args.alat_scale}")
@@ -2214,6 +2238,8 @@ Examples:
                         seed=args.seed,
                         mode_2d=args.mode_2d,
                         z_iso_factor=args.z_iso_factor,
+                        rec_steps=rec_steps,
+                        rec_method=args.rec_method,
                     )
                 finally:
                     shutil.move(orig_lat_tmp, "lattice.nml")
@@ -2235,6 +2261,8 @@ Examples:
                     seed=args.seed,
                     mode_2d=args.mode_2d,
                     z_iso_factor=args.z_iso_factor,
+                    rec_steps=rec_steps,
+                    rec_method=args.rec_method,
                 )
             
             if args.verbose:

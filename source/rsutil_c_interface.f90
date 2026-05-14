@@ -10,7 +10,8 @@ contains
 
 subroutine process_lattice(cluster_type_str, empty_spheres_flag, min_radius, max_radius, &
                            lmax_flag, lattice_dist, basis_dist, alat_scale, &
-                           seed_flag, seed_value, mode_2d_flag, z_iso_factor_in) bind(c,name='process_lattice')
+                           seed_flag, seed_value, mode_2d_flag, z_iso_factor_in, &
+                           rec_steps_in, rec_method_flag) bind(c,name='process_lattice')
    implicit none
    character(kind=c_char), intent(in) :: cluster_type_str(*)
    integer(c_int), intent(in), value :: empty_spheres_flag
@@ -24,6 +25,8 @@ subroutine process_lattice(cluster_type_str, empty_spheres_flag, min_radius, max
    integer(c_int), intent(in), value :: seed_value
    integer(c_int), intent(in), value :: mode_2d_flag
    real(c_double), intent(in), value :: z_iso_factor_in
+   integer(c_int), intent(in), value :: rec_steps_in
+   integer(c_int), intent(in), value :: rec_method_flag
    character(len=20) :: cluster_type
    integer :: i, slen
 
@@ -48,6 +51,15 @@ subroutine process_lattice(cluster_type_str, empty_spheres_flag, min_radius, max
    random_seed_value = int(seed_value)
    use_2d_mode = (mode_2d_flag == 1)
    z_iso_factor = real(z_iso_factor_in, rp)
+   rec_steps = int(rec_steps_in)
+   select case (int(rec_method_flag))
+   case (1)
+      rec_method = "chebyshev"
+   case (2)
+      rec_method = "lanczos"
+   case default
+      rec_method = "block"
+   end select
 
    ! Print settings
    if (trim(cluster_type) == "free") then

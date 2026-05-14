@@ -207,6 +207,8 @@ The ``--setup`` flag processes lattice structures and calculates optimal Wigner-
 - ``--seed``: Integer seed for reproducible random distortions.
 - ``--2d``: Enable 2D slab mode for setup/export geometry handling.
 - ``--z-iso-factor``: Surface-margin factor for density-aware 2D ``Lz`` (requires ``--2d``).
+- ``--rec-method``: Override ``&control recur`` in ``input_new.nml`` (``block``, ``chebyshev``, ``lanczos``).
+- ``--rec-steps``: Override ``&control lld`` in ``input_new.nml``.
 - ``--sqs``: Enable SQS assignment on all sites, e.g. ``"Fe=0.5,Ni=0.5"`` (requires ``--supercell``).
 - ``--sqs-shells``: Number of pair-distance shells in the SQS objective.
 - ``--sqs-steps``: Number of MC swap steps for SQS optimization.
@@ -240,6 +242,10 @@ The ``--setup`` flag processes lattice structures and calculates optimal Wigner-
     # 2D mode with isotropic-density margins
     rsutil --setup --2d --z-iso-factor 0.5
 
+    # Override recursion controls in &control
+    rsutil --setup --rec-method chebyshev
+    rsutil --setup --rec-method lanczos --rec-steps 64
+
     # SQS on all supercell sites
     rsutil --setup --supercell 2 2 2 --sqs "Fe=0.5,Ni=0.3,Co=0.2" \
            --sqs-shells 3 --sqs-steps 5000 --sqs-seed 1234
@@ -268,6 +274,17 @@ Supercell Notes
   - ``a3 || cross(a1,a2)``, sign chosen so ``a3·z >= 0``.
 - In setup output, 2D mode enforces ``b3=F`` and ``n3=1`` in ``input_new.nml``.
 - ``--z-iso-factor`` is only valid together with ``--2d``.
+
+Recursion Control Notes
+~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``--rec-method`` maps to ``recur`` in the ``&control`` namelist.
+- ``--rec-steps`` maps to ``lld`` in the ``&control`` namelist.
+- Defaults:
+  - method: ``block``
+  - steps: ``20``
+- Special default:
+  - if ``--rec-method chebyshev`` is selected and ``--rec-steps`` is omitted, steps default to ``200``.
 
 Setup Safety Workflow
 ~~~~~~~~~~~~~~~~~~~~~

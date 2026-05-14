@@ -16,5 +16,7 @@ module rsutil_config
   logical :: use_fixed_seed = .false.
   logical :: use_2d_mode = .false.
   real(rp) :: z_iso_factor = -1.0_rp
+  integer :: rec_steps = 20
+  character(len=16) :: rec_method = "block"
 
 end module rsutil_config

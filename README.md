@@ -121,6 +121,10 @@ rsutil --setup --2d --z-iso-factor 0.5
 rsutil --setup --supercell 2 2 2 --sqs "Fe=0.5,Ni=0.3,Co=0.2" \
        --sqs-shells 3 --sqs-steps 5000 --sqs-seed 1234
 
+# Recursion control override in &control
+rsutil --setup --rec-method chebyshev           # default rec-steps becomes 200
+rsutil --setup --rec-method lanczos --rec-steps 64
+
 # Apply reproducible random distortions and scale alat
 rsutil --setup --lattice-dist 0.01 --basis-dist 0.02 --alat-scale 1.01 --seed 1234
 ```
@@ -135,6 +139,10 @@ LMAX notes
 - ``--lattice-dist`` and ``--basis-dist`` are Gaussian std.dev values in units of ``alat``.
 - ``--alat-scale`` scales ``alat`` before applying distortions.
 - ``--seed`` makes distortions reproducible across runs.
+- ``--rec-method`` overrides ``&control recur`` in ``input_new.nml``.
+- ``--rec-steps`` overrides ``&control lld`` in ``input_new.nml``.
+- Recursion defaults: ``rec-method=block`` and ``rec-steps=20``.
+- If ``rec-method=chebyshev`` and ``--rec-steps`` is omitted, default ``rec-steps`` is ``200``.
 
 2D mode notes
 -------------

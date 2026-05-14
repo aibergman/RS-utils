@@ -92,7 +92,7 @@ subroutine process_lattice_impl()
   ! This subroutine writes the updated &lattice and &atoms groups
   ! to a new input namelist file.
   !-----------------------------------------------------------------
-  call update_namelists("input.nml", "input_new.nml", lat_input, atm_input)
+  call update_namelists("input.nml", "input_new.nml", lat_input, atm_input, rec_steps, rec_method)
 
   if (lmax_override >= 0) then
     call update_atoms(pot_data, atm_input, lat_data, lat_input, lmax_override)
