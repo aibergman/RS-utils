@@ -190,18 +190,9 @@ Notes:
 - Integer site counts are chosen to match the requested fractions as closely as possible for the given supercell size.
 - Distortions/scaling can be combined and are applied after SQS assignment.
 
-Namelist compatibility notes
-----------------------------
+## Notes
 
-The setup pipeline preserves selected extended ``&lattice`` fields when present in input:
-
-- ``strux_backend``
-- ``strux_want_sdot``
-- ``strux_solve_scale``
-
-These keys are only written to ``input_new.nml`` when they were present in the original input.
-
-Caution: The f-electron treatment is not fully optimal yet so please double check occupations and core/valence electrons in the input is properly 
+Caution: The f-electron treatment is not fully optimal yet so please double check occupations and core/valence electrons in the input is properly
 described.
 
 ## License
