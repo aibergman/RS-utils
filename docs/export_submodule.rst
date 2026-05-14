@@ -78,6 +78,12 @@ The ``lmto47`` module exports RS-LMTO lattice/input data to an LMTO47 ``CTRL`` f
     # Explicit spin and l-channel settings
     rsutil --lmto47 --data /path/to/simulation --nspin 2 --lmx 3 --out lmto47_out
 
+    # 2D mode with default z-rule
+    rsutil --lmto47 --data /path/to/simulation --2d --out lmto47_out
+
+    # 2D mode with isotropic-density margins
+    rsutil --lmto47 --data /path/to/simulation --2d --z-iso-factor 0.5 --out lmto47_out
+
 Notes:
 
 - ``--nspin`` controls ``NSPIN`` in the LMTO47 ``OPTIONS`` block.
@@ -85,3 +91,5 @@ Notes:
 - ``--lattice-dist`` and ``--basis-dist`` apply Gaussian distortions in units of ``alat``.
 - ``--alat-scale`` scales ``alat`` before distortion.
 - ``--seed`` makes distortions reproducible.
+- ``--2d`` enables slab-oriented z-length derivation.
+- ``--z-iso-factor`` switches 2D z-length from fixed ``+1.0*alat`` to density-aware margins.

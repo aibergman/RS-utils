@@ -21,6 +21,7 @@ Notes:
 
 - ``process_lattice(..., lmx=2)`` exposes setup-side ``lmax`` override from Python.
 - ``process_lattice`` also supports ``lattice_dist``, ``basis_dist``, ``alat_scale``, and ``seed`` for reproducible geometric perturbations.
+- ``process_lattice`` supports 2D slab mode via ``mode_2d`` and optional ``z_iso_factor``.
 - Current backend support in this repository is ``0 <= lmax <= 3``.
 - Extended lattice keys ``strux_backend``, ``strux_want_sdot``, and ``strux_solve_scale`` are preserved when present.
 - CLI-level SQS controls (``--sqs``, ``--sqs-shells``, ``--sqs-steps``, ``--sqs-seed``) can be combined with ``--supercell`` for both ``--setup`` and ``--lmto47`` workflows.

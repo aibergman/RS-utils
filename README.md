@@ -111,6 +111,12 @@ rsutil --lmto47 --nspin 2 --lmx 3 --out lmto47_out
 # Export LMTO47 from a staged 2x2x2 supercell (non-destructive by default)
 rsutil --lmto47 --supercell 2 2 2 --out lmto47_out
 
+# 2D setup mode (default c-axis rule)
+rsutil --setup --2d
+
+# 2D setup mode with isotropic-density surface margins
+rsutil --setup --2d --z-iso-factor 0.5
+
 # SQS on all supercell sites (requires --supercell)
 rsutil --setup --supercell 2 2 2 --sqs "Fe=0.5,Ni=0.3,Co=0.2" \
        --sqs-shells 3 --sqs-steps 5000 --sqs-seed 1234
@@ -129,6 +135,24 @@ LMAX notes
 - ``--lattice-dist`` and ``--basis-dist`` are Gaussian std.dev values in units of ``alat``.
 - ``--alat-scale`` scales ``alat`` before applying distortions.
 - ``--seed`` makes distortions reproducible across runs.
+
+2D mode notes
+-------------
+
+- ``--2d`` enables slab-oriented setup/export geometry handling.
+- If ``--2d`` is given without ``--z-iso-factor``:
+  - ``Lz = (zmax - zmin) + 1.0*alat``.
+- If ``--2d --z-iso-factor X`` is given:
+  - ``Lz = (zmax - zmin) + X*sqrt(A/n_bottom) + X*sqrt(A/n_top)``.
+- In both cases, the third lattice vector is aligned with the normal to ``a1,a2``:
+  - ``a3 || cross(a1,a2)``, sign chosen to keep positive global ``z`` projection.
+- In setup output (``input_new.nml``), 2D mode enforces ``b3=F`` and ``n3=1``.
+
+Caveats:
+
+- ``--z-iso-factor`` requires ``--2d``.
+- Surface-layer counting for isotropic mode uses a small z-tolerance; strongly rumpled surfaces may need manual verification.
+- This is a practical ASA setup heuristic, not a full electrostatic vacuum convergence protocol; verify sensitivity for production runs.
 
 Setup safety workflow
 ---------------------

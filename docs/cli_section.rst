@@ -205,6 +205,8 @@ The ``--setup`` flag processes lattice structures and calculates optimal Wigner-
 - ``--basis-dist``: Gaussian std.dev for basis-vector distortion in units of ``alat``.
 - ``--alat-scale``: Scalar factor applied to ``alat`` before distortion.
 - ``--seed``: Integer seed for reproducible random distortions.
+- ``--2d``: Enable 2D slab mode for setup/export geometry handling.
+- ``--z-iso-factor``: Surface-margin factor for density-aware 2D ``Lz`` (requires ``--2d``).
 - ``--sqs``: Enable SQS assignment on all sites, e.g. ``"Fe=0.5,Ni=0.5"`` (requires ``--supercell``).
 - ``--sqs-shells``: Number of pair-distance shells in the SQS objective.
 - ``--sqs-steps``: Number of MC swap steps for SQS optimization.
@@ -232,6 +234,12 @@ The ``--setup`` flag processes lattice structures and calculates optimal Wigner-
     # Distort lattice/basis vectors reproducibly and scale alat
     rsutil --setup --lattice-dist 0.01 --basis-dist 0.02 --alat-scale 1.01 --seed 1234
 
+    # 2D mode with simple z-rule
+    rsutil --setup --2d
+
+    # 2D mode with isotropic-density margins
+    rsutil --setup --2d --z-iso-factor 0.5
+
     # SQS on all supercell sites
     rsutil --setup --supercell 2 2 2 --sqs "Fe=0.5,Ni=0.3,Co=0.2" \
            --sqs-shells 3 --sqs-steps 5000 --sqs-seed 1234
@@ -247,6 +255,19 @@ Supercell Notes
 - By default, ``--supercell`` is staged internally and original input files are restored after setup.
 - Use ``--in-place`` if you explicitly want to replace ``lattice.nml``/``input.nml``.
 - The same staged supercell behavior also applies when using ``--lmto47``.
+
+2D Notes
+~~~~~~~~
+
+- ``--2d`` modifies setup/export geometry before WS/ASA steps.
+- Default 2D z-length (when ``--z-iso-factor`` is omitted):
+  - ``Lz = (zmax-zmin) + 1.0*alat``.
+- Isotropic-density mode:
+  - ``Lz = (zmax-zmin) + X*sqrt(A/n_bottom) + X*sqrt(A/n_top)`` with ``X = --z-iso-factor``.
+- The third lattice vector is built from the surface normal, not forced to global z:
+  - ``a3 || cross(a1,a2)``, sign chosen so ``a3·z >= 0``.
+- In setup output, 2D mode enforces ``b3=F`` and ``n3=1`` in ``input_new.nml``.
+- ``--z-iso-factor`` is only valid together with ``--2d``.
 
 Setup Safety Workflow
 ~~~~~~~~~~~~~~~~~~~~~
