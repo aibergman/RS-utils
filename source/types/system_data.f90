@@ -44,6 +44,7 @@ module system_data
     integer :: num_quant_s           ! Number of s-orbitals
     integer :: num_quant_p           ! Number of p-orbitals
     integer :: num_quant_d           ! Number of d-orbitals
+    integer :: num_quant_f           ! Number of f-orbitals
   end type element_t
 
   !----------------------------------------------------------------
@@ -71,6 +72,9 @@ module system_data
     real(rp), allocatable :: ppar(:, :)           ! (l, spin) Potential parameters
     real(rp), allocatable :: obar(:, :)           ! (l, spin) Overlap parameters
     real(rp), allocatable :: vl(:, :)             ! (l, spin) Local potential parameters
+    real(rp), allocatable :: screening_alpha(:)   ! Screening alpha per l
+    real(rp), allocatable :: screening_alpha_dot(:) ! Screening alpha dot per l
+    real(rp), dimension(2) :: vmtz = 0.0_rp
   end type potential_t
 
   !-------------------------------------------------------------------
@@ -93,6 +97,18 @@ module system_data
     real(rp), allocatable :: ct(:)   ! Cutoff radius per site
     real(rp) :: r2                   ! Max cutoff radius (squared)
     integer :: lmax = 2              ! Target maximum angular momentum for RS output
+    character(len=16) :: strux_backend = ''
+    character(len=16) :: screening = ''
+    logical :: strux_want_sdot = .false.
+    real(rp) :: strux_solve_scale = 1.0_rp
+    real(rp), allocatable :: screening_alpha(:)
+    real(rp), allocatable :: screening_sigma(:)
+    logical :: has_strux_backend = .false.
+    logical :: has_screening = .false.
+    logical :: has_strux_want_sdot = .false.
+    logical :: has_strux_solve_scale = .false.
+    logical :: has_screening_alpha = .false.
+    logical :: has_screening_sigma = .false.
   end type lattice_inp
 
   !-------------------------------------------------------------------

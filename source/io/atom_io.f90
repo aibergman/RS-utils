@@ -94,6 +94,7 @@ contains
       element_data%num_quant_s  = num_quant_s
       element_data%num_quant_p  = num_quant_p
       element_data%num_quant_d  = num_quant_d
+      element_data%num_quant_f  = num_quant_f
 
       par_data%lmax = lmax
       if (par_data%lmax < 0 .or. par_data%lmax > 3) then
@@ -121,6 +122,9 @@ contains
       par_data%qpar         = qpar(1:par_data%lmax+1, :)
       par_data%ppar         = ppar(1:par_data%lmax+1, :)
       par_data%vl           = vl(1:par_data%lmax+1, :)
+      par_data%vmtz         = vmtz
+      par_data%screening_alpha = screening_alpha(1:par_data%lmax+1)
+      par_data%screening_alpha_dot = screening_alpha_dot(1:par_data%lmax+1)
 
 
     end subroutine read_atom
@@ -150,7 +154,8 @@ contains
       write(unit, '(4X,A,I0,A)') "f_core=", element%f_core, ","
       write(unit, '(4X,A,I0,A)') "num_quant_s=", element%num_quant_s, ","
       write(unit, '(4X,A,I0,A)') "num_quant_p=", element%num_quant_p, ","
-      write(unit, '(4X,A,I0)') "num_quant_d=", element%num_quant_d
+      write(unit, '(4X,A,I0,A)') "num_quant_d=", element%num_quant_d, ","
+      write(unit, '(4X,A,I0)') "num_quant_f=", element%num_quant_f
       write(unit,*) "/"
       write(unit,*)
   
@@ -214,6 +219,8 @@ contains
       call write_2d_array(unit, "qpar", par%qpar)
       call write_2d_array(unit, "ppar", par%ppar)
       call write_2d_array(unit, "vl", par%vl)
+      if (allocated(par%screening_alpha)) write(unit, '(4X,A,*(G20.14,1X))') "screening_alpha(:) = ", par%screening_alpha
+      if (allocated(par%screening_alpha_dot)) write(unit, '(4X,A,*(G20.14,1X))') "screening_alpha_dot(:) = ", par%screening_alpha_dot
   
       write(unit,*) "/"
   
@@ -298,6 +305,8 @@ subroutine screen_ort(potential, wsm)
    if (allocated(par_data%ppar)) deallocate(par_data%ppar)
    if (allocated(par_data%obar)) deallocate(par_data%obar)
    if (allocated(par_data%vl)) deallocate(par_data%vl)
+   if (allocated(par_data%screening_alpha)) deallocate(par_data%screening_alpha)
+   if (allocated(par_data%screening_alpha_dot)) deallocate(par_data%screening_alpha_dot)
 
    allocate(par_data%pl(nl, 2))
    allocate(par_data%ql(3, nl, 2))
@@ -311,6 +320,10 @@ subroutine screen_ort(potential, wsm)
    allocate(par_data%ppar(nl, 2))
    allocate(par_data%obar(nl, 2))
    allocate(par_data%vl(nl, 2))
+   allocate(par_data%screening_alpha(nl))
+   allocate(par_data%screening_alpha_dot(nl))
+   par_data%screening_alpha = 0.0_rp
+   par_data%screening_alpha_dot = 0.0_rp
  end subroutine allocate_potential_arrays
 
 end module atom_io

@@ -208,8 +208,10 @@ contains
     element%num_quant_s = int(potential%pl(1,1))
     element%num_quant_p = 0
     element%num_quant_d = 0
+    element%num_quant_f = 0
     if (size(potential%pl, 1) >= 2) element%num_quant_p = int(potential%pl(2,1))
     if (size(potential%pl, 1) >= 3) element%num_quant_d = int(potential%pl(3,1))
+    if (size(potential%pl, 1) >= 4) element%num_quant_f = int(potential%pl(4,1))
     ! Add small values to moments for empty spheres
     if(element%atomic_number==0)  then
       call random_number(potential%ql)

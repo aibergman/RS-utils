@@ -27,15 +27,19 @@ contains
         real(kind=8) :: alat
         character(len=8) :: crystal_sym
         real(kind=8) :: wav
+        character(len=16) :: strux_backend = '', screening = ''
+        logical :: strux_want_sdot = .false.
+        real(rp) :: strux_solve_scale = 1.0_rp
         logical :: pbc=.true., b1=.true., b2=.true., b3=.true.
         integer :: n1=10, n2=10, n3=10, i, pos, j
         ! Additions from previous lattice.nml entries
         integer :: ntype = 1
-        real(rp), allocatable :: ct(:)
+        real(rp), allocatable :: ct(:), screening_alpha(:), screening_sigma(:)
         real(rp) :: r2
 
         namelist /lattice/ rc, alat, crystal_sym, wav, pbc, b1, b2, b3, n1, n2, n3, ndim, &
-            ntype, ct, r2, lmax
+            ntype, ct, r2, lmax, strux_backend, screening, strux_want_sdot, &
+            strux_solve_scale, screening_alpha, screening_sigma
 
         !-------------------------------------------------------------------
         ! Temporary variables for reading the atoms namelist.
@@ -111,8 +115,26 @@ contains
         lat%ndim = ndim
         lat%r2 = r2
         lat%lmax = lmax
+        lat%strux_backend = strux_backend
+        lat%screening = screening
+        lat%strux_want_sdot = strux_want_sdot
+        lat%strux_solve_scale = strux_solve_scale
+        lat%has_strux_backend = namelist_has_key(filename, "lattice", "strux_backend")
+        lat%has_screening = namelist_has_key(filename, "lattice", "screening")
+        lat%has_strux_want_sdot = namelist_has_key(filename, "lattice", "strux_want_sdot")
+        lat%has_strux_solve_scale = namelist_has_key(filename, "lattice", "strux_solve_scale")
+        lat%has_screening_alpha = namelist_has_key(filename, "lattice", "screening_alpha")
+        lat%has_screening_sigma = namelist_has_key(filename, "lattice", "screening_sigma")
         allocate(lat%ct(lat%ntype))
         lat%ct = ct
+        if (allocated(screening_alpha)) then
+          allocate(lat%screening_alpha(size(screening_alpha)))
+          lat%screening_alpha = screening_alpha
+        end if
+        if (allocated(screening_sigma)) then
+          allocate(lat%screening_sigma(size(screening_sigma)))
+          lat%screening_sigma = screening_sigma
+        end if
 
         atm%database = database
          ! Strip any digits from the label
@@ -179,10 +201,51 @@ contains
           end if
           write(unit, '(A, I0)') "ntype = ", lat%ntype
           write(unit, '(A, I0)') "lmax = ", lat%lmax
+          if (lat%has_strux_backend .and. len_trim(lat%strux_backend) > 0) &
+            write(unit, '(A, A)') "strux_backend = ", "'" // trim(lat%strux_backend) // "'"
+          if (lat%has_screening .and. len_trim(lat%screening) > 0) &
+            write(unit, '(A, A)') "screening = ", "'" // trim(lat%screening) // "'"
+          if (lat%has_strux_want_sdot) write(unit, '(A, L1)') "strux_want_sdot = ", lat%strux_want_sdot
+          if (lat%has_strux_solve_scale) write(unit, '(A, ES16.8)') "strux_solve_scale = ", lat%strux_solve_scale
+          if (lat%has_screening_alpha .and. allocated(lat%screening_alpha)) &
+            write(unit, '(A, *(ES16.8,1X))') "screening_alpha(:) = ", lat%screening_alpha
+          if (lat%has_screening_sigma .and. allocated(lat%screening_sigma)) &
+            write(unit, '(A, *(ES16.8,1X))') "screening_sigma(:) = ", lat%screening_sigma
           write(unit, '(A, F10.4)') "ct(:) = ", lat%ct(1)
           write(unit, '(A, F12.6)') "r2 = ", lat%r2
           write(unit, '(A)') "/"
         end subroutine write_lattice_block
+
+        logical function namelist_has_key(filename, block_name, key_name)
+          implicit none
+          character(len=*), intent(in) :: filename, block_name, key_name
+          integer :: unit, ios
+          character(len=1024) :: line, tline
+          logical :: in_block
+          character(len=64) :: block_tag
+
+          namelist_has_key = .false.
+          in_block = .false.
+          block_tag = "&" // trim(adjustl(block_name))
+
+          open(newunit=unit, file=filename, status='old', action='read', iostat=ios)
+          if (ios /= 0) return
+          do
+            read(unit, '(A)', iostat=ios) line
+            if (ios /= 0) exit
+            tline = adjustl(line)
+            if (.not. in_block) then
+              if (index(tline, block_tag) == 1) in_block = .true.
+            else
+              if (trim(tline) == "/") exit
+              if (index(tline, trim(key_name)) > 0 .and. index(tline, "=") > 0) then
+                namelist_has_key = .true.
+                exit
+              end if
+            end if
+          end do
+          close(unit)
+        end function namelist_has_key
       
         !-------------------------------------------------------------------
         ! Subroutine: write_atoms_block
