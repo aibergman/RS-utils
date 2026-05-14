@@ -24,97 +24,49 @@ RS-utils is a Python + Fortran toolkit for RS-LMTO workflows. It now includes a 
 - **Atomic Data Lookups:** Efficient lookup tables for atomic numbers and electron counts.
 - **CMake Build System:** A modern CMake-based build framework to compile the Fortran sources.
 
-## Installation
+## Build and Installation
 
-### Python (recommended)
+### Python package (recommended)
 
 ```bash
 pip install -e .
 ```
 
-Key runtime dependencies: numpy, scipy, matplotlib, spglib (pymatgen/seekpath used for k-paths).
+Key runtime dependencies: `numpy`, `scipy`, `matplotlib`, `spglib` (with `pymatgen/seekpath` for k-path workflows).
 
-### Fortran build (optional, for legacy utilities)
+### Fortran build (optional; legacy utilities)
 
 ```bash
 cmake -S . -B build
 cmake --build build
 ```
 
+This builds the Fortran library and executable targets (for example `rsutil.x` in the build tree).
+
 ## CLI Usage
 
-Band structure and DOS (pure Python):
+The installed CLI entrypoint is:
 
 ```bash
-# Band structure (high-symmetry path)
-rsutil bands --lattice lattice.nml --hamiltonian rs2txt.dat --nk 100 --output bands.png
-
-# Projected bands
-rsutil bands --lattice lattice.nml --hamiltonian rs2txt.dat --nk 100 --projections --projection orbital
-
-# DOS with Fermi level and moments
-rsutil dos --lattice lattice.nml --hamiltonian rs2txt.dat --mesh 6 6 6 --electrons 16 --moments
-```
-
-Legacy workflow (Fortran-backed):
-
-    ```bash
-    cmake --build .
-    ```
-
-This will create a binary `process_lattice.x` in the `./build/bin` directory of your repository.
-
-## Usage
-
-After building, an executable (for example, `rsutil.x`) will be available in your build directory. To run the program you need
-RS-LMTO-ASA compliant `input.nml` and `lattice.nml` files present. Based on the structural information in `lattice.nml`
-and the chemical information in `input.nml`, the binary will calculate optimal Wigner–Seitz radii and reasonable starting
-guesses for occupations, moments, and potential parameters. Results are written to atomic `*_out.nml` files and updated
-`input.nml` / `lattice.nml` copies placed in per-atom output directories when post-processing is requested.
-
-Alternatively, the Python package exposes a `rsutil` console script and higher-level tools (visualizer, exchange mapping,
-export utilities). Install the package into your Python environment to use the CLI:
-
-```bash
-pip install .
-# or for editable development install:
-pip install -e .
-```
-
-Python CLI examples
--------------------
-
-After installing the Python package, the `rsutil` console script is available. Example workflows:
-
-```bash
-# Show help and available options
 rsutil --help
+```
 
-# Process lattice inputs (same as the Fortran driver)
+### Setup workflows (`--setup`)
+
+```bash
+# Basic setup
 rsutil --setup
 
-# Create a 1x1x2 supercell (unique labels and per-species .nml files)
+# Supercell setup
 rsutil --setup --supercell 1 1 2
 
-# Explicitly replace input files (otherwise setup is non-destructive)
+# In-place replacement (otherwise setup is non-destructive)
 rsutil --setup --supercell 1 1 2 --in-place
 
-# Run exchange mapping and write a human-readable R_ij table
-rsutil --exchange --cutoff 3.0 --unique --rij-out rij_map.txt --rij-format txt
-
-# Export to UppASD format (requires built exchange files)
-rsutil --export --jij jijso.out --dmi dmi --out uppasd_export
-
-# Export to LMTO47 CTRL format
-rsutil --lmto47 --nspin 2 --lmx 3 --out lmto47_out
-
-# Export LMTO47 from a staged 2x2x2 supercell (non-destructive by default)
-rsutil --lmto47 --supercell 2 2 2 --out lmto47_out
-
-# 2D setup mode (default c-axis rule)
+# 2D mode (default c-axis rule)
 rsutil --setup --2d
 
-# 2D setup mode with isotropic-density surface margins
+# 2D mode with isotropic-density margins
 rsutil --setup --2d --z-iso-factor 0.5
 
 # SQS on all supercell sites (requires --supercell)
@@ -125,8 +77,53 @@ rsutil --setup --supercell 2 2 2 --sqs "Fe=0.5,Ni=0.3,Co=0.2" \
 rsutil --setup --rec-method chebyshev           # default rec-steps becomes 200
 rsutil --setup --rec-method lanczos --rec-steps 64
 
-# Apply reproducible random distortions and scale alat
+# Reproducible distortions and scaling
 rsutil --setup --lattice-dist 0.01 --basis-dist 0.02 --alat-scale 1.01 --seed 1234
+```
+
+### Export workflows (`--export`, `--lmto47`)
+
+```bash
+# Export to UppASD format (requires built exchange files)
+rsutil --export --jij jijso.out --dmi dmi --out uppasd_export
+
+# Export to LMTO47 CTRL format
+rsutil --lmto47 --nspin 2 --lmx 3 --out lmto47_out
+
+# LMTO47 export from staged supercell (non-destructive by default)
+rsutil --lmto47 --supercell 2 2 2 --out lmto47_out
+```
+
+### Visualization workflows (`--lattice`, `--clust`)
+
+```bash
+# Lattice visualization
+rsutil --lattice --data .
+
+# Cluster visualization
+rsutil --clust --data .
+```
+
+### Exchange mapping workflow (`--exchange`)
+
+```bash
+# Exchange map with readable R_ij output
+rsutil --exchange --cutoff 3.0 --unique --rij-out rij_map.txt --rij-format txt
+```
+
+### Bands and DOS workflows (pure Python)
+
+```bash
+# Band structure
+rsutil bands --lattice lattice.nml --hamiltonian rs2txt.dat --nk 100 --output bands.png
+
+# Projected bands
+rsutil bands --lattice lattice.nml --hamiltonian rs2txt.dat --nk 100 \
+       --projections --projection orbital
+
+# DOS with Fermi level and moments
+rsutil dos --lattice lattice.nml --hamiltonian rs2txt.dat --mesh 6 6 6 \
+       --electrons 16 --moments
 ```
 
 LMAX notes
