@@ -1049,7 +1049,8 @@ def validate_setup_inputs():
     return True
 
 
-def validate_setup_parameters(min_radius, max_radius, lmx, lattice_dist, basis_dist, alat_scale):
+def validate_setup_parameters(min_radius, max_radius, lmx, lattice_dist, basis_dist, alat_scale,
+                              mode_2d, z_iso_factor):
     """
     Validate setup parameter ranges.
     
@@ -1097,6 +1098,14 @@ def validate_setup_parameters(min_radius, max_radius, lmx, lattice_dist, basis_d
 
     if alat_scale <= 0:
         print(f"ERROR: --alat-scale must be > 0, got {alat_scale}", file=sys.stderr)
+        return False
+
+    if z_iso_factor is not None and z_iso_factor <= 0:
+        print(f"ERROR: --z-iso-factor must be > 0, got {z_iso_factor}", file=sys.stderr)
+        return False
+
+    if z_iso_factor is not None and not mode_2d:
+        print("ERROR: --z-iso-factor requires --2d", file=sys.stderr)
         return False
     
     return True
@@ -1974,6 +1983,19 @@ Examples:
         help="Random seed for reproducible lattice/basis distortions (default: random)",
     )
     parser.add_argument(
+        "--2d",
+        dest="mode_2d",
+        action="store_true",
+        default=False,
+        help="Enable 2D setup mode and derive z-axis length before WS/ASA processing",
+    )
+    parser.add_argument(
+        "--z-iso-factor",
+        type=float,
+        default=None,
+        help="Isotropic-density surface margin factor for 2D z-axis derivation (requires --2d)",
+    )
+    parser.add_argument(
         "--sqs",
         type=str,
         default=None,
@@ -2076,6 +2098,8 @@ Examples:
             args.lattice_dist,
             args.basis_dist,
             args.alat_scale,
+            args.mode_2d,
+            args.z_iso_factor,
         ):
             sys.exit(1)
         if not validate_sqs_parameters(args.sqs, args.sqs_shells, args.sqs_steps):
@@ -2095,6 +2119,12 @@ Examples:
         print(f"  Lattice dist:      {args.lattice_dist} alat")
         print(f"  Basis dist:        {args.basis_dist} alat")
         print(f"  Alat scale:        {args.alat_scale}")
+        print(f"  2D mode:           {'enabled' if args.mode_2d else 'disabled'}")
+        if args.mode_2d:
+            if args.z_iso_factor is None:
+                print("  2D z rule:         (zmax-zmin) + 1.0*alat")
+            else:
+                print(f"  2D z rule:         isotropic (factor={args.z_iso_factor})")
         if args.seed is not None:
             print(f"  Seed:              {args.seed}")
         if args.sqs is not None:
@@ -2182,6 +2212,8 @@ Examples:
                         basis_dist=args.basis_dist,
                         alat_scale=args.alat_scale,
                         seed=args.seed,
+                        mode_2d=args.mode_2d,
+                        z_iso_factor=args.z_iso_factor,
                     )
                 finally:
                     shutil.move(orig_lat_tmp, "lattice.nml")
@@ -2201,6 +2233,8 @@ Examples:
                     basis_dist=args.basis_dist,
                     alat_scale=args.alat_scale,
                     seed=args.seed,
+                    mode_2d=args.mode_2d,
+                    z_iso_factor=args.z_iso_factor,
                 )
             
             if args.verbose:
@@ -2298,6 +2332,11 @@ Examples:
         if args.alat_scale <= 0:
             print(f"ERROR: --alat-scale must be > 0, got {args.alat_scale}", file=sys.stderr)
             sys.exit(1)
+        if args.z_iso_factor is not None and args.z_iso_factor <= 0:
+            print(f"ERROR: --z-iso-factor must be > 0, got {args.z_iso_factor}", file=sys.stderr)
+            sys.exit(1)
+        if args.z_iso_factor is not None and not args.mode_2d:
+            print("ERROR: --z-iso-factor requires --2d", file=sys.stderr)
         if not validate_sqs_parameters(args.sqs, args.sqs_shells, args.sqs_steps):
             sys.exit(1)
         if args.sqs is not None and args.supercell is None:
@@ -2358,6 +2397,8 @@ Examples:
                 basis_dist=args.basis_dist,
                 alat_scale=args.alat_scale,
                 seed=args.seed,
+                mode_2d=args.mode_2d,
+                z_iso_factor=args.z_iso_factor,
             )
             print(f"LMTO47 CTRL written to: {ctrl_file}")
         finally:

@@ -111,6 +111,8 @@ def _apply_geometry_transforms(
     lattice_dist: float = 0.0,
     basis_dist: float = 0.0,
     seed: Optional[int] = None,
+    mode_2d: bool = False,
+    z_iso_factor: Optional[float] = None,
 ) -> float:
     if alat_scale <= 0:
         raise ValueError(f"alat_scale must be > 0, got {alat_scale}")
@@ -118,6 +120,10 @@ def _apply_geometry_transforms(
         raise ValueError(f"lattice_dist must be >= 0, got {lattice_dist}")
     if basis_dist < 0:
         raise ValueError(f"basis_dist must be >= 0, got {basis_dist}")
+    if z_iso_factor is not None and z_iso_factor <= 0:
+        raise ValueError(f"z_iso_factor must be > 0, got {z_iso_factor}")
+    if z_iso_factor is not None and not mode_2d:
+        raise ValueError("z_iso_factor requires mode_2d=True")
 
     rng = np.random.default_rng(seed)
 
@@ -126,6 +132,40 @@ def _apply_geometry_transforms(
     for atom in structure.atoms_uc:
         atom.position = np.array(atom.position, dtype=float) * alat_scale
     alat_angstrom = float(alat_angstrom * alat_scale)
+
+    if mode_2d:
+        z_positions = np.array([float(atom.position[2]) for atom in structure.atoms_uc], dtype=float)
+        if z_positions.size == 0:
+            raise ValueError("2D mode requires at least one atom")
+        zmin = float(np.min(z_positions))
+        zmax = float(np.max(z_positions))
+        zspan = zmax - zmin
+
+        if z_iso_factor is None:
+            lz = zspan + alat_angstrom
+        else:
+            a1 = np.array(structure.unit_cell[0], dtype=float)
+            a2 = np.array(structure.unit_cell[1], dtype=float)
+            area = float(np.linalg.norm(np.cross(a1, a2)))
+            if area <= 0:
+                raise ValueError("Invalid in-plane area for 2D mode")
+            tol = 1.0e-8
+            n1 = int(np.count_nonzero(np.abs(z_positions - zmin) <= tol))
+            nM = int(np.count_nonzero(np.abs(z_positions - zmax) <= tol))
+            if n1 <= 0 or nM <= 0:
+                raise ValueError("2D layer detection failed")
+            lz = zspan + z_iso_factor * np.sqrt(area / n1) + z_iso_factor * np.sqrt(area / nM)
+
+        if lz <= 0:
+            raise ValueError("Computed 2D z-axis length is non-positive")
+        normal = np.cross(a1, a2)
+        nrm = float(np.linalg.norm(normal))
+        if nrm <= 1e-12:
+            raise ValueError("Cannot build 2D normal: a1 and a2 are collinear")
+        normal = normal / nrm
+        if normal[2] < 0:
+            normal = -normal
+        structure.unit_cell[2] = normal * lz
 
     # Apply Gaussian noise in units of alat to Cartesian vectors.
     if lattice_dist > 0:
@@ -202,6 +242,8 @@ def export_ctrl(
     basis_dist: float = 0.0,
     alat_scale: float = 1.0,
     seed: Optional[int] = None,
+    mode_2d: bool = False,
+    z_iso_factor: Optional[float] = None,
     **kwargs
 ) -> str:
     alat_angstrom = None
@@ -248,6 +290,8 @@ def export_ctrl(
         lattice_dist=lattice_dist,
         basis_dist=basis_dist,
         seed=seed,
+        mode_2d=mode_2d,
+        z_iso_factor=z_iso_factor,
     )
 
     payload = build_ctrl_payload(structure, alat_angstrom=alat_angstrom, nspin=nspin, lmx=lmx)

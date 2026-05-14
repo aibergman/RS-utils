@@ -102,7 +102,8 @@ if lib_filename is not None:
         # Define process_lattice() signature with multiple arguments
         _rsutil.process_lattice.argtypes = [
             ctypes.c_char_p, ctypes.c_int, ctypes.c_double, ctypes.c_double, ctypes.c_int,
-            ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_int, ctypes.c_int
+            ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_int, ctypes.c_int,
+            ctypes.c_int, ctypes.c_double
         ]
         _rsutil.process_lattice.restype = None
     except Exception as e:
@@ -118,7 +119,8 @@ else:
 def process_lattice(cluster_type: str = "periodic", empty_spheres: bool = False,
                    min_empty_radius: float = 1.2, max_empty_radius: float = 2.5,
                    lmx: int = 2, lattice_dist: float = 0.0, basis_dist: float = 0.0,
-                   alat_scale: float = 1.0, seed: Optional[int] = None) -> None:
+                   alat_scale: float = 1.0, seed: Optional[int] = None,
+                   mode_2d: bool = False, z_iso_factor: Optional[float] = None) -> None:
     """
     Python wrapper for the process_lattice() Fortran routine.
     
@@ -156,6 +158,8 @@ def process_lattice(cluster_type: str = "periodic", empty_spheres: bool = False,
     alat_scale_dbl = ctypes.c_double(alat_scale)
     seed_flag = ctypes.c_int(1 if seed is not None else 0)
     seed_value = ctypes.c_int(0 if seed is None else int(seed))
+    mode_2d_flag = ctypes.c_int(1 if mode_2d else 0)
+    z_iso_factor_dbl = ctypes.c_double(-1.0 if z_iso_factor is None else float(z_iso_factor))
 
     # Call the Fortran routine with separate arguments
     _rsutil.process_lattice(
@@ -169,4 +173,6 @@ def process_lattice(cluster_type: str = "periodic", empty_spheres: bool = False,
         alat_scale_dbl,
         seed_flag,
         seed_value,
+        mode_2d_flag,
+        z_iso_factor_dbl,
     )

@@ -14,5 +14,7 @@ module rsutil_config
   real(rp) :: alat_scale_factor = 1.0_rp
   integer :: random_seed_value = 0
   logical :: use_fixed_seed = .false.
+  logical :: use_2d_mode = .false.
+  real(rp) :: z_iso_factor = -1.0_rp
 
 end module rsutil_config
