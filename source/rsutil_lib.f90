@@ -46,6 +46,10 @@ subroutine process_lattice_impl()
   end if
 
   call apply_setup_geometry_transforms(lat_input, lat_data)
+  if (use_2d_mode) then
+     lat_input%b3 = .false.
+     lat_input%n3 = 1
+  end if
 
   !-----------------------------------------------------------------
   ! Initialize the spheres module.
@@ -139,7 +143,8 @@ subroutine apply_2d_cell_mode(lat_inp, lat_dat)
   type(lattice_inp), intent(in) :: lat_inp
   type(lattice_t), intent(inout) :: lat_dat
   integer :: nsites, i, n_bottom, n_top
-  real(rp) :: zmin, zmax, zspan, lz_ang, lz_norm, area_xy
+  real(rp) :: zmin, zmax, zspan, lz_ang, lz_norm, area_xy, nrm
+  real(rp) :: normal(3)
   real(rp), parameter :: ztol = 1.0e-6_rp
 
   nsites = size(lat_dat%crd, 2)
@@ -168,8 +173,13 @@ subroutine apply_2d_cell_mode(lat_inp, lat_dat)
 
   if (lz_norm <= 0.0_rp) error stop "Computed 2d z-length is non-positive"
 
-  lat_dat%a(:, 3) = 0.0_rp
-  lat_dat%a(3, 3) = lz_norm
+  normal = cross3(lat_dat%a(:, 1), lat_dat%a(:, 2))
+  nrm = sqrt(sum(normal**2))
+  if (nrm <= 1.0e-12_rp) error stop "Cannot build 2d normal: a1 and a2 are collinear"
+  normal = normal / nrm
+  if (normal(3) < 0.0_rp) normal = -normal
+
+  lat_dat%a(:, 3) = normal * lz_norm
 end subroutine apply_2d_cell_mode
 
 subroutine set_seed_from_integer(seed_value)

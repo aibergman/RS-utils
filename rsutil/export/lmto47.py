@@ -158,7 +158,14 @@ def _apply_geometry_transforms(
 
         if lz <= 0:
             raise ValueError("Computed 2D z-axis length is non-positive")
-        structure.unit_cell[2] = np.array([0.0, 0.0, lz], dtype=float)
+        normal = np.cross(a1, a2)
+        nrm = float(np.linalg.norm(normal))
+        if nrm <= 1e-12:
+            raise ValueError("Cannot build 2D normal: a1 and a2 are collinear")
+        normal = normal / nrm
+        if normal[2] < 0:
+            normal = -normal
+        structure.unit_cell[2] = normal * lz
 
     # Apply Gaussian noise in units of alat to Cartesian vectors.
     if lattice_dist > 0:
