@@ -51,6 +51,7 @@ from . import process_lattice
 from .viz.rs_visualizer import rs_visualizer
 from .exchange.exchange_map import exchange_map
 from .export.uppasd import export_from_files
+from .export.lmto47 import export_ctrl
 
 
 def _make_common_parser():
@@ -1694,6 +1695,24 @@ Examples:
         help="Output directory for exported UppASD files (relative to --data)",
     )
     parser.add_argument(
+        "--lmto47",
+        action="store_true",
+        default=False,
+        help="Export RS-LMTO lattice/input to LMTO47 CTRL format",
+    )
+    parser.add_argument(
+        "--nspin",
+        type=int,
+        default=2,
+        help="NSPIN value for LMTO47 export (default: 2)",
+    )
+    parser.add_argument(
+        "--lmx",
+        type=int,
+        default=2,
+        help="Maximum L channel override (default: 2; spd)",
+    )
+    parser.add_argument(
         "--cluster",
         type=str,
         default="periodic",
@@ -1817,7 +1836,8 @@ Examples:
                 cluster_type=args.cluster, 
                 empty_spheres=args.empty_spheres,
                 min_empty_radius=args.min_empty_radius, 
-                max_empty_radius=args.max_empty_radius
+                max_empty_radius=args.max_empty_radius,
+                lmx=args.lmx,
             )
             
             if args.verbose:
@@ -1904,6 +1924,19 @@ Examples:
             rij_out=args.rij_out,
             rij_fmt=args.rij_format,
         )
+    # Export to LMTO47 CTRL if requested
+    elif args.lmto47:
+        lattice_path = os.path.join(args.data, "lattice.nml")
+        input_path = os.path.join(args.data, "input.nml")
+        out_dir = os.path.join(args.data, args.out) if args.data else args.out
+        ctrl_file = export_ctrl(
+            source=("rs_lmto", lattice_path, input_path),
+            out_dir=out_dir,
+            header="RS-tools export",
+            nspin=args.nspin,
+            lmx=args.lmx,
+        )
+        print(f"LMTO47 CTRL written to: {ctrl_file}")
     # Export to UppASD if requested
     elif args.export:
         # default lattice path in data dir

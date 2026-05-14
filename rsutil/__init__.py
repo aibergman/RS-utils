@@ -100,7 +100,7 @@ if lib_filename is not None:
         lib_path: str = os.path.join(pkg_dir, lib_filename)
         _rsutil: ctypes.CDLL = ctypes.CDLL(lib_path)
         # Define process_lattice() signature with multiple arguments
-        _rsutil.process_lattice.argtypes = [ctypes.c_char_p, ctypes.c_int, ctypes.c_double, ctypes.c_double]
+        _rsutil.process_lattice.argtypes = [ctypes.c_char_p, ctypes.c_int, ctypes.c_double, ctypes.c_double, ctypes.c_int]
         _rsutil.process_lattice.restype = None
     except Exception as e:
         import warnings
@@ -112,8 +112,9 @@ else:
     _rsutil = None
 
 
-def process_lattice(cluster_type: str = "periodic", empty_spheres: bool = False, 
-                   min_empty_radius: float = 1.2, max_empty_radius: float = 2.5) -> None:
+def process_lattice(cluster_type: str = "periodic", empty_spheres: bool = False,
+                   min_empty_radius: float = 1.2, max_empty_radius: float = 2.5,
+                   lmx: int = 2) -> None:
     """
     Python wrapper for the process_lattice() Fortran routine.
     
@@ -147,4 +148,4 @@ def process_lattice(cluster_type: str = "periodic", empty_spheres: bool = False,
     max_radius_dbl = ctypes.c_double(max_empty_radius)
     
     # Call the Fortran routine with separate arguments
-    _rsutil.process_lattice(cluster_type.encode('utf-8'), empty_spheres_int, min_radius_dbl, max_radius_dbl)
+    _rsutil.process_lattice(cluster_type.encode('utf-8'), empty_spheres_int, min_radius_dbl, max_radius_dbl, ctypes.c_int(lmx))

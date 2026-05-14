@@ -3,8 +3,8 @@ complex(rp), dimension(9) :: cx0, cx1, wx0, wx1
 real(rp), dimension(3) :: mom
 real(rp), dimension(3) :: lmom
 real(rp), dimension(18) :: cshi, dw_l
-real(rp), dimension(3, 2):: pl, center_band, width_band, gravity_center, shifted_band, obar, c, enu, ppar, qpar, srdel, vl
-real(rp), dimension(3, 3, 2) :: ql
+real(rp), dimension(4, 2):: pl, center_band, width_band, gravity_center, shifted_band, obar, c, enu, ppar, qpar, srdel, vl
+real(rp), dimension(3, 4, 2) :: ql
 real(rp) :: center_band_s_up, center_band_s_dw, &
             center_band_p_up, center_band_p_dw, &
             center_band_d_up, center_band_d_dw, &

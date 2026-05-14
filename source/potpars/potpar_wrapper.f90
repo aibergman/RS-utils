@@ -6,13 +6,14 @@ module potpar_wrapper
   implicit none
 contains
 
-  subroutine update_atoms(pot_data, atm_input, lat_data, lat_input)
+  subroutine update_atoms(pot_data, atm_input, lat_data, lat_input, lmax_override)
     implicit none
 
     type(potential_t), intent(out) :: pot_data
     type(atoms_inp), intent(in) :: atm_input
     type(lattice_t), intent(in) :: lat_data
     type(lattice_inp), intent(in) :: lat_input
+    integer, intent(in), optional :: lmax_override
 
     ! Local variables
     integer :: I
@@ -20,7 +21,7 @@ contains
     character(len=20) :: filename
     
     do I = 1, lat_data%nbulk_bulk
-      call process_one_atom(pot_data, atm_input, lat_data, lat_input, element, I)
+      call process_one_atom(pot_data, atm_input, lat_data, lat_input, element, I, lmax_override)
       !  write(*,*) atm_input%label(I)
       !  write(*,*) element%symbol
       filename = trim(adjustl(atm_input%label(I))) // ".nml"
@@ -29,7 +30,7 @@ contains
 
   end subroutine update_atoms
 
-  subroutine process_one_atom(pot_data, atm_input, lat_data, lat_input, element, iatom)
+  subroutine process_one_atom(pot_data, atm_input, lat_data, lat_input, element, iatom, lmax_override)
   !subroutine process_one_atom(pot_data, z, wsr, wavg)
     implicit none
     type(potential_t), intent(out) :: pot_data
@@ -38,6 +39,8 @@ contains
     type(lattice_inp), intent(in) :: lat_input
     type(element_t), intent(out) :: element
     integer, intent(in) :: iatom
+    integer, intent(in), optional :: lmax_override
+    integer :: target_lmax
 
     ! Local variables
     type(lmto_t) :: lm
@@ -53,15 +56,28 @@ contains
     lm%wsr(1) = lat_data%ws(iatom)
     lm%avw = lat_input%wav
 
-    ! Initialization (one atom at a time, hard wired to Lmax=2)
+    ! Initialization (one atom at a time, default Lmax=2 unless overridden)
     lm%nclass = 1
-    lm%nl = 3
+    target_lmax = 2
+    if (present(lmax_override)) target_lmax = lmax_override
+    if (target_lmax < 0 .or. target_lmax > 3) then
+      error stop "Requested lmax out of supported range [0,3]"
+    end if
+    lm%nl = target_lmax + 1
     lm%nsp = 2
     lm%lafm = .false.
     lm%lfree = .false.
+    allocate(lm%pnu(0:lm%nl-1, 2, 1))
+    allocate(lm%qnu(0:2, 0:lm%nl-1, 2, 1))
+    allocate(lm%pp(6, 0:lm%nl-1, 2, 1))
+    allocate(lm%pdum(0:lm%nl-1, 2, 1))
+    lm%pnu = 0.0d0
+    lm%qnu = 0.0d0
+    lm%pp = 0.0d0
+    lm%pdum = 0.0d0
 
     ! Transform and compute moments (defcnf & defmom)
-    call perform_transformations(lm%konfig, lm%lmx, lm%nclass, lm%nl, lm%nsp, lm%pnu, lm%qnu, lm%z, lm%lafm, lm%lfree)
+    call perform_transformations(lm%konfig, lm%lmx, lm%nclass, lm%nl, lm%nsp, lm%pnu, lm%qnu, lm%z, lm%lafm, lm%lfree, target_lmax)
 
     ! Compute potential parameters (defpp and related processing)
     call compute_potential(lm%avw, lm%nclass, lm%nl, lm%nsp, lm%pp, lm%wsr, lm%z, lm%pdum)
@@ -93,19 +109,20 @@ contains
     read(*,*) wsr(1)
   end subroutine get_user_input
 
-  subroutine perform_transformations(konfig, lmx, nclass, nl, nsp, pnu, qnu, z, lafm, lfree)
+  subroutine perform_transformations(konfig, lmx, nclass, nl, nsp, pnu, qnu, z, lafm, lfree, target_lmax)
     implicit none
     ! Calls defcnf and defmom from lm47_utils and adjusts the quantum numbers.
     integer, intent(inout) :: konfig(0:3, 1)
     integer, intent(inout) :: lmx(1)
     integer, intent(in) :: nclass, nl, nsp
-    real(kind=8), intent(inout) :: pnu(0:3-1, 2, 1)
-    real(kind=8), intent(inout) :: qnu(0:2, 0:3-1, 2, 1)
+    real(kind=8), intent(inout) :: pnu(0:, :, :)
+    real(kind=8), intent(inout) :: qnu(0:, 0:, :, :)
     real(kind=8), intent(in) :: z(1)
     logical, intent(inout) :: lafm, lfree
+    integer, intent(in) :: target_lmax
 
     call defcnf(konfig, lmx(1), z(1))
-    lmx(1) = 2
+    lmx(1) = min(target_lmax, 3)
     ! print *, 'Calling defmom', lfree
     ! lfree = .true.
     call defmom(konfig, lafm, lfree, lmx, nclass, nl, nsp, pnu, qnu, z)
@@ -118,9 +135,9 @@ contains
     ! Calls defpp from lm47_utils and then reorders and transforms the potential parameters.
     real(kind=8), intent(in) :: avw
     integer, intent(in) :: nclass, nl, nsp
-    real(kind=8), intent(inout) :: pp(6, 0:3-1, 2, 1)
+    real(kind=8), intent(inout) :: pp(:, :, :, :)
     real(kind=8), intent(in) :: wsr(1), z(1)
-    real(kind=8), intent(inout) :: pdum(0:3-1, 2, 1)
+    real(kind=8), intent(inout) :: pdum(:, :, :)
     ! print *, 'Calling defpp'
     call defpp(avw, nclass, nl, nsp, pp, wsr, z)
     ! Transform from LMTO47 to RS-LMTO convention:
@@ -167,25 +184,53 @@ contains
 
     integer :: i, j, k, nf
 
-    potential%lmax = 2
+    potential%lmax = lm%nl - 1
+    if (allocated(potential%pl)) deallocate(potential%pl)
+    if (allocated(potential%ql)) deallocate(potential%ql)
+    if (allocated(potential%center_band)) deallocate(potential%center_band)
+    if (allocated(potential%shifted_band)) deallocate(potential%shifted_band)
+    if (allocated(potential%width_band)) deallocate(potential%width_band)
+    if (allocated(potential%enu)) deallocate(potential%enu)
+    if (allocated(potential%c)) deallocate(potential%c)
+    if (allocated(potential%srdel)) deallocate(potential%srdel)
+    if (allocated(potential%qpar)) deallocate(potential%qpar)
+    if (allocated(potential%ppar)) deallocate(potential%ppar)
+    if (allocated(potential%obar)) deallocate(potential%obar)
+    if (allocated(potential%vl)) deallocate(potential%vl)
+    allocate(potential%pl(potential%lmax+1,2))
+    allocate(potential%ql(3,potential%lmax+1,2))
+    allocate(potential%center_band(potential%lmax+1,2))
+    allocate(potential%shifted_band(potential%lmax+1,2))
+    allocate(potential%width_band(potential%lmax+1,2))
+    allocate(potential%enu(potential%lmax+1,2))
+    allocate(potential%c(potential%lmax+1,2))
+    allocate(potential%srdel(potential%lmax+1,2))
+    allocate(potential%qpar(potential%lmax+1,2))
+    allocate(potential%ppar(potential%lmax+1,2))
+    allocate(potential%obar(potential%lmax+1,2))
+    allocate(potential%vl(potential%lmax+1,2))
+    potential%center_band = 0.0_rp
+    potential%shifted_band = 0.0_rp
+    potential%width_band = 0.0_rp
+    potential%obar = 0.0_rp
 
     ! Potential function
-    potential%pl = lm%pnu(:,:,1)
+    potential%pl = lm%pnu(0:potential%lmax,:,1)
 
     ! Charge and band moments
-    potential%ql = lm%qnu(:,:,:,1)
+    potential%ql = lm%qnu(:,0:potential%lmax,:,1)
 
     ! Wigner-Seitz radius
     potential%ws_r = lm%wsr(1)
 
     ! ORT potential parameters
-    potential%enu = lm%pp(1, :, :, 1)
-    potential%c = lm%pp(2, :, :, 1)
-    potential%srdel = lm%pp(3, :, :, 1)
-    potential%qpar = lm%pp(4, :, :, 1)
-    potential%ppar = lm%pp(5, :, :, 1)
+    potential%enu = lm%pp(1, 0:potential%lmax, :, 1)
+    potential%c = lm%pp(2, 0:potential%lmax, :, 1)
+    potential%srdel = lm%pp(3, 0:potential%lmax, :, 1)
+    potential%qpar = lm%pp(4, 0:potential%lmax, :, 1)
+    potential%ppar = lm%pp(5, 0:potential%lmax, :, 1)
     ! Actually vl is not pp(6) but it is not an input anyway
-    potential%vl =  lm%pp(6, :, :, 1)
+    potential%vl =  lm%pp(6, 0:potential%lmax, :, 1)
     !potential%dnu = lm%pp(6, :, :, 1)
 
     element%symbol = atom%label(iatom)
@@ -197,8 +242,10 @@ contains
     !print *,'AB core:', element%atomic_number, element%valence
 
     element%num_quant_s = int(potential%pl(1,1))
-    element%num_quant_p = int(potential%pl(2,1))
-    element%num_quant_d = int(potential%pl(3,1))
+    element%num_quant_p = 0
+    element%num_quant_d = 0
+    if (potential%lmax >= 1) element%num_quant_p = int(potential%pl(2,1))
+    if (potential%lmax >= 2) element%num_quant_d = int(potential%pl(3,1))
     ! Add small values to moments for empty spheres
     if(element%atomic_number==0)  then
       call random_number(potential%ql)

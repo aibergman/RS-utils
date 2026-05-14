@@ -33,9 +33,15 @@ contains
         integer :: ntype = 1
         real(rp), allocatable :: ct(:)
         real(rp) :: r2
+        character(len=16) :: strux_backend = ''
+        logical :: strux_want_sdot = .false.
+        real(rp) :: strux_solve_scale = 1.0_rp
+        logical :: has_strux_backend, has_strux_want_sdot, has_strux_solve_scale
+        character(len=1024) :: scan_line
+        integer :: scan_ios
 
         namelist /lattice/ rc, alat, crystal_sym, wav, pbc, b1, b2, b3, n1, n2, n3, ndim, &
-            ntype, ct, r2
+            ntype, ct, r2, strux_backend, strux_want_sdot, strux_solve_scale
 
         !-------------------------------------------------------------------
         ! Temporary variables for reading the atoms namelist.
@@ -57,6 +63,18 @@ contains
         ! Set ntype to zero to track if it was read from the file.
         ntype = lat_lat%ntype
         r2 = lat_lat%r2
+        has_strux_backend = .false.
+        has_strux_want_sdot = .false.
+        has_strux_solve_scale = .false.
+        do
+          read(unit, '(A)', iostat=scan_ios) scan_line
+          if (scan_ios /= 0) exit
+          scan_line = lower_string(scan_line)
+          if (index(scan_line, "strux_backend") > 0) has_strux_backend = .true.
+          if (index(scan_line, "strux_want_sdot") > 0) has_strux_want_sdot = .true.
+          if (index(scan_line, "strux_solve_scale") > 0) has_strux_solve_scale = .true.
+        end do
+        rewind(unit)
 
         ! Read the &lattice namelist.
         read(unit, nml=lattice,  iostat=read_status)
@@ -110,6 +128,12 @@ contains
         lat%ntype = ntype
         lat%ndim = ndim
         lat%r2 = r2
+        lat%strux_backend = strux_backend
+        lat%has_strux_backend = has_strux_backend
+        lat%strux_want_sdot = strux_want_sdot
+        lat%has_strux_want_sdot = has_strux_want_sdot
+        lat%strux_solve_scale = strux_solve_scale
+        lat%has_strux_solve_scale = has_strux_solve_scale
         allocate(lat%ct(lat%ntype))
         lat%ct = ct
 
@@ -179,8 +203,22 @@ contains
           write(unit, '(A, I0)') "ntype = ", lat%ntype
           write(unit, '(A, F10.4)') "ct(:) = ", lat%ct(1)
           write(unit, '(A, F12.6)') "r2 = ", lat%r2
+          if (lat%has_strux_backend) write(unit, '(A, A, A)') "strux_backend = '", trim(lat%strux_backend), "'"
+          if (lat%has_strux_want_sdot) write(unit, '(A, L1)') "strux_want_sdot = ", lat%strux_want_sdot
+          if (lat%has_strux_solve_scale) write(unit, '(A, ES16.8)') "strux_solve_scale = ", lat%strux_solve_scale
           write(unit, '(A)') "/"
         end subroutine write_lattice_block
+
+        function lower_string(s) result(out)
+          character(len=*), intent(in) :: s
+          character(len=len(s)) :: out
+          integer :: ii, ia
+          out = s
+          do ii = 1, len(s)
+            ia = iachar(s(ii:ii))
+            if (ia >= iachar('A') .and. ia <= iachar('Z')) out(ii:ii) = achar(ia + 32)
+          end do
+        end function lower_string
       
         !-------------------------------------------------------------------
         ! Subroutine: write_atoms_block
