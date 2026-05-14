@@ -1,0 +1,81 @@
+&calculation
+!post_processing = 'band_structure'
+!post_processing = 'density_of_states'
+pre_processing = 'bravais'
+verbose = T
+/
+&lattice
+rc = 010 ! radius cut. We could think about setting a default
+alat = 2.859 ! lattice parapeter
+crystal_sym = 'file' ! options are bcc, fcc and hcp so far.
+wav = 1.406216
+pbc = .true.
+ntype = 2
+ct(:) = 4.0d0
+r2 = 16.0d0
+/
+&atoms
+database = './'
+label(1) = 'Fe'
+label(2) = 'Co'
+/
+&self
+use_kspace = .true.     ! USE K-SPACE DIAGONALIZATION INSTEAD OF RECURSION
+ws_all = .true. ! ''
+nstep = 2
+conv_thr = 0.5e-9
+/
+&energy
+fermi = 0.005107
+energy_min = -1.0
+energy_max = 0.5
+channels_ldos = 2500
+/
+&control
+calctype = 'B'
+nsp = 1 ! type of calculation, nsp can be 1, 2, 3 or 4
+lld = 21
+recur = 'block'
+/
+&mix
+beta = 0.02
+mixtype = 'broyden'
+/
+
+&reciprocal
+! K-point mesh for SCF (start with 12x12x12 for benchmarking)
+nk1 = 16
+nk2 = 16
+nk3 = 16
+
+! K-point offset (Gamma-centered mesh)
+k_offset_x = 0.0
+k_offset_y = 0.0
+k_offset_z = 0.0
+
+! Symmetry reduction (highly recommended for BCC - reduces by ~48x)
+use_symmetry_reduction = .false.
+use_time_reversal = .false.
+
+! DOS calculation method
+dos_method = 'gaussian'
+gaussian_sigma = 0.003
+!dos_method = 'tetrahedron'    ! Use tetrahedron for accuracy
+
+! Energy grid for DOS
+n_energy_points = 2000
+dos_energy_min = -1.5         ! Match energy_min from &energy
+dos_energy_max = 1.0          ! Match energy_max from &energy
+
+! Temperature for Fermi-Dirac smearing
+temperature = 300.0
+
+! Don't auto-find Fermi - use value from &energy
+auto_find_fermi = .true.
+
+! Suppress verbose k-point loggin
+suppress_internal_logs = .true.
+/
+&dos
+total_electrons = 17.0
+/

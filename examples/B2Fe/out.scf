@@ -1,0 +1,67 @@
+ Running with           2 MPI processes.
+ Each MPI process is using           2 OpenMP threads.
+  OpenMP in play with            2  cores.
+          15           1        2145        2164        2165        2470        2471        2490        2491        6473        6779        6798        6799        6819        7125           0
+          15           6
+          15           1        2145        2164        2165        2470        2471        2490        2491        6473        6779        6798        6799        6819        7125           0
+          15           6
+[Feb  3 2025 10:20:26.368] [element.f90:92]            [1m[32m<info> [0m[0mReading element from previous result ./Fe-1_out.nml
+[Feb  3 2025 10:20:26.369] [potential.f90:161]         [1m[32m<info> [0m[0mReading potential from previous result ./Fe-1_out.nml
+[Feb  3 2025 10:20:26.369] [element.f90:92]            [1m[32m<info> [0m[0mReading element from previous result ./Fe-2_out.nml
+[Feb  3 2025 10:20:26.369] [potential.f90:161]         [1m[32m<info> [0m[0mReading potential from previous result ./Fe-2_out.nml
+[Feb  3 2025 10:20:27.242] [self.f90:683]              [1m[32m<info> [0m[0mPerform recursion at step 1
+[Feb  3 2025 10:20:27.543] [recursion.f90:1123]        [1m[32m<info> [0m[0mBlock recursion on progress for atom 1
+[Feb  3 2025 10:20:27.743] [recursion.f90:1123]        [1m[32m<info> [0m[0mBlock recursion on progress for atom 2
+[Feb  3 2025 10:20:40.055] [self.f90:733]              [1m[32m<info> [0m[0mCalculating the density of states and the new moment bands
+[Feb  3 2025 10:20:40.950] [bands.f90:251]             [1m[32m<info> [0m[0mValence is:       16.000000
+[Feb  3 2025 10:20:41.171] [bands.f90:807]             [1m[32m<info> [0m[0mSpin moment of atom   2 is   1.588349
+[Feb  3 2025 10:20:41.172] [bands.f90:817]             [1m[32m<info> [0m[0mSpin moment projections of atom   2 is   0.000000   0.000000  -1.588349
+[Feb  3 2025 10:20:41.220] [bands.f90:317]             [1m[32m<info> [0m[0mFree Fermi energy: -0.671411
+[Feb  3 2025 10:20:41.220] [bands.f90:807]             [1m[32m<info> [0m[0mSpin moment of atom   1 is   1.610659
+[Feb  3 2025 10:20:41.220] [bands.f90:817]             [1m[32m<info> [0m[0mSpin moment projections of atom   1 is   0.000000   0.000000  -1.610659
+[Feb  3 2025 10:20:41.220] [mix.f90:362]               [1m[32m<info> [0m[0mSpin moment at atom    2 is being considered induced
+[Feb  3 2025 10:20:41.230] [bands.f90:921]             [1m[32m<info> [0m[0mOrbital moment of atom   2 is   0.001496   0.000391  -0.000414
+[Feb  3 2025 10:20:41.278] [bands.f90:921]             [1m[32m<info> [0m[0mOrbital moment of atom   1 is  -0.001964   0.000138  -0.006440
+ ******NEUTRALIDADE DE CARGA NAO OBEDECIDA - 5E-04 PROGRAMA ABORTADO
+[Feb  3 2025 10:20:41.279] [self.f90:770]              [1m[32m<info> [0m[0mMixtype is broyden
+[Feb  3 2025 10:20:41.280] [mix.f90:407]               [1m[32m<info> [0m[0mValence at atom   1 is   8.000000
+[Feb  3 2025 10:20:41.280] [mix.f90:410]               [1m[32m<info> [0m[0mCharge transfer at atom    1:  -0.007385  -1.201112   1.193728
+[Feb  3 2025 10:20:41.280] [mix.f90:407]               [1m[32m<info> [0m[0mValence at atom   2 is   8.000000
+[Feb  3 2025 10:20:41.280] [mix.f90:410]               [1m[32m<info> [0m[0mCharge transfer at atom    2:   0.007385  -1.197390   1.204775
+[Feb  3 2025 10:20:41.280] [mix.f90:417]               [1m[32m<info> [0m[0mMoment diff for atom:   1 is   0.296553
+[Feb  3 2025 10:20:41.280] [mix.f90:417]               [1m[32m<info> [0m[0mMoment diff for atom:   2 is   0.296456
+ ******NEUTRALIDADE DE CARGA NAO OBEDECIDA - 5E-04 PROGRAMA ABORTADO
+[Feb  3 2025 10:20:41.280] [self.f90:986]              [1m[32m<info> [0m[0mFe-1
+[Feb  3 2025 10:20:41.280] [self.f90:1061]             [1m[32m<info> [0m[0mXC functional: B-H 11.3628046049354612E-004
+[Feb  3 2025 10:20:41.280] [self.f90:1091]             [1m[32m<info> [0m[0mF core check:0
+[Feb  3 2025 10:20:41.280] [self.f90:1061]             [1m[32m<info> [0m[0mXC functional: B-H 11.3628046049354612E-004
+[Feb  3 2025 10:20:41.280] [self.f90:1091]             [1m[32m<info> [0m[0mF core check:0
+[Feb  3 2025 10:20:41.364] [self.f90:797]              [1m[32m<info> [0m[0mAtomic SFC done for atom Fe-2
+[Feb  3 2025 10:20:41.364] [self.f90:797]              [1m[32m<info> [0m[0mAtomic SFC done for atom Fe-1
+[Feb  3 2025 10:20:41.364] [self.f90:822]              [1m[32m<info> [0m[0mFrom orthogonal to TB basis for atom Fe-1
+[Feb  3 2025 10:20:41.364] [self.f90:822]              [1m[32m<info> [0m[0mFrom orthogonal to TB basis for atom Fe-2
+[Feb  3 2025 10:20:41.364] [self.f90:834]              [1m[32m<info> [0m[0mNot converged! Diff= 0.2096605631
+[Feb  3 2025 10:20:41.365] [bands.f90:1092]            [1m[32m<info> [0m[0mMagnetic field on atom   1 is         0.000000         0.000000    -20743.278305
+[Feb  3 2025 10:20:41.365] [bands.f90:1093]            [1m[32m<info> [0m[0mMagnetic torque on atom   1 is        -0.000000         0.000000         0.000000
+[Feb  3 2025 10:20:41.365] [bands.f90:1092]            [1m[32m<info> [0m[0mMagnetic field on atom   2 is         0.000000         0.000000    -20322.062895
+[Feb  3 2025 10:20:41.365] [bands.f90:1093]            [1m[32m<info> [0m[0mMagnetic torque on atom   2 is        -0.000000         0.000000         0.000000
+[Feb  3 2025 10:20:41.365] [self.f90:879]              [1m[32m<info> [0m[0mCalculation finished. Report printed in report.out
+-------------------------------------------------------------------- TIMER REPORT ---------------------------------------------------------------------
+  CATEGORY                                            MEAN            MAX            MIN          TOTAL      TOTAL (%)         NCALLS   TOTAL NCALLS   
+  total                                                  -              -              -        17.0384          100.0              1             86   
+  └─ Calculation                                         -              -              -        17.0384          100.0              1             85   
+     ├─ Calculation*                                     -              -              -         1.2881            7.6              -              1   
+     ├─ pre-processing                                   -              -              -         1.6280            9.6              1              1   
+     └─ self-consistency                                 -              -              -        14.1223           82.9              1             83   
+        ├─ self-consistency*                             -              -              -         0.0004            0.0              -              1   
+        ├─ recursion                                     -              -              -        12.8127           75.2              1             80   
+        │  ├─ recursion*                                 -              -              -         0.3239            1.9              -              1   
+        │  ├─ H|PSI_n>                              0.4749         0.5834         0.4101         9.4987           55.7             20             20   
+        │  ├─ H|Psi_n-A_n|Psi_n-B_n|Psi_n-1         0.0780         0.0811         0.0749         1.5604            9.2             20             20   
+        │  ├─ B_n+1                                 0.0001         0.0002         0.0001         0.0025            0.0             20             20   
+        │  └─ <PSI|B_n+1|PSI>                       0.0714         0.1137         0.0637         1.4273            8.4             20             20   
+        ├─ calculation-of-DOS                            -              -              -         1.2249            7.2              1              1   
+        └─ atomic-sfc                                    -              -              -         0.0844            0.5              1              1   
+------------------------------------------------------------------------------------------------------------------------------------------------------
+  * exclusive values to this label
+------------------------------------------------------------------------------------------------------------------------------------------------------

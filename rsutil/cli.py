@@ -1,23 +1,33 @@
 """
 This module provides a command-line interface (CLI) for the rsutil package.
-It allows users to process lattice structures, visualize data, and create
-exchange input files through various command-line arguments.
+It allows users to process lattice structures, visualize data, create
+exchange input files, and perform band structure/DOS analysis through
+various command-line arguments and subcommands.
 
 Functions
 ---------
+main()
     Sets up the command-line argument parser and handles the execution of
     different functionalities based on the provided arguments.
 
 Usage
 -----
-To use this CLI, run the script with the desired flags:
-    python cli.py --setup
-    python cli.py --lattice --data <data_directory>
-    python cli.py --clust --data <data_directory>
-    python cli.py --exchange
+Existing functionality (flags):
+    rsutil --setup
+    rsutil --lattice --data <data_directory>
+    rsutil --clust --data <data_directory>
+    rsutil --exchange
+    rsutil --export
 
-Flags
------
+New subcommand functionality:
+    rsutil bands [options]          # Band structure calculation
+    rsutil dos [options]            # DOS calculation
+    rsutil moments [options]        # DOS moments analysis
+    rsutil projections [options]    # Projected bands
+    rsutil complete [options]       # Complete analysis
+
+Flags (existing functionality)
+-------------------------------
 --setup, -S
     Process lattice.
 --lattice, -L
@@ -26,16 +36,1533 @@ Flags
     Run visualizer for clust file.
 --exchange, -J
     Create exchange input files.
+--export, -E
+    Export to UppASD format.
 --data
     Directory for data files to be visualized (default: current directory).
 """
 
 import argparse
+import os
+import numpy as np
+import sys
+from pathlib import Path
 from . import process_lattice
 from .viz.rs_visualizer import rs_visualizer
 from .exchange.exchange_map import exchange_map
 from .export.uppasd import export_from_files
-import os
+from .export.lmto47 import export_ctrl
+
+
+def _make_common_parser():
+    """Create common parser for band/DOS subcommands"""
+    p = argparse.ArgumentParser(add_help=False)
+    p.add_argument(
+        "--lattice", default="lattice.nml", help="Lattice file (default: lattice.nml)"
+    )
+    p.add_argument(
+        "--hamiltonian",
+        default="rs2txt.dat",
+        help="Hamiltonian file (default: rs2txt.dat)",
+    )
+    p.add_argument(
+        "--lattice-format",
+        choices=["rs-lmto", "paoflow", "kite"],
+        default=None,
+        help="Lattice file format (auto-detect if not specified)",
+    )
+    p.add_argument(
+        "--hamiltonian-format",
+        choices=["rs-lmto", "paoflow", "kite"],
+        default=None,
+        help="Hamiltonian file format (auto-detect if not specified)",
+    )
+    return p
+
+
+def run_bands_subcommand(args):
+    """Run band structure calculation, projections, altermagnetic, or Berry curvature analysis"""
+    from .bands import load_lattice, load_hamiltonian, BandStructureCalculator
+
+    print(f"Reading lattice from {args.lattice}...")
+    lattice = load_lattice(args.lattice, format=args.lattice_format)
+
+    print(f"Reading Hamiltonian from {args.hamiltonian}...")
+    hamiltonian = load_hamiltonian(args.hamiltonian, format=args.hamiltonian_format)
+
+    # Helper function to setup k-path based on mode
+    def setup_kpath_from_args(calc, args):
+        """Setup k-path based on --kpath-mode and related arguments"""
+        kpath_mode = getattr(args, "kpath_mode", "auto")
+        
+        if kpath_mode == "seekpath":
+            print(f"Setting up k-path with seekpath (symprec={args.seekpath_symprec}, distance={args.seekpath_distance})...")
+            try:
+                kpoints, klabels, kdistances = calc.setup_kpath_seekpath(
+                    num_points=args.nk,
+                    interactive=False
+                )
+                return kpoints, klabels, kdistances
+            except ImportError:
+                print("Warning: seekpath not available, falling back to auto mode")
+                return calc.setup_kpath(args.nk)
+        
+        elif kpath_mode == "custom":
+            if not args.custom_path:
+                print("Error: --custom-path required with --kpath-mode custom")
+                raise ValueError("--custom-path not specified")
+            
+            from .bands import seekpath_kpath, build_custom_kpath
+            
+            print(f"Setting up seekpath data for custom path...")
+            kpath_data = seekpath_kpath(
+                lattice_vectors=lattice.lattice_vectors,
+                atomic_positions=lattice.atomic_positions,
+                atomic_numbers=lattice.atomic_numbers,
+                num_points=args.nk,
+                symprec=args.seekpath_symprec,
+                reference_distance=args.seekpath_distance
+            )
+            
+            # Show available symmetry points
+            print("\nAvailable symmetry points:")
+            point_coords = kpath_data['point_coords']
+            available_points = sorted(point_coords.keys())
+            for point in available_points:
+                coords = point_coords[point]
+                print(f"  {point:6s}: ({coords[0]:7.4f}, {coords[1]:7.4f}, {coords[2]:7.4f})")
+            
+            labels = args.custom_path.split('-')
+            print(f"\nBuilding custom k-path: {' -> '.join(labels)}")
+            kpoints_frac, xvals, xticks, xticklabels, metadata = build_custom_kpath(
+                point_coords=kpath_data['point_coords'],
+                reciprocal_lattice=kpath_data['reciprocal_lattice'],
+                labels_list=labels,
+                total_kpoints=args.nk
+            )
+            
+            # keep k-points in fractional coordinates for calculate_bands()
+            kpoints = kpoints_frac
+            kdistances = xvals
+            klabels_list = xticklabels
+            
+            # Store for later use (export, plotting)
+            calc._kpath_data = {
+                'metadata': metadata,
+                'reciprocal_lattice': kpath_data['reciprocal_lattice'],
+                'point_coords': kpath_data['point_coords']
+            }
+            
+            return kpoints, klabels_list, kdistances
+        
+        elif kpath_mode == "interactive":
+            print("Interactive k-path selection mode...")
+            try:
+                kpoints, klabels, kdistances = calc.setup_kpath_seekpath(
+                    num_points=args.nk,
+                    interactive=True
+                )
+                return kpoints, klabels, kdistances
+            except ImportError:
+                print("Warning: seekpath not available for interactive mode")
+                return calc.setup_kpath(args.nk)
+        
+        else:  # auto mode (default)
+            print(f"Generating k-path with {args.nk} points (auto mode)...")
+            return calc.setup_kpath(args.nk)
+
+    # Helper function to handle BZ plotting and k-path export
+    def handle_kpath_output(args, lattice, kpoints, klabels, kdistances, kpath_data=None):
+        """Plot Brillouin zone and export k-path if requested"""
+        if args.plot_bz:
+            try:
+                from .bands import seekpath_kpath, plot_brillouin_zone
+                
+                # Get BZ data if not provided
+                if kpath_data is None:
+                    kpath_data = seekpath_kpath(
+                        lattice_vectors=lattice.lattice_vectors,
+                        atomic_positions=lattice.atomic_positions,
+                        atomic_numbers=lattice.atomic_numbers,
+                        symprec=args.seekpath_symprec,
+                        reference_distance=args.seekpath_distance
+                    )
+                
+                print(f"Plotting Brillouin zone to {args.output_prefix}_bz.png...")
+                fig, ax = plot_brillouin_zone(
+                    reciprocal_lattice=kpath_data['reciprocal_lattice'],
+                    point_coords=kpath_data['point_coords'],
+                    label_hs_points=True,
+                    label_primes=args.prime_points,
+                    figsize=(10, 10)
+                )
+                fig.savefig(f"{args.output_prefix}_bz.png", dpi=300, bbox_inches='tight')
+                print("Brillouin zone plot saved.")
+            except ImportError as e:
+                print(f"Warning: Could not plot Brillouin zone: {e}")
+        
+        if args.export_kpath:
+            from .bands import export_kpath
+            
+            print(f"Exporting k-path to {args.export_kpath}...")
+            export_kpath(
+                filename=args.export_kpath,
+                kpath_x=kdistances,
+                kpoints_abs=kpoints,
+                kpoint_labels=klabels,
+                header='x_linearcoord  kx  ky  kz'
+            )
+            print(f"K-path exported to {args.export_kpath}")
+
+    # Check for altermagnetic analysis
+    if args.altermagnetic:
+        from .bands.altermagnetic import AltermagneticAnalyzer
+
+        # Initialize band structure calculator with collinear support
+        print("Setting up band structure calculator (collinear)...")
+        calc = BandStructureCalculator(lattice, hamiltonian, collinear=True)
+
+        kpoints, klabels, kdistances = setup_kpath_from_args(calc, args)
+
+        print("Calculating spin-polarized bands...")
+        bands_up, bands_down = calc.calculate_bands_collinear(kpoints)
+
+        # Create altermagnetic analyzer
+        print("Running altermagnetic analysis...")
+        analyzer = AltermagneticAnalyzer(
+            bands_up, bands_down, kpoints, kdistances, fermi_energy=args.fermi_energy
+        )
+
+        # Get identification result
+        result = analyzer.identify_altermagnetic_bands(
+            magnetization_threshold=args.mag_threshold
+        )
+
+        # Print summary
+        print()
+        analyzer.print_altermagnetic_summary()
+
+        # Handle BZ plotting and k-path export
+        handle_kpath_output(args, lattice, kpoints, klabels, kdistances)
+
+        # Generate plots if requested
+        if args.plot_splitting:
+            output_file = f"{args.output_prefix}_splitting.png"
+            print(f"\nPlotting spin splitting map to {output_file}...")
+            analyzer.plot_spin_splitting_map(output_file)
+
+        if args.plot_character:
+            output_file = f"{args.output_prefix}_character.png"
+            print(f"Plotting altermagnetic character to {output_file}...")
+            analyzer.plot_altermagnetic_character(output_file)
+
+        # Save band structure plot
+        if args.plot_bands:
+            output_file = f"{args.output_prefix}_bands.png"
+            print(f"Plotting collinear bands to {output_file}...")
+            calc.plot_bands_collinear(
+                kdistances, bands_up, bands_down, klabels, output_file
+            )
+
+        print("\nDone!")
+
+    # Check for Berry curvature analysis
+    elif args.berry:
+        from .bands.berry_curvature import BerryCurvatureCalculator
+
+        print("Setting up band structure calculator...")
+        calc = BandStructureCalculator(lattice, hamiltonian)
+
+        kpoints, klabels, kdistances = setup_kpath_from_args(calc, args)
+
+        print("Calculating band structure with eigenvector storage...")
+        energies = calc.calculate_bands(kpoints, store_eigenvectors=True)
+
+        # Use real eigenvectors from Hamiltonian diagonalization (Phase 3)
+        eigenvectors = calc.eigenvectors
+        print(f"Eigenvector shape: {eigenvectors.shape}")
+
+        # Initialize Berry curvature calculator
+        print("Computing Berry curvature...")
+        a = lattice.lattice_vectors
+        reciprocal_lattice = (
+            2 * np.pi * np.linalg.inv(a.T)
+        )  # Reciprocal lattice vectors as columns
+
+        berry_calc = BerryCurvatureCalculator(
+            energies,
+            eigenvectors,
+            kpoints,
+            reciprocal_lattice,
+            fermi_energy=args.fermi_energy,
+        )
+
+        # Identify topological bands
+        print("\nAnalyzing topological properties...")
+        topology = berry_calc.identify_topological_bands(chern_tolerance=args.chern_tol)
+
+        print("\nTopological Band Classification:")
+        print(f"  Trivial bands: {topology['trivial_bands']}")
+        print(f"  Non-trivial bands: {topology['nontrivial_bands']}")
+
+        # Print band-resolved properties
+        if args.num_bands:
+            print(
+                f"\nBand-Resolved Properties (first {min(args.num_bands, nbands)} bands):"
+            )
+            berry_calc.print_berry_summary(num_bands=min(args.num_bands, nbands))
+
+        # Calculate Chern numbers for selected bands
+        if args.chern_bands:
+            print("\nChern Numbers:")
+            for band in args.chern_bands:
+                if band < nbands:
+                    chern = berry_calc.calculate_chern_number(band)
+                    print(f"  Band {band}: C = {chern:.4f}")
+
+        # Calculate anomalous Hall conductivity
+        if args.ahc:
+            print("\nAnomalous Hall Conductivity:")
+            for band in range(min(5, nbands)):
+                sigma_xy = berry_calc.calculate_anomalous_hall_conductivity(
+                    band, temperature=args.temperature
+                )
+                print(f"  Band {band}: σ_xy = {sigma_xy:.4e} (e²/h)")
+
+        # Calculate orbital magnetization
+        if args.orbital_mag:
+            print("\nOrbital Magnetization:")
+            for band in range(min(5, nbands)):
+                m_orb = berry_calc.calculate_orbital_magnetization(
+                    band, temperature=args.temperature
+                )
+                print(f"  Band {band}: M_orb = {m_orb:.4e} μ_B")
+
+        # Handle BZ plotting and k-path export
+        handle_kpath_output(args, lattice, kpoints, klabels, kdistances)
+
+        # Generate plots if requested
+        if args.plot_berry:
+            band = min(0, args.plot_berry - 1)  # Default to band 0
+            output_file = f"{args.output_prefix}_berry_band{band}.png"
+            print(f"\nPlotting Berry curvature for band {band} to {output_file}...")
+            berry_calc.plot_berry_curvature_map(band, output_file)
+
+        if args.plot_chern:
+            output_file = f"{args.output_prefix}_chern.png"
+            print(f"Plotting Chern numbers to {output_file}...")
+            berry_calc.plot_chern_number_histogram(output_file)
+
+        # Save band structure plot
+        if args.plot_bands:
+            output_file = f"{args.output_prefix}_bands.png"
+            print(f"Plotting band structure to {output_file}...")
+            calc.plot_bands(kdistances, energies, klabels, output_file)
+
+        print("\nDone!")
+
+    # Check for spin texture analysis (Phase 4)
+    elif args.spin_texture:
+        from .bands.spin_texture import SpinTextureCalculator
+
+        print("Setting up band structure calculator with eigenvector storage...")
+        calc = BandStructureCalculator(lattice, hamiltonian)
+
+        kpoints, klabels, kdistances = setup_kpath_from_args(calc, args)
+
+        print("Calculating band structure with eigenvector storage...")
+        energies = calc.calculate_bands(kpoints, store_eigenvectors=True)
+
+        # Use real eigenvectors from Hamiltonian diagonalization (Phase 4)
+        eigenvectors = calc.eigenvectors
+        print(f"Eigenvector shape: {eigenvectors.shape}")
+
+        # Initialize spin texture calculator
+        print("Computing spin texture...")
+        a = lattice.lattice_vectors
+        reciprocal_lattice = (
+            2 * np.pi * np.linalg.inv(a.T)
+        )  # Reciprocal lattice vectors as columns
+
+        spin_calc = SpinTextureCalculator(
+            energies,
+            eigenvectors,
+            kpoints,
+            reciprocal_lattice,
+            fermi_energy=args.fermi_energy,
+        )
+
+        spin_texture = spin_calc.calculate_spin_texture()
+        print(f"Spin texture shape: {spin_texture.shape}")
+        print(f"Average spin polarization: {np.mean(spin_calc.spin_polarization):.4f}")
+
+        # Analyze specific band if requested
+        if args.spin_band is not None:
+            band_idx = args.spin_band
+            print(f"\nAnalyzing spin texture for band {band_idx}...")
+
+            # Spin-momentum locking
+            locking = spin_calc.identify_spin_momentum_locking(
+                band_idx, energy_window=0.1
+            )
+            print(f"  Locking type: {locking['locking_type']}")
+            print(f"  Locking strength: {locking['locking_strength']:.3f}")
+            print(f"  Dominant spin orientation: {locking['spin_orientation']}")
+
+            # Plot 2D spin texture
+            output_file = f"{args.output_prefix}_spin_texture_band{band_idx}.png"
+            print(f"Plotting 2D spin texture to {output_file}...")
+            spin_calc.plot_spin_texture_2d(
+                band_idx,
+                component=args.spin_component,
+                plane=args.spin_plane,
+                output_file=output_file,
+            )
+
+            # Plot 3D Fermi surface if requested
+            if args.plot_spin_fermi:
+                output_file = f"{args.output_prefix}_fermi_spin_band{band_idx}.png"
+                print(f"Plotting 3D Fermi surface to {output_file}...")
+                spin_calc.plot_fermi_surface_spin_texture(
+                    band_idx, output_file=output_file
+                )
+
+            # Rashba analysis if requested
+            if args.rashba_analysis:
+                print(f"\nExtracting Rashba parameters for band {band_idx}...")
+                try:
+                    rashba_params = spin_calc.extract_rashba_parameters(band_idx)
+                    print(f"  αR = {rashba_params['alpha_R']:.4e} eV·Å")
+                    print(f"  E0 = {rashba_params['E_0']:.4f} eV")
+                    print(f"  Fit quality (R²) = {rashba_params['fit_quality']:.4f}")
+                except Exception as e:
+                    print(f"  Rashba analysis failed: {e}")
+
+        # Handle BZ plotting and k-path export
+        handle_kpath_output(args, lattice, kpoints, klabels, kdistances)
+
+        print("\nDone!")
+
+    # Check for fat bands visualization (Phase 4)
+    elif args.fat_bands:
+        from .bands.fat_bands import FatBandsPlotter
+
+        print("Setting up band structure calculator with eigenvector storage...")
+        calc = BandStructureCalculator(lattice, hamiltonian)
+
+        kpoints, klabels, kdistances = setup_kpath_from_args(calc, args)
+
+        print("Calculating band structure with eigenvector storage...")
+        energies = calc.calculate_bands(kpoints, store_eigenvectors=True)
+        eigenvectors = calc.eigenvectors
+
+        # Initialize fat bands plotter
+        print("Preparing fat bands visualization...")
+        fat_plotter = FatBandsPlotter(
+            energies, eigenvectors, kdistances, klabels, fermi_energy=args.fermi_energy
+        )
+
+        # Use energy range only if explicitly provided
+        energy_range = tuple(args.energy_range) if args.energy_range else None
+
+        # Plot based on type
+        if args.fat_type == "spin":
+            output_file = f"{args.output_prefix}_fat_bands_spin.png"
+            print(f"Plotting spin-resolved fat bands to {output_file}...")
+            fat_plotter.plot_spin_resolved_fat_bands(
+                energy_range=energy_range, output_file=output_file
+            )
+
+        elif args.fat_type == "linewidth" and args.fat_orbitals:
+            projections = fat_plotter.calculate_orbital_projections(args.fat_orbitals)
+            output_file = f"{args.output_prefix}_fat_bands_orbitals.png"
+            print(f"Plotting orbital fat bands (linewidth) to {output_file}...")
+            fat_plotter.plot_fat_bands_linewidth(
+                projections,
+                scale_factor=args.fat_scale,
+                energy_range=energy_range,
+                output_file=output_file,
+                title=f"Fat Bands - Orbitals {args.fat_orbitals}",
+            )
+
+        elif args.fat_type == "color" and args.fat_orbitals:
+            projections = fat_plotter.calculate_orbital_projections(args.fat_orbitals)
+            output_file = f"{args.output_prefix}_fat_bands_orbitals_color.png"
+            print(f"Plotting orbital fat bands (color) to {output_file}...")
+            fat_plotter.plot_fat_bands_color(
+                projections,
+                energy_range=energy_range,
+                output_file=output_file,
+                title=f"Fat Bands - Orbitals {args.fat_orbitals}",
+            )
+
+        elif args.fat_orbital_groups:
+            import json
+
+            orbital_groups = json.loads(args.fat_orbital_groups)
+            output_file = f"{args.output_prefix}_fat_bands_groups.png"
+            print(f"Plotting orbital character fat bands to {output_file}...")
+            fat_plotter.plot_orbital_character(
+                orbital_groups, energy_range=energy_range, output_file=output_file
+            )
+
+        else:
+            print("Default: Plotting spin-resolved fat bands...")
+            output_file = f"{args.output_prefix}_fat_bands_spin.png"
+            fat_plotter.plot_spin_resolved_fat_bands(
+                energy_range=energy_range, output_file=output_file
+            )
+
+        # Handle BZ plotting and k-path export
+        handle_kpath_output(args, lattice, kpoints, klabels, kdistances)
+
+        print("\nDone!")
+
+    # Regular projections or band structure
+    elif args.projections:
+        # Run projected bands
+        from .bands.projections import ProjectedBandCalculator
+
+        print("Setting up projected band structure calculator...")
+        # Create calculator with specified spin projection mode
+        proj_calc = ProjectedBandCalculator(
+            lattice,
+            hamiltonian,
+            spin_projection_mode=getattr(args, "projections_mode", "expectation"),
+        )
+
+        kpoints, klabels, kdistances = setup_kpath_from_args(proj_calc, args)
+
+        print("Calculating projected band structure...")
+        band_energies, projections = proj_calc.calculate_projected_bands(kpoints)
+
+        projection_type = args.projection
+        output_file = f"{args.output_prefix}_{projection_type}.png"
+        print(
+            f"Plotting {projection_type} projections (mode: {proj_calc.spin_projection_mode}) to {output_file}..."
+        )
+        proj_calc.plot_projected_bands(
+            kdistances,
+            band_energies,
+            projections,
+            klabels,
+            projection_type,
+            output_file,
+        )
+
+        # Handle BZ plotting and k-path export
+        handle_kpath_output(args, lattice, kpoints, klabels, kdistances)
+
+        print("Done!")
+    else:
+        # Run regular band structure
+        print("Setting up band structure calculator...")
+        calc = BandStructureCalculator(lattice, hamiltonian)
+
+        kpoints, klabels, kdistances = setup_kpath_from_args(calc, args)
+
+        print("Calculating band structure...")
+        band_energies = calc.calculate_bands(kpoints)
+
+        # Handle BZ plotting and k-path export
+        handle_kpath_output(args, lattice, kpoints, klabels, kdistances)
+
+        print(f"Plotting results to {args.output}...")
+        calc.plot_bands(kdistances, band_energies, klabels, args.output)
+
+        print("Done!")
+
+
+def run_dos_subcommand(args):
+    """Run DOS calculation or DOS moments analysis"""
+    from .bands import load_lattice, load_hamiltonian, FullBZCalculator, DOSCalculator
+
+    if args.moments:
+        # Run DOS moments analysis
+        from .bands.dos_moments import DOSMomentsCalculator
+
+        lattice = load_lattice(args.lattice, format=args.lattice_format)
+        hamiltonian = load_hamiltonian(args.hamiltonian, format=args.hamiltonian_format)
+        bz_calc = FullBZCalculator(lattice, hamiltonian)
+        dos_calc = DOSCalculator(bz_calc)
+
+        print("Calculating DOS for moments analysis...")
+        use_tetrahedron = not getattr(args, "no_tetrahedron", False)
+
+        dos_data = dos_calc.calculate_dos(
+            mesh_size=tuple(args.mesh),
+            energy_range=tuple(args.energy_range) if args.energy_range else None,
+            num_energies=args.num_energies,
+            use_symmetry=not args.no_symmetry,
+            use_tetrahedron=use_tetrahedron,
+            gaussian_smearing=0.1,
+        )
+
+        # Perform moments analysis
+        moments_calc = DOSMomentsCalculator(
+            dos_data["energies"],
+            dos_data["total_dos"],
+            dos_data.get("orbital_dos"),
+            temperature=args.temperature,
+        )
+
+        if args.electrons:
+            print(f"Finding Fermi level for {args.electrons} electrons...")
+            energy_range = tuple(args.energy_range) if args.energy_range else None
+            fermi_level = moments_calc.find_fermi_level(args.electrons, energy_range)
+            print(f"Fermi level: {fermi_level:.6f} eV")
+        else:
+            print("Auto-detecting electron count...")
+            # Count electrons at zero energy
+            total_electrons = moments_calc.total_dos.sum() * (
+                moments_calc.energies[1] - moments_calc.energies[0]
+            )
+            fermi_level = moments_calc.find_fermi_level(total_electrons)
+            print(f"Fermi level: {fermi_level:.6f} eV")
+
+        # Calculate moments
+        print("\nCalculating DOS moments...")
+        moments = moments_calc.calculate_moments(fermi_level)
+
+        # Print results
+        print("\nDOS Moments:")
+        if "total" in moments:
+            print(f"\nTotal DOS:")
+            total_moments = moments["total"]
+            print(f"  Occupation (electrons):      {total_moments['occupation']:.4f}")
+            print(
+                f"  Avg Energy (rel to EF):      {total_moments['avg_energy_rel_ef']:.4f} eV"
+            )
+            print(
+                f"  Energy Spread (width):       {total_moments['band_width']:.4f} eV"
+            )
+            print(
+                f"  Band Center:                 {total_moments['band_center']:.4f} eV"
+            )
+
+        # Save results
+        moments_calc.save_moments(f"{args.output_prefix}_moments.npz")
+        print(f"\nResults saved to {args.output_prefix}_moments.npz")
+        print("Done!")
+    else:
+        # Run regular DOS calculation
+        lattice = load_lattice(args.lattice, format=args.lattice_format)
+        hamiltonian = load_hamiltonian(args.hamiltonian, format=args.hamiltonian_format)
+        bz_calc = FullBZCalculator(lattice, hamiltonian)
+        dos_calc = DOSCalculator(bz_calc)
+
+        # If electrons are specified, use Fermi level determination
+        if args.electrons is not None:
+            print(
+                f"Calculating DOS with Fermi level determination for {args.electrons} electrons..."
+            )
+            energy_range_val = tuple(args.energy_range) if args.energy_range else None
+            dos_data, moments_calc = dos_calc.calculate_dos_with_moments(
+                mesh_size=tuple(args.mesh),
+                target_electrons=args.electrons,
+                temperature=getattr(args, "temperature", 300.0),
+                energy_range=energy_range_val,
+                num_energies=args.num_energies,
+                use_symmetry=not args.no_symmetry,
+                use_tetrahedron=not args.no_tetrahedron,
+                gaussian_smearing=getattr(args, "gaussian_smearing", 0.1),
+                output_prefix=args.output_prefix,
+            )
+
+            fermi_level = moments_calc.fermi_level
+            if fermi_level is not None:
+                print(f"Fermi level determined: {fermi_level:.6f} eV")
+                dos_calc.plot_dos(
+                    dos_data,
+                    fermi_energy=fermi_level,
+                    output_file=f"{args.output_prefix}.png",
+                )
+            else:
+                print("Warning: Could not determine Fermi level")
+                dos_calc.plot_dos(
+                    dos_data, fermi_energy=0.0, output_file=f"{args.output_prefix}.png"
+                )
+        else:
+            # Simple DOS calculation
+            print("Calculating DOS...")
+            dos_data = dos_calc.calculate_dos(
+                mesh_size=tuple(args.mesh),
+                energy_range=tuple(args.energy_range) if args.energy_range else None,
+                num_energies=args.num_energies,
+                use_symmetry=not args.no_symmetry,
+                use_tetrahedron=not args.no_tetrahedron,
+                gaussian_smearing=getattr(args, "gaussian_smearing", 0.1),
+            )
+
+            fermi_energy = getattr(args, "fermi_energy", 0.0)
+            dos_calc.plot_dos(
+                dos_data,
+                fermi_energy=fermi_energy,
+                output_file=f"{args.output_prefix}.png",
+            )
+
+        print("Done!")
+
+
+def create_bands_parser(subparsers):
+    """Create bands subcommand parser"""
+    parser = subparsers.add_parser(
+        "bands",
+        parents=[_make_common_parser()],
+        help="Calculate band structure and projections",
+    )
+    parser.add_argument(
+        "--nk",
+        type=int,
+        default=100,
+        help="Number of k-points along path (default: 100)",
+    )
+    parser.add_argument(
+        "--output",
+        default="band_structure.png",
+        help="Output plot file (default: band_structure.png)",
+    )
+    parser.add_argument(
+        "--projections",
+        action="store_true",
+        help="Calculate projected bands instead of total bands",
+    )
+    parser.add_argument(
+        "--projection",
+        choices=["orbital", "site", "spin", "all"],
+        default="all",
+        help="Type of projection (default: all)",
+    )
+    parser.add_argument(
+        "--projections-mode",
+        choices=["expectation", "weight_up", "weight_down", "polarization"],
+        default="expectation",
+        help=(
+            "Spin projection visualization mode (for --projections --projection spin): "
+            "expectation: <S_z> in [-0.5,+0.5]; "
+            "weight_up: P_up in [0,1]; "
+            "weight_down: P_down in [0,1]; "
+            "polarization: signed in [-1,+1] (default: expectation)"
+        ),
+    )
+    parser.add_argument(
+        "--output-prefix", default="bands", help="Output file prefix (default: bands)"
+    )
+    parser.add_argument(
+        "--energy-range",
+        nargs=2,
+        type=float,
+        help="Y-axis energy range (emin emax) for band plots",
+    )
+    # Altermagnetic analysis options
+    parser.add_argument(
+        "--altermagnetic",
+        action="store_true",
+        help="Analyze altermagnetic materials (spin splitting without net magnetization)",
+    )
+    parser.add_argument(
+        "--mag-threshold",
+        type=float,
+        default=0.1,
+        help="Magnetization threshold for altermagnetic detection (default: 0.1)",
+    )
+    parser.add_argument(
+        "--plot-splitting",
+        action="store_true",
+        help="Plot spin splitting map in k-space (with --altermagnetic)",
+    )
+    parser.add_argument(
+        "--plot-character",
+        action="store_true",
+        help="Plot altermagnetic character, magnetization vs splitting (with --altermagnetic)",
+    )
+
+    # Berry curvature options
+    parser.add_argument(
+        "--berry",
+        action="store_true",
+        help="Calculate Berry curvature and topological properties",
+    )
+    parser.add_argument(
+        "--fermi-energy",
+        type=float,
+        default=0.0,
+        help="Fermi energy in eV (default: 0.0)",
+    )
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=0.0,
+        help="Temperature in K for thermal effects (default: 0.0 K)",
+    )
+    parser.add_argument(
+        "--chern-bands",
+        nargs="+",
+        type=int,
+        help="Band indices for Chern number calculation (space-separated)",
+    )
+    parser.add_argument(
+        "--chern-tol",
+        type=float,
+        default=0.1,
+        help="Tolerance for Chern number quantization (default: 0.1)",
+    )
+    parser.add_argument(
+        "--ahc",
+        action="store_true",
+        help="Calculate anomalous Hall conductivity for first 5 bands (with --berry)",
+    )
+    parser.add_argument(
+        "--orbital-mag",
+        action="store_true",
+        help="Calculate orbital magnetization for first 5 bands (with --berry)",
+    )
+    parser.add_argument(
+        "--num-bands", type=int, help="Number of bands to analyze (default: all)"
+    )
+    parser.add_argument(
+        "--plot-berry",
+        type=int,
+        help="Plot Berry curvature for specified band (with --berry)",
+    )
+    parser.add_argument(
+        "--plot-chern",
+        action="store_true",
+        help="Plot Chern numbers histogram (with --berry)",
+    )
+    parser.add_argument(
+        "--plot-bands",
+        action="store_true",
+        help="Plot band structure (with --altermagnetic or --berry)",
+    )
+
+    # Advanced K-path options (seekpath, custom paths, prime convention)
+    parser.add_argument(
+        "--kpath-mode",
+        choices=["auto", "seekpath", "custom", "interactive"],
+        default="auto",
+        help=(
+            "K-path generation mode: "
+            "auto: Simple path from pymatgen (fast); "
+            "seekpath: High-symmetry path with explicit points; "
+            "custom: User-specified path (requires --custom-path); "
+            "interactive: Prompt user to choose (default: auto)"
+        ),
+    )
+    parser.add_argument(
+        "--seekpath-symprec",
+        type=float,
+        default=1e-5,
+        help="Symmetry tolerance for seekpath (default: 1e-5)",
+    )
+    parser.add_argument(
+        "--seekpath-distance",
+        type=float,
+        default=0.025,
+        help="Reference distance for seekpath BZ sampling (default: 0.025 Å⁻¹)",
+    )
+    parser.add_argument(
+        "--custom-path",
+        type=str,
+        help="Custom k-path labels, e.g. 'K-Gamma-K' or 'X-Gamma-X-M' (requires --kpath-mode custom)",
+    )
+    parser.add_argument(
+        "--prime-points",
+        action="store_true",
+        help="Apply prime convention to k-points (K'=(-K_x,-K_y,K_z); useful for custom paths)",
+    )
+    parser.add_argument(
+        "--stabilize-degenerate",
+        choices=["none", "block_average", "pair_cancel"],
+        default="block_average",
+        help="Stabilization mode for degenerate bands in projections (default: block_average)",
+    )
+    parser.add_argument(
+        "--plot-bz",
+        action="store_true",
+        help="Plot Brillouin zone polyhedron with high-symmetry points (requires pymatgen)",
+    )
+    parser.add_argument(
+        "--export-kpath",
+        type=str,
+        help="Export k-path to file for reproducibility (e.g., 'kpath.dat')",
+    )
+
+    # Spin texture options (Phase 4)
+    parser.add_argument(
+        "--spin-texture",
+        action="store_true",
+        help="Calculate and visualize spin texture",
+    )
+    parser.add_argument(
+        "--spin-band",
+        type=int,
+        help="Band index for spin texture analysis (with --spin-texture)",
+    )
+    parser.add_argument(
+        "--spin-plane",
+        choices=["xy", "xz", "yz"],
+        default="xy",
+        help="k-space plane for 2D spin texture plot (default: xy)",
+    )
+    parser.add_argument(
+        "--spin-component",
+        choices=["x", "y", "z", "magnitude"],
+        default="z",
+        help="Spin component for coloring (default: z)",
+    )
+    parser.add_argument(
+        "--rashba-analysis",
+        action="store_true",
+        help="Extract Rashba/Dresselhaus parameters (with --spin-texture)",
+    )
+    parser.add_argument(
+        "--plot-spin-fermi",
+        action="store_true",
+        help="Plot 3D Fermi surface with spin texture (with --spin-texture)",
+    )
+
+    # Fat bands options (Phase 4)
+    parser.add_argument(
+        "--fat-bands",
+        action="store_true",
+        help="Plot fat bands showing orbital/spin projections",
+    )
+    parser.add_argument(
+        "--fat-type",
+        choices=["linewidth", "color", "spin"],
+        default="spin",
+        help="Fat bands visualization type (default: spin)",
+    )
+    parser.add_argument(
+        "--fat-orbitals",
+        nargs="+",
+        type=int,
+        help="Orbital indices for fat bands projection",
+    )
+    parser.add_argument(
+        "--fat-orbital-groups",
+        type=str,
+        help='Orbital groups as JSON string, e.g., \'{"s":[0,9],"p":[1,2,3,10,11,12]}\'',
+    )
+    parser.add_argument(
+        "--fat-scale",
+        type=float,
+        default=5.0,
+        help="Scale factor for fat bands linewidth (default: 5.0)",
+    )
+
+    parser.set_defaults(func=run_bands_subcommand)
+    return parser
+
+
+def create_dos_parser(subparsers):
+    """Create DOS subcommand parser"""
+    parser = subparsers.add_parser(
+        "dos",
+        parents=[_make_common_parser()],
+        help="Calculate density of states or DOS moments",
+    )
+    parser.add_argument(
+        "--mesh",
+        nargs=3,
+        type=int,
+        default=[6, 6, 6],
+        help="k-point mesh size (default: 6 6 6)",
+    )
+    parser.add_argument(
+        "--energy-range", nargs=2, type=float, help="Energy range (emin emax)"
+    )
+    parser.add_argument(
+        "--num-energies",
+        type=int,
+        default=1000,
+        help="Number of energy points (default: 1000)",
+    )
+    parser.add_argument(
+        "--fermi-energy",
+        type=float,
+        default=0.0,
+        help="Fermi energy for plots (default: 0.0)",
+    )
+    parser.add_argument(
+        "--electrons",
+        type=float,
+        help="Number of electrons (auto-determine Fermi level)",
+    )
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=300.0,
+        help="Temperature in K (default: 300.0)",
+    )
+    parser.add_argument(
+        "--no-symmetry", action="store_true", help="Disable symmetry reduction"
+    )
+    parser.add_argument(
+        "--no-tetrahedron",
+        action="store_true",
+        help="Use Gaussian broadening instead of tetrahedron",
+    )
+    parser.add_argument(
+        "--gaussian-smearing",
+        type=float,
+        default=0.1,
+        help="Gaussian smearing width in eV (default: 0.1)",
+    )
+    parser.add_argument(
+        "--output-prefix", default="dos", help="Output file prefix (default: dos)"
+    )
+    parser.add_argument(
+        "--moments",
+        action="store_true",
+        help="Calculate DOS moments analysis instead of DOS plot",
+    )
+    parser.set_defaults(func=run_dos_subcommand)
+    return parser
+
+
+def validate_setup_inputs():
+    """
+    Validate that required input files exist for --setup workflow.
+    
+    Returns
+    -------
+    bool
+        True if all required files exist, False otherwise
+    """
+    required_files = ['lattice.nml', 'input.nml']
+    missing_files = []
+    
+    for filename in required_files:
+        if not Path(filename).exists():
+            missing_files.append(filename)
+    
+    if missing_files:
+        print(f"ERROR: Required input files not found: {', '.join(missing_files)}", file=sys.stderr)
+        print("\nThe --setup workflow requires the following files in the current directory:", file=sys.stderr)
+        print("  - lattice.nml   : Lattice structure data (lattice_t namelist)", file=sys.stderr)
+        print("  - input.nml     : Atomic positions and parameters (&lattice, &atoms namelists)", file=sys.stderr)
+        print("\nPlease ensure these files exist before running --setup.", file=sys.stderr)
+        return False
+    
+    return True
+
+
+def validate_setup_parameters(min_radius, max_radius):
+    """
+    Validate setup parameter ranges.
+    
+    Parameters
+    ----------
+    min_radius : float
+        Minimum empty sphere radius
+    max_radius : float
+        Maximum empty sphere radius
+    
+    Returns
+    -------
+    bool
+        True if parameters are valid, False otherwise
+    """
+    if min_radius <= 0:
+        print(f"ERROR: --min_empty_radius must be positive, got {min_radius}", file=sys.stderr)
+        return False
+    
+    if max_radius <= 0:
+        print(f"ERROR: --max_empty_radius must be positive, got {max_radius}", file=sys.stderr)
+        return False
+    
+    if min_radius >= max_radius:
+        print(f"ERROR: --min_empty_radius ({min_radius}) must be less than --max_empty_radius ({max_radius})", file=sys.stderr)
+        return False
+    
+    if max_radius > 10.0:
+        print(f"WARNING: --max_empty_radius ({max_radius}) is very large. Typical values are 1.5-3.0.", file=sys.stderr)
+    
+    if min_radius < 0.5:
+        print(f"WARNING: --min_empty_radius ({min_radius}) is very small. Typical values are 1.0-1.5.", file=sys.stderr)
+    
+    return True
+
+
+def validate_output_files():
+    """
+    Validate that output files were created and are readable.
+    
+    Returns
+    -------
+    dict
+        Dictionary with validation results for each file
+    """
+    validation_results = {}
+    expected_files = ['lattice_new.nml', 'input_new.nml']
+    
+    for filename in expected_files:
+        filepath = Path(filename)
+        result = {
+            'exists': filepath.exists(),
+            'readable': False,
+            'size': 0,
+            'valid_format': False
+        }
+        
+        if result['exists']:
+            result['size'] = filepath.stat().st_size
+            try:
+                with open(filepath, 'r') as f:
+                    content = f.read()
+                    result['readable'] = True
+                    # Basic format check - should contain namelist markers
+                    result['valid_format'] = '&' in content and '/' in content
+            except Exception:
+                pass
+        
+        validation_results[filename] = result
+    
+    return validation_results
+
+
+def print_validation_report(validation_results):
+    """Print validation report for output files."""
+    print("\nValidation Report:")
+    print("-" * 70)
+    
+    all_valid = True
+    for filename, result in validation_results.items():
+        status = "✓ PASS" if result['exists'] and result['readable'] and result['valid_format'] else "✗ FAIL"
+        print(f"{status} {filename}")
+        
+        if not result['exists']:
+            print(f"     ERROR: File not created")
+            all_valid = False
+        elif not result['readable']:
+            print(f"     ERROR: File not readable")
+            all_valid = False
+        elif not result['valid_format']:
+            print(f"     WARNING: File may not be valid namelist format")
+        else:
+            print(f"     Size: {result['size']} bytes")
+    
+    print("-" * 70)
+    if all_valid:
+        print("All validation checks passed ✓")
+    else:
+        print("Some validation checks failed ✗")
+    
+    return all_valid
+
+
+def create_backup_files():
+    """Create backup copies of input files."""
+    input_files = ['lattice.nml', 'input.nml']
+    backed_up = []
+    
+    for filename in input_files:
+        if Path(filename).exists():
+            backup_path = Path(f"{filename}.bak")
+            try:
+                import shutil
+                shutil.copy2(filename, backup_path)
+                backed_up.append(str(backup_path))
+            except Exception as e:
+                print(f"WARNING: Could not create backup of {filename}: {e}", file=sys.stderr)
+    
+    if backed_up:
+        print(f"Created backups: {', '.join(backed_up)}")
+    
+    return backed_up
+
+
+def apply_in_place_updates():
+    """Apply in-place updates by renaming _new files to originals."""
+    updates = [
+        ('lattice_new.nml', 'lattice.nml'),
+        ('input_new.nml', 'input.nml')
+    ]
+    
+    updated = []
+    for new_file, orig_file in updates:
+        if Path(new_file).exists():
+            # Create backup first
+            if Path(orig_file).exists():
+                backup_path = Path(f"{orig_file}.bak")
+                try:
+                    import shutil
+                    shutil.copy2(orig_file, backup_path)
+                    print(f"Backup created: {backup_path}")
+                except Exception as e:
+                    print(f"WARNING: Could not create backup of {orig_file}: {e}", file=sys.stderr)
+            
+            # Replace original with new
+            try:
+                import shutil
+                shutil.move(new_file, orig_file)
+                updated.append(orig_file)
+                print(f"Updated: {orig_file}")
+            except Exception as e:
+                print(f"ERROR: Could not update {orig_file}: {e}", file=sys.stderr)
+    
+    return updated
+
+
+def create_supercell(nx, ny, nz):
+    """
+    Create a supercell by repeating the unit cell nx×ny×nz times.
+    
+    Reads lattice.nml, creates supercell, and writes updated file.
+    Coordinates in lattice.nml are Cartesian (normalized, lattice parameter = 1).
+    The supercell uses broken symmetry indexing (1..N) for index arrays, expands
+    input.nml labels into unique per-atom species, updates ntype/ct accordingly,
+    and creates per-species .nml files by copying from the original species files.
+    
+    Parameters
+    ----------
+    nx, ny, nz : int
+        Repetitions along each lattice vector
+        
+    Returns
+    -------
+    bool
+        True if successful, False otherwise
+    """
+    import re
+    import shutil
+    import numpy as np
+    
+    print(f"\nCreating {nx}×{ny}×{nz} supercell...")
+    
+    lattice_file = Path('lattice.nml')
+    if not lattice_file.exists():
+        print("ERROR: lattice.nml not found", file=sys.stderr)
+        return False
+    
+    def set_or_insert_lattice_scalar(text, key, value):
+        """Set key in &lattice block, or insert it if missing."""
+        block = re.search(r'&lattice\b(.*?)/', text, flags=re.IGNORECASE | re.DOTALL)
+        if not block:
+            return text
+        btxt = block.group(0)
+        # Replace existing assignment in lattice block only
+        new_btxt, nrep = re.subn(
+            rf'(^\s*{key}\s*=\s*).*$',
+            rf'\g<1>{value}',
+            btxt,
+            flags=re.IGNORECASE | re.MULTILINE,
+        )
+        if nrep == 0:
+            # Insert before terminating "/"
+            new_btxt = re.sub(r'/\s*$', f"{key} = {value}\n/", btxt, flags=re.MULTILINE)
+        return text[:block.start()] + new_btxt + text[block.end():]
+
+    try:
+        # === Process lattice.nml ===
+        with open(lattice_file, 'r') as f:
+            content = f.read()
+        
+        # Extract lattice vectors (a(:,1), a(:,2), a(:,3))
+        lattice_vectors = []
+        for i in [1, 2, 3]:
+            pattern = rf'a\s*\(\s*:\s*,\s*{i}\s*\)\s*=\s*([-\d.eE+]+)\s*,\s*([-\d.eE+]+)\s*,\s*([-\d.eE+]+)'
+            match = re.search(pattern, content)
+            if match:
+                vec = [float(match.group(1)), float(match.group(2)), float(match.group(3))]
+                lattice_vectors.append(vec)
+        
+        if len(lattice_vectors) != 3:
+            print(f"ERROR: Could not parse all 3 lattice vectors (found {len(lattice_vectors)})", file=sys.stderr)
+            return False
+        
+        a_vec, b_vec, c_vec = np.array(lattice_vectors)
+        
+        # Extract atomic positions (Cartesian coordinates, normalized)
+        positions = []
+        crd_pattern = r'crd\s*\(\s*:\s*,\s*(\d+)\s*\)\s*=\s*([-\d.eE+]+)\s*,\s*([-\d.eE+]+)\s*,\s*([-\d.eE+]+)'
+        for match in re.finditer(crd_pattern, content):
+            atom_idx = int(match.group(1))
+            x, y, z = float(match.group(2)), float(match.group(3)), float(match.group(4))
+            positions.append(np.array([x, y, z]))
+        
+        if not positions:
+            print("ERROR: Could not parse atomic positions from lattice.nml", file=sys.stderr)
+            return False
+        
+        n_atoms_orig = len(positions)
+        print(f"  Original unit cell: {n_atoms_orig} atoms")
+        
+        # Create supercell positions (Cartesian)
+        # For each repetition (ix, iy, iz), shift by ix*a + iy*b + iz*c
+        supercell_positions = []
+        for ix in range(nx):
+            for iy in range(ny):
+                for iz in range(nz):
+                    for pos in positions:
+                        new_pos = pos + ix * a_vec + iy * b_vec + iz * c_vec
+                        supercell_positions.append(new_pos)
+        
+        n_atoms_super = len(supercell_positions)
+        print(f"  Supercell: {n_atoms_super} atoms ({nx}×{ny}×{nz} = {nx*ny*nz} unit cells)")
+        
+        # Update nbas and related counts
+        content = re.sub(r'(nbulk_bulk\s*=\s*)\d+', f'nbulk_bulk = {n_atoms_super}', content, flags=re.IGNORECASE)
+        content = re.sub(r'(ntot\s*=\s*)\d+', f'ntot = {n_atoms_super}', content, flags=re.IGNORECASE)
+        content = re.sub(r'(nbas\s*=\s*)\d+', f'nbas = {n_atoms_super}', content, flags=re.IGNORECASE)
+        content = re.sub(r'(nrec\s*=\s*)\d+', f'nrec = {n_atoms_super}', content, flags=re.IGNORECASE)
+        
+        # Scale lattice vectors
+        content = re.sub(
+            r'(a\s*\(\s*:\s*,\s*1\s*\)\s*=\s*)([-\d.eE+]+)\s*,\s*([-\d.eE+]+)\s*,\s*([-\d.eE+]+)',
+            lambda m: f"{m.group(1)}{float(m.group(2))*nx:.10f}, {float(m.group(3))*nx:.10f}, {float(m.group(4))*nx:.10f}",
+            content,
+            flags=re.IGNORECASE
+        )
+        
+        content = re.sub(
+            r'(a\s*\(\s*:\s*,\s*2\s*\)\s*=\s*)([-\d.eE+]+)\s*,\s*([-\d.eE+]+)\s*,\s*([-\d.eE+]+)',
+            lambda m: f"{m.group(1)}{float(m.group(2))*ny:.10f}, {float(m.group(3))*ny:.10f}, {float(m.group(4))*ny:.10f}",
+            content,
+            flags=re.IGNORECASE
+        )
+        
+        content = re.sub(
+            r'(a\s*\(\s*:\s*,\s*3\s*\)\s*=\s*)([-\d.eE+]+)\s*,\s*([-\d.eE+]+)\s*,\s*([-\d.eE+]+)',
+            lambda m: f"{m.group(1)}{float(m.group(2))*nz:.10f}, {float(m.group(3))*nz:.10f}, {float(m.group(4))*nz:.10f}",
+            content,
+            flags=re.IGNORECASE
+        )
+        
+        # Replace atomic positions
+        crd_start = re.search(r'crd\s*\(\s*:\s*,\s*1\s*\)', content)
+        if not crd_start:
+            print("ERROR: Could not find coordinate section", file=sys.stderr)
+            return False
+        
+        # Find end of crd section
+        crd_section_start = crd_start.start()
+        lines = content[crd_section_start:].split('\n')
+        crd_lines_count = sum(1 for line in lines if 'crd(' in line)
+        
+        temp_pos = crd_section_start
+        for i in range(crd_lines_count):
+            temp_pos = content.find('\n', temp_pos) + 1
+        crd_section_end = temp_pos
+        
+        # Build new coordinate section
+        new_crd_section = ""
+        for i, pos in enumerate(supercell_positions, start=1):
+            new_crd_section += f"crd(:, {i}) = {pos[0]:.10f}, {pos[1]:.10f}, {pos[2]:.10f}\n"
+        
+        new_content = content[:crd_section_start] + new_crd_section + content[crd_section_end:]
+        
+        # Update arrays that depend on atom count (broken symmetry: 1..N)
+        for array_name in ['izp', 'no', 'iu', 'ib', 'irec']:
+            array_start = re.search(rf'{array_name}\s*\(\s*1\s*\)', new_content)
+            if array_start:
+                array_section_start = array_start.start()
+                lines = new_content[array_section_start:].split('\n')
+                array_lines = sum(1 for line in lines if f'{array_name}(' in line)
+                
+                temp_pos = array_section_start
+                for i in range(array_lines):
+                    temp_pos = new_content.find('\n', temp_pos) + 1
+                array_section_end = temp_pos
+                
+                new_array_section = ""
+                for i in range(1, n_atoms_super + 1):
+                    new_array_section += f"{array_name}({i}) = {i}\n"
+                
+                new_content = new_content[:array_section_start] + new_array_section + new_content[array_section_end:]
+        
+        # Backup and write lattice.nml
+        backup_file = Path('lattice_original.nml.bak')
+        shutil.copy2('lattice.nml', backup_file)
+        
+        with open('lattice.nml', 'w') as f:
+            f.write(new_content)
+        
+        print(f"  ✓ Updated lattice.nml with supercell (backup: {backup_file})")
+        
+        # === Update input.nml to replicate labels ===
+        input_file = Path('input.nml')
+        if input_file.exists():
+            with open(input_file, 'r') as f:
+                input_content = f.read()
+            
+            # Extract labels
+            label_pattern = r"label\s*\(\s*(\d+)\s*\)\s*=\s*['\"]([^'\"]+)['\"]"
+            orig_labels = {}
+            for match in re.finditer(label_pattern, input_content):
+                idx = int(match.group(1))
+                label = match.group(2)
+                if idx <= n_atoms_orig:
+                    orig_labels[idx] = label
+            
+            # Extract ct values (match original label ordering)
+            ct_pattern = r'ct\s*\(\s*(\d+)\s*\)\s*=\s*([\-\d.eE+]+)'
+            orig_ct = {}
+            for match in re.finditer(ct_pattern, input_content):
+                idx = int(match.group(1))
+                val = match.group(2)
+                orig_ct[idx] = val
+            
+            if orig_labels:
+                # Replicate labels for supercell (unique labels, broken symmetry)
+                orig_label_keys = sorted(orig_labels.keys())
+                label_meta = []
+                for key in orig_label_keys:
+                    label = orig_labels[key]
+                    match = re.match(r'^(.*?)(\d+)$', label)
+                    if match:
+                        base = match.group(1)
+                        start_num = int(match.group(2))
+                    else:
+                        base = label
+                        start_num = 0
+                    label_meta.append((base, start_num, label))
+                
+                orig_ct_values = []
+                if orig_ct:
+                    for key in orig_label_keys:
+                        if key in orig_ct:
+                            orig_ct_values.append(orig_ct[key])
+                
+                label_counts = {}
+                super_labels = []
+                super_ct = []
+                source_labels = []
+                for _ in range(nx * ny * nz):
+                    for idx, key in enumerate(orig_label_keys):
+                        base, start_num, src_label = label_meta[idx]
+                        if base not in label_counts:
+                            label_counts[base] = start_num - 1 if start_num > 0 else 0
+                        label_counts[base] += 1
+                        super_labels.append(f"{base}{label_counts[base]}")
+                        source_labels.append(src_label)
+                        if orig_ct_values:
+                            super_ct.append(orig_ct_values[idx])
+                new_ntype = len(super_labels)
+                
+                # Find label section and replace
+                label_start = re.search(r"label\s*\(\s*1\s*\)", input_content)
+                if label_start:
+                    # Find end of label section
+                    label_section_start = label_start.start()
+                    lines = input_content[label_section_start:].split('\n')
+                    label_lines = sum(1 for line in lines if 'label(' in line)
+                    
+                    temp_pos = label_section_start
+                    for i in range(label_lines):
+                        temp_pos = input_content.find('\n', temp_pos) + 1
+                    label_section_end = temp_pos
+                    
+                    # Build new label section
+                    new_label_section = ""
+                    for i, label in enumerate(super_labels, start=1):
+                        new_label_section += f"label({i}) = '{label}'\n"
+                    
+                    input_content = input_content[:label_section_start] + new_label_section + input_content[label_section_end:]
+                    
+                    # Ensure ntype in &lattice matches expanded labels
+                    input_content = set_or_insert_lattice_scalar(input_content, "ntype", str(new_ntype))
+                    
+                    # Expand ct definitions to match ntype.
+                    # Supports both ct(:)=... and ct(i)=... input styles.
+                    if super_ct:
+                        ct_start = re.search(r'ct\s*\(\s*(:|\d+)\s*\)', input_content, flags=re.IGNORECASE)
+                        if ct_start:
+                            ct_section_start = ct_start.start()
+                            lines = input_content[ct_section_start:].split('\n')
+                            ct_lines = sum(1 for line in lines if re.search(r'\bct\s*\(', line, flags=re.IGNORECASE))
+                            
+                            temp_pos = ct_section_start
+                            for i in range(ct_lines):
+                                temp_pos = input_content.find('\n', temp_pos) + 1
+                            ct_section_end = temp_pos
+                            
+                            new_ct_section = ""
+                            for i, val in enumerate(super_ct, start=1):
+                                new_ct_section += f"ct({i}) = {val}\n"
+                            
+                            input_content = input_content[:ct_section_start] + new_ct_section + input_content[ct_section_end:]
+                        else:
+                            # No ct definition existed; insert per-type ct lines in &lattice
+                            insert_ct = "".join([f"ct({i}) = {val}\n" for i, val in enumerate(super_ct, start=1)])
+                            block = re.search(r'&lattice\b(.*?)/', input_content, flags=re.IGNORECASE | re.DOTALL)
+                            if block:
+                                btxt = block.group(0)
+                                new_btxt = re.sub(r'/\s*$', insert_ct + "/", btxt, flags=re.MULTILINE)
+                                input_content = input_content[:block.start()] + new_btxt + input_content[block.end():]
+                    
+                    # Backup and write
+                    input_backup = Path('input_original.nml.bak')
+                    shutil.copy2('input.nml', input_backup)
+                    
+                    with open('input.nml', 'w') as f:
+                        f.write(input_content)
+                    
+                    print(f"  ✓ Updated input.nml with replicated labels (backup: {input_backup})")
+                    
+                    # Create per-species .nml files for unique labels
+                    for new_label, src_label in zip(super_labels, source_labels):
+                        src_file = Path(f"{src_label}.nml")
+                        dest_file = Path(f"{new_label}.nml")
+                        if src_file.exists() and not dest_file.exists():
+                            shutil.copy2(src_file, dest_file)
+        
+        print(f"  ✓ Supercell creation complete")
+        
+        return True
+        
+    except Exception as e:
+        print(f"ERROR creating supercell: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+def print_summary_diff():
+    """Print a summary of changes between old and new files."""
+    print("\nSummary of Changes:")
+    print("=" * 70)
+    
+    # Compare lattice files
+    old_lattice = Path('lattice.nml')
+    new_lattice = Path('lattice_new.nml')
+    
+    if old_lattice.exists() and new_lattice.exists():
+        old_size = old_lattice.stat().st_size
+        new_size = new_lattice.stat().st_size
+        print(f"\nlattice.nml:")
+        print(f"  Old size: {old_size} bytes")
+        print(f"  New size: {new_size} bytes")
+        print(f"  Change:   {new_size - old_size:+d} bytes")
+    
+    # Compare input files  
+    old_input = Path('input.nml')
+    new_input = Path('input_new.nml')
+    
+    if old_input.exists() and new_input.exists():
+        old_size = old_input.stat().st_size
+        new_size = new_input.stat().st_size
+        print(f"\ninput.nml:")
+        print(f"  Old size: {old_size} bytes")
+        print(f"  New size: {new_size} bytes")
+        print(f"  Change:   {new_size - old_size:+d} bytes")
+        
+        # Try to extract some key info
+        try:
+            with open(new_input, 'r') as f:
+                content = f.read()
+                if 'nbas' in content:
+                    # Try to find nbas value
+                    for line in content.split('\n'):
+                        if 'nbas' in line.lower() and '=' in line:
+                            print(f"  {line.strip()}")
+                            break
+        except Exception:
+            pass
+    
+    print("=" * 70)
 
 
 def main():
@@ -54,91 +1581,336 @@ def main():
     None
     """
     parser = argparse.ArgumentParser(
-        description="RS Tools Command Line Interface"
+        description="RS Tools Command Line Interface",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Existing functionality (flags)
+  rsutil --setup                            # Process lattice
+  rsutil --lattice --data examples/bccFe    # Visualize lattice
+  rsutil --exchange --cutoff 1.5            # Create exchange maps
+  rsutil --export --jij jijso.out           # Export to UppASD
+  
+  # Band structure & DOS (subcommands)
+  rsutil bands --lattice lattice.nml --nk 200            # Band structure
+  rsutil bands --projections --projection orbital        # Orbital projections
+  rsutil dos --mesh 8 8 8 --electrons 8.0                # DOS with Fermi level
+  rsutil dos --mesh 10 10 10 --electrons 8.0 --moments   # DOS moments analysis
+  
+  # Band-Related Properties (Phase 2 - flags on bands subcommand)
+  rsutil bands --altermagnetic --nk 100 --plot-splitting --plot-bands
+                                      # Detect altermagnetic materials
+  rsutil bands --altermagnetic --nk 150 --  rsutil bands --altermagnetic --nk 150 --  rsutil bands    rsutil bands --altermae altermagneti  rsutil bands --til ban  rsutil bands --alt--ahc --orbital-mag --plot-chern
+                                      # Topological properties analysis
+  rsutil bands --berry --nk 150 --chern-bands 0 1 2 --plot-berry 0
+                                      # Calculate specific Chern numbers
+        """,
+    )
+
+    # Create subparsers for new band/DOS functionality
+    subparsers = parser.add_subparsers(dest="subcommand", help="Available subcommands")
+
+    # Add band/DOS subcommands
+    create_bands_parser(subparsers)
+    create_dos_parser(subparsers)
+
+    # Existing flags for backward compatibility
+    parser.add_argument(
+        "--setup", "-S", action="store_true", default=False, help="Process lattice"
     )
     parser.add_argument(
-        '--setup', '-S', action='store_true', default=False,
-        help='Process lattice'
+        "--lattice",
+        "-L",
+        action="store_true",
+        default=False,
+        help="Run visualizer for lattice input",
     )
     parser.add_argument(
-        '--lattice', '-L', action='store_true', default=False,
-        help='Run visualizer for lattice input'
+        "--clust",
+        "-C",
+        action="store_true",
+        default=False,
+        help="Run visualizer for clust file",
     )
     parser.add_argument(
-        '--clust', '-C', action='store_true', default=False,
-        help='Run visualizer for clust file'
+        "--exchange",
+        "-J",
+        action="store_true",
+        default=False,
+        help="Create exchange input files",
     )
     parser.add_argument(
-        '--exchange', '-J', action='store_true', default=False,
-        help='Create exchange input files'
+        "--data",
+        type=str,
+        default=".",
+        help="Directory for data files to be visualized",
     )
     parser.add_argument(
-        '--data', type=str, default='.',
-        help='Directory for data files to be visualized'
+        "--cutoff",
+        type=float,
+        default="1.0",
+        help="Cutoff for exchange interactions, in lattice units",
     )
     parser.add_argument(
-        '--cutoff', type=float, default='1.0',
-        help='Cutoff for exchange interactions, in lattice units'
+        "--unique",
+        action="store_true",
+        default=False,
+        help="Find only unique neighbors per shell (one representative per unique species-vector combination)",
     )
     parser.add_argument(
-        '--unique', action='store_true', default=False,
-        help='Find only unique neighbors per shell (one representative per unique species-vector combination)'
+        "--shell-width",
+        type=float,
+        default=0.1,
+        help="Width of shells for grouping neighbors when using --unique (default: 0.1)",
     )
     parser.add_argument(
-        '--shell-width', type=float, default=0.1,
-        help='Width of shells for grouping neighbors when using --unique (default: 0.1)'
+        "--soc",
+        action="store_true",
+        default=False,
+        help="Account for spin-orbit coupling in symmetry considerations",
     )
     parser.add_argument(
-        '--soc', action='store_true', default=False,
-        help='Account for spin-orbit coupling in symmetry considerations'
+        "--export",
+        "-E",
+        action="store_true",
+        default=False,
+        help="Export RS-LMTO inputs to UppASD format",
     )
     parser.add_argument(
-        '--rij-out', type=str, default=None,
-        help='Write R_ij mappings to this file (JSON)'
+        "--jij",
+        type=str,
+        default=None,
+        help="Path to jijso.out file to include in export",
     )
     parser.add_argument(
-        '--rij-format', type=str, default='json', choices=['json', 'txt'],
-        help='Format for R_ij output (json or txt; default: json)'
+        "--dmi",
+        type=str,
+        default=None,
+        help="Path to dijso.out / dmi file to include in export (DM vectors)",
     )
     parser.add_argument(
-        '--export', '-E', action='store_true', default=False,
-        help='Export RS-LMTO inputs to UppASD format'
+        "--out",
+        type=str,
+        default="uppasd_out",
+        help="Output directory for exported UppASD files (relative to --data)",
     )
     parser.add_argument(
-        '--jij', type=str, default=None,
-        help='Path to jijso.out file to include in export'
+        "--lmto47",
+        action="store_true",
+        default=False,
+        help="Export RS-LMTO lattice/input to LMTO47 CTRL format",
     )
     parser.add_argument(
-        '--dmi', type=str, default=None,
-        help='Path to dijso.out / dmi file to include in export (DM vectors)'
+        "--nspin",
+        type=int,
+        default=2,
+        help="NSPIN value for LMTO47 export (default: 2)",
     )
     parser.add_argument(
-        '--out', type=str, default='uppasd_out',
-        help='Output directory for exported UppASD files (relative to --data)'
+        "--lmx",
+        type=int,
+        default=2,
+        help="Maximum L channel override (default: 2; spd)",
     )
     parser.add_argument(
-        '--cluster', type=str, default='periodic', choices=['periodic', 'free'],
-        help='Cluster type: periodic (default) or free'
+        "--cluster",
+        type=str,
+        default="periodic",
+        choices=["periodic", "free"],
+        help="Cluster type: periodic (default) or free",
     )
     parser.add_argument(
-        '--empty_spheres', action='store_true', default=False,
-        help='Enable empty sphere calculations'
+        "--empty_spheres",
+        action="store_true",
+        default=False,
+        help="Enable empty sphere calculations",
     )
     parser.add_argument(
-        '--min_empty_radius', type=float, default=1.2,
-        help='Minimum empty sphere radius (default: 1.2)'
+        "--min_empty_radius",
+        type=float,
+        default=1.2,
+        help="Minimum empty sphere radius (default: 1.2)",
     )
     parser.add_argument(
-        '--max_empty_radius', type=float, default=2.5,
-        help='Maximum empty sphere radius (default: 2.5)'
+        "--max_empty_radius",
+        type=float,
+        default=2.5,
+        help="Maximum empty sphere radius (default: 2.5)",
+    )
+    parser.add_argument(
+        '--verbose', '-v', action='store_true', default=False,
+        help='Show detailed progress during processing'
+    )
+    parser.add_argument(
+        '--summary', action='store_true', default=False,
+        help='Print summary of changes after processing'
+    )
+    parser.add_argument(
+        '--validate', action='store_true', default=False,
+        help='Validate output files after generation'
+    )
+    parser.add_argument(
+        '--backup', action='store_true', default=False,
+        help='Create backup files before any operations'
+    )
+    parser.add_argument(
+        '--in-place', action='store_true', default=False,
+        help='Update input files in place (creates .bak backups)'
+    )
+    parser.add_argument(
+        '--supercell', nargs=3, type=int, metavar=('NX', 'NY', 'NZ'),
+        help='Create supercell by repeating unit cell NX×NY×NZ times'
     )
 
     args = parser.parse_args()
 
+    # Handle subcommands first (new band/DOS functionality)
+    if args.subcommand:
+        if hasattr(args, "func"):
+            return args.func(args)
+        else:
+            parser.print_help()
+            return
+
+    # Handle existing flag-based functionality (backward compatibility)
     # Process lattice if --setup flag is provided
     if args.setup:
-        process_lattice(cluster_type=args.cluster, empty_spheres=args.empty_spheres, 
-                       min_empty_radius=args.min_empty_radius, max_empty_radius=args.max_empty_radius)
+        print("=" * 70)
+        print("RS-utils Lattice Setup")
+        print("=" * 70)
+        
+        # Validate input files exist
+        if not validate_setup_inputs():
+            sys.exit(1)
+        
+        # Validate parameter ranges
+        if not validate_setup_parameters(args.min_empty_radius, args.max_empty_radius):
+            sys.exit(1)
+        
+        # Display configuration
+        print(f"\nConfiguration:")
+        print(f"  Cluster type:      {args.cluster}")
+        print(f"  Empty spheres:     {'enabled' if args.empty_spheres else 'disabled'}")
+        if args.empty_spheres:
+            print(f"  Min radius:        {args.min_empty_radius}")
+            print(f"  Max radius:        {args.max_empty_radius}")
+        if args.supercell:
+            nx, ny, nz = args.supercell
+            print(f"  Supercell:         {nx}×{ny}×{nz}")
+        if args.verbose:
+            print(f"  Verbose mode:      enabled")
+        if args.validate:
+            print(f"  Validation:        enabled")
+        if args.summary:
+            print(f"  Summary:           enabled")
+        if args.backup:
+            print(f"  Backup:            enabled")
+        if args.in_place:
+            print(f"  In-place update:   enabled")
+        print()
+        
+        # Create backups if requested
+        if args.backup or args.in_place:
+            print("Creating backup files...")
+            create_backup_files()
+            print()
+        
+        # Create supercell if requested (do this BEFORE processing)
+        if args.supercell:
+            nx, ny, nz = args.supercell
+            if nx < 1 or ny < 1 or nz < 1:
+                print("ERROR: Supercell dimensions must be positive integers", file=sys.stderr)
+                sys.exit(1)
+            
+            if not create_supercell(nx, ny, nz):
+                print("ERROR: Failed to create supercell", file=sys.stderr)
+                sys.exit(1)
+            print()
+        
+        # Process lattice with error handling
+        try:
+            if args.verbose:
+                print("Starting lattice processing...")
+            
+            process_lattice(
+                cluster_type=args.cluster, 
+                empty_spheres=args.empty_spheres,
+                min_empty_radius=args.min_empty_radius, 
+                max_empty_radius=args.max_empty_radius,
+                lmx=args.lmx,
+            )
+            
+            if args.verbose:
+                print("Lattice processing completed.")
+            
+            # Check if output files were created
+            output_files = ['lattice_new.nml', 'input_new.nml']
+            created_files = [f for f in output_files if Path(f).exists()]
+            
+            if created_files:
+                print("\n" + "=" * 70)
+                print("SUCCESS: Lattice processing completed")
+                print("=" * 70)
+                print("\nGenerated files:")
+                for filename in created_files:
+                    file_size = Path(filename).stat().st_size
+                    print(f"  ✓ {filename} ({file_size} bytes)")
+                
+                # Run validation if requested
+                if args.validate:
+                    validation_results = validate_output_files()
+                    print_validation_report(validation_results)
+                
+                # Print summary if requested
+                if args.summary:
+                    print_summary_diff()
+                
+                # Apply in-place updates if requested
+                if args.in_place:
+                    print("\nApplying in-place updates...")
+                    updated = apply_in_place_updates()
+                    if updated:
+                        print(f"\nUpdated {len(updated)} file(s) in place.")
+                        print("Original files backed up with .bak extension.")
+                        print("\nNext steps:")
+                        print("  Continue with exchange calculations:")
+                        print("     rsutil --exchange --cutoff 2.5")
+                    else:
+                        print("No files were updated.", file=sys.stderr)
+                else:
+                    # Standard workflow message
+                    print("\nNext steps:")
+                    print("  1. Review the generated files")
+                    if not args.validate:
+                        print("     (run with --validate to check file integrity)")
+                    if not args.summary:
+                        print("     (run with --summary to see detailed changes)")
+                    print("  2. Rename them to replace original files:")
+                    print("     mv lattice_new.nml lattice.nml")
+                    print("     mv input_new.nml input.nml")
+                    print("     (or use --in-place flag to do this automatically)")
+                    print("  3. Continue with exchange calculations:")
+                    print("     rsutil --exchange --cutoff 2.5")
+            else:
+                print("\nWARNING: Processing completed but expected output files were not found.", file=sys.stderr)
+                print("Check for error messages above.", file=sys.stderr)
+                
+        except FileNotFoundError as e:
+            print(f"\nERROR: File not found during processing: {e}", file=sys.stderr)
+            print("This may indicate missing data files or incorrect file paths.", file=sys.stderr)
+            sys.exit(1)
+        except ValueError as e:
+            print(f"\nERROR: Invalid parameter or data: {e}", file=sys.stderr)
+            sys.exit(1)
+        except RuntimeError as e:
+            print(f"\nERROR: Processing failed: {e}", file=sys.stderr)
+            sys.exit(1)
+        except Exception as e:
+            print(f"\nERROR: Unexpected error during lattice processing:", file=sys.stderr)
+            print(f"  {type(e).__name__}: {e}", file=sys.stderr)
+            print("\nPlease check your input files and try again.", file=sys.stderr)
+            print("If the problem persists, please report this error.", file=sys.stderr)
+            sys.exit(1)
     # Run visualizer for lattice or clust file if --lattice or --clust flag is provided
     elif args.lattice or args.clust:
         rs_visualizer(args.data, clust=args.clust)
@@ -152,13 +1924,32 @@ def main():
             rij_out=args.rij_out,
             rij_fmt=args.rij_format,
         )
+    # Export to LMTO47 CTRL if requested
+    elif args.lmto47:
+        lattice_path = os.path.join(args.data, "lattice.nml")
+        input_path = os.path.join(args.data, "input.nml")
+        out_dir = os.path.join(args.data, args.out) if args.data else args.out
+        ctrl_file = export_ctrl(
+            source=("rs_lmto", lattice_path, input_path),
+            out_dir=out_dir,
+            header="RS-tools export",
+            nspin=args.nspin,
+            lmx=args.lmx,
+        )
+        print(f"LMTO47 CTRL written to: {ctrl_file}")
     # Export to UppASD if requested
     elif args.export:
         # default lattice path in data dir
-        lattice_path = os.path.join(args.data, 'lattice.nml')
+        lattice_path = os.path.join(args.data, "lattice.nml")
         out_dir = os.path.join(args.data, args.out) if args.data else args.out
-        export_from_files(lattice_nml=lattice_path, input_nml=None, clust=None,
-                          out_dir=out_dir, jij_file=args.jij, dij_file=args.dmi)
+        export_from_files(
+            lattice_nml=lattice_path,
+            input_nml=None,
+            clust=None,
+            out_dir=out_dir,
+            jij_file=args.jij,
+            dij_file=args.dmi,
+        )
     # Print help message if no valid flag is provided
     else:
         parser.print_help()

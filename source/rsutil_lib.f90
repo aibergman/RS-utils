@@ -88,7 +88,11 @@ subroutine process_lattice_impl()
   !-----------------------------------------------------------------
   call update_namelists("input.nml", "input_new.nml", lat_input, atm_input)
 
-  call update_atoms(pot_data, atm_input, lat_data, lat_input)
+  if (lmax_override >= 0) then
+    call update_atoms(pot_data, atm_input, lat_data, lat_input, lmax_override)
+  else
+    call update_atoms(pot_data, atm_input, lat_data, lat_input, 2)
+  end if
 
 end subroutine process_lattice_impl
 
