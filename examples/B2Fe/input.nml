@@ -1,0 +1,36 @@
+&calculation
+pre_processing = 'bravais'
+verbose = T
+/
+&lattice
+rc = 100
+alat =     2.861200
+crystal_sym = 'b2'
+wav = 1.4087762282
+/
+&atoms
+database = './'
+label(1) = 'Fe-1'
+label(2) = 'Fe-2'
+/
+&self
+ws_all = .true. ! ''
+nstep = 1
+conv_thr = 0.5e-9
+/
+&energy
+fermi = -0.069282
+energy_min = -1.0
+energy_max = 0.5
+channels_ldos = 2500
+/
+&control
+calctype = 'B'
+nsp = 1 ! type of calculation, nsp can be 1, 2, 3 or 4
+lld = 21
+recur = 'block'
+/
+&mix
+beta = 0.2
+mixtype = 'broyden'
+/

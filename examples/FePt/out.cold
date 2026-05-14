@@ -1,0 +1,196 @@
+ Running with           2 MPI processes.
+ Each MPI process is using           1 OpenMP threads.
+  OpenMP in play with            1  cores.
+          15           1        2145        2164        2165        2470        2471        2490        2491        6473        6779        6798        6799        6819        7125           0
+          15           6
+          15           1        2145        2164        2165        2470        2471        2490        2491        6473        6779        6798        6799        6819        7125           0
+          15           6
+[Feb  3 2025 14:34:26.719] [self.f90:1047]             [1m[32m<info> [0m[0mFe
+[Feb  3 2025 14:34:26.720] [self.f90:1122]             [1m[32m<info> [0m[0mXC functional: B-H 11.2665793431972596E-004
+[Feb  3 2025 14:34:26.720] [self.f90:1152]             [1m[32m<info> [0m[0mF core check:0
+[Feb  3 2025 14:34:26.775] [self.f90:1122]             [1m[32m<info> [0m[0mXC functional: B-H 11.3806909436030355E-005
+[Feb  3 2025 14:34:26.776] [self.f90:1152]             [1m[32m<info> [0m[0mF core check:14
+395  0  0  35  29     -0.16419633     -0.16419633     -0.16419633
+396  0  5 615 611     -0.16419633     -0.16419633     -0.16419633  -1.4252D-06
+397  0  0  35  29     -0.16419633     -0.16419633     -0.16419633
+398  0  5 615 611     -0.16419633     -0.16419633     -0.16419633  -1.4252D-06
+399  0  0  35  29     -0.16419633     -0.16419633     -0.16419633
+400  0  5 615 611     -0.16419633     -0.16419633     -0.16419633  -1.4252D-06
+[Feb  3 2025 14:34:26.800] [self.f90:869]              [1m[32m<info> [0m[0mAtomic SFC done for atom Fe
+[Feb  3 2025 14:34:26.930] [self.f90:869]              [1m[32m<info> [0m[0mAtomic SFC done for atom Pt
+[Feb  3 2025 14:34:26.930] [self.f90:893]              [1m[32m<info> [0m[0mFrom orthogonal to TB basis for atom Fe
+[Feb  3 2025 14:34:26.930] [self.f90:893]              [1m[32m<info> [0m[0mFrom orthogonal to TB basis for atom Pt
+[Feb  3 2025 14:34:26.930] [self.f90:769]              [1m[32m<info> [0m[0mPerform recursion at step 1
+[Feb  3 2025 14:34:27.224] [recursion.f90:1119]        [1m[32m<info> [0m[0mBlock recursion on progress for atom 1
+[Feb  3 2025 14:34:27.230] [recursion.f90:1119]        [1m[32m<info> [0m[0mBlock recursion on progress for atom 2
+[Feb  3 2025 14:34:35.899] [self.f90:813]              [1m[32m<info> [0m[0mCalculating the density of states and the new moment bands
+[Feb  3 2025 14:34:36.654] [bands.f90:251]             [1m[32m<info> [0m[0mValence is:       18.000000
+[Feb  3 2025 14:34:39.078] [bands.f90:807]             [1m[32m<info> [0m[0mSpin moment of atom   2 is   0.422249
+[Feb  3 2025 14:34:39.078] [bands.f90:817]             [1m[32m<info> [0m[0mSpin moment projections of atom   2 is  -0.000000  -0.000000  -0.422249
+[Feb  3 2025 14:34:39.095] [bands.f90:317]             [1m[32m<info> [0m[0mFree Fermi energy: -0.142229
+[Feb  3 2025 14:34:39.096] [bands.f90:807]             [1m[32m<info> [0m[0mSpin moment of atom   1 is   1.467106
+[Feb  3 2025 14:34:39.096] [bands.f90:817]             [1m[32m<info> [0m[0mSpin moment projections of atom   1 is   0.000000   0.000000  -1.467106
+[Feb  3 2025 14:34:39.096] [mix.f90:362]               [1m[32m<info> [0m[0mSpin moment at atom    2 is being considered induced
+[Feb  3 2025 14:34:39.099] [bands.f90:921]             [1m[32m<info> [0m[0mOrbital moment of atom   2 is   0.000000   0.000000  -0.140554
+[Feb  3 2025 14:34:39.116] [bands.f90:921]             [1m[32m<info> [0m[0mOrbital moment of atom   1 is  -0.000000  -0.000000  -0.061523
+[Feb  3 2025 14:34:39.117] [self.f90:722]              [1m[32m<info> [0m[0mMixtype is broyden
+[Feb  3 2025 14:34:39.117] [mix.f90:407]               [1m[32m<info> [0m[0mValence at atom   1 is   8.000000
+[Feb  3 2025 14:34:39.117] [mix.f90:410]               [1m[32m<info> [0m[0mCharge transfer at atom    1:  -0.085613  -0.021403  -0.064210
+[Feb  3 2025 14:34:39.117] [mix.f90:407]               [1m[32m<info> [0m[0mValence at atom   2 is  10.000000
+[Feb  3 2025 14:34:39.117] [mix.f90:410]               [1m[32m<info> [0m[0mCharge transfer at atom    2:   0.085613   0.021403   0.064210
+[Feb  3 2025 14:34:39.117] [mix.f90:417]               [1m[32m<info> [0m[0mMoment diff for atom:   1 is   0.054292
+[Feb  3 2025 14:34:39.117] [mix.f90:417]               [1m[32m<info> [0m[0mMoment diff for atom:   2 is   0.093294
+[Feb  3 2025 14:34:39.117] [self.f90:1122]             [1m[32m<info> [0m[0mXC functional: B-H 11.3806909436030355E-005
+[Feb  3 2025 14:34:39.117] [self.f90:1152]             [1m[32m<info> [0m[0mF core check:14
+[Feb  3 2025 14:34:39.117] [self.f90:1047]             [1m[32m<info> [0m[0mFe
+[Feb  3 2025 14:34:39.117] [self.f90:1122]             [1m[32m<info> [0m[0mXC functional: B-H 11.2665793431972596E-004
+[Feb  3 2025 14:34:39.117] [self.f90:1152]             [1m[32m<info> [0m[0mF core check:0
+[Feb  3 2025 14:34:39.198] [self.f90:869]              [1m[32m<info> [0m[0mAtomic SFC done for atom Fe
+[Feb  3 2025 14:34:39.264] [self.f90:869]              [1m[32m<info> [0m[0mAtomic SFC done for atom Pt
+[Feb  3 2025 14:34:39.265] [self.f90:893]              [1m[32m<info> [0m[0mFrom orthogonal to TB basis for atom Fe
+[Feb  3 2025 14:34:39.265] [self.f90:893]              [1m[32m<info> [0m[0mFrom orthogonal to TB basis for atom Pt
+[Feb  3 2025 14:34:39.265] [self.f90:755]              [1m[32m<info> [0m[0mNot converged! Diff= 0.0539709955
+[Feb  3 2025 14:34:39.265] [self.f90:769]              [1m[32m<info> [0m[0mPerform recursion at step 2
+[Feb  3 2025 14:34:39.394] [recursion.f90:1119]        [1m[32m<info> [0m[0mBlock recursion on progress for atom 2
+[Feb  3 2025 14:34:39.398] [recursion.f90:1119]        [1m[32m<info> [0m[0mBlock recursion on progress for atom 1
+[Feb  3 2025 14:34:51.040] [self.f90:813]              [1m[32m<info> [0m[0mCalculating the density of states and the new moment bands
+[Feb  3 2025 14:34:51.522] [bands.f90:251]             [1m[32m<info> [0m[0mValence is:       18.000000
+[Feb  3 2025 14:34:51.522] [bands.f90:807]             [1m[32m<info> [0m[0mSpin moment of atom   2 is   0.335919
+[Feb  3 2025 14:34:51.522] [bands.f90:817]             [1m[32m<info> [0m[0mSpin moment projections of atom   2 is  -0.000000  -0.000000  -0.335919
+[Feb  3 2025 14:34:51.541] [bands.f90:317]             [1m[32m<info> [0m[0mFree Fermi energy: -0.148932
+[Feb  3 2025 14:34:51.542] [bands.f90:807]             [1m[32m<info> [0m[0mSpin moment of atom   1 is   1.672387
+[Feb  3 2025 14:34:51.542] [bands.f90:817]             [1m[32m<info> [0m[0mSpin moment projections of atom   1 is   0.000000   0.000000  -1.672387
+[Feb  3 2025 14:34:51.542] [mix.f90:362]               [1m[32m<info> [0m[0mSpin moment at atom    2 is being considered induced
+[Feb  3 2025 14:34:51.545] [bands.f90:921]             [1m[32m<info> [0m[0mOrbital moment of atom   2 is   0.000000   0.000000  -0.121691
+[Feb  3 2025 14:34:51.565] [bands.f90:921]             [1m[32m<info> [0m[0mOrbital moment of atom   1 is  -0.000000  -0.000000  -0.072242
+[Feb  3 2025 14:34:51.565] [self.f90:722]              [1m[32m<info> [0m[0mMixtype is broyden
+[Feb  3 2025 14:34:51.565] [mix.f90:407]               [1m[32m<info> [0m[0mValence at atom   1 is   8.000000
+[Feb  3 2025 14:34:51.565] [mix.f90:410]               [1m[32m<info> [0m[0mCharge transfer at atom    1:  -0.147355  -0.072434  -0.074921
+[Feb  3 2025 14:34:51.565] [mix.f90:407]               [1m[32m<info> [0m[0mValence at atom   2 is  10.000000
+[Feb  3 2025 14:34:51.565] [mix.f90:410]               [1m[32m<info> [0m[0mCharge transfer at atom    2:   0.147355   0.072434   0.074921
+[Feb  3 2025 14:34:51.565] [mix.f90:417]               [1m[32m<info> [0m[0mMoment diff for atom:   1 is   0.065477
+[Feb  3 2025 14:34:51.565] [mix.f90:417]               [1m[32m<info> [0m[0mMoment diff for atom:   2 is   0.068881
+[Feb  3 2025 14:34:51.565] [self.f90:1122]             [1m[32m<info> [0m[0mXC functional: B-H 11.3806909436030355E-005
+[Feb  3 2025 14:34:51.565] [self.f90:1152]             [1m[32m<info> [0m[0mF core check:14
+[Feb  3 2025 14:34:51.565] [self.f90:1047]             [1m[32m<info> [0m[0mFe
+[Feb  3 2025 14:34:51.565] [self.f90:1122]             [1m[32m<info> [0m[0mXC functional: B-H 11.2665793431972596E-004
+[Feb  3 2025 14:34:51.565] [self.f90:1152]             [1m[32m<info> [0m[0mF core check:0
+[Feb  3 2025 14:34:51.651] [self.f90:869]              [1m[32m<info> [0m[0mAtomic SFC done for atom Fe
+[Feb  3 2025 14:34:51.712] [self.f90:869]              [1m[32m<info> [0m[0mAtomic SFC done for atom Pt
+[Feb  3 2025 14:34:51.712] [self.f90:893]              [1m[32m<info> [0m[0mFrom orthogonal to TB basis for atom Fe
+[Feb  3 2025 14:34:51.712] [self.f90:893]              [1m[32m<info> [0m[0mFrom orthogonal to TB basis for atom Pt
+[Feb  3 2025 14:34:51.712] [self.f90:755]              [1m[32m<info> [0m[0mNot converged! Diff= 0.0475177713
+[Feb  3 2025 14:34:51.712] [self.f90:769]              [1m[32m<info> [0m[0mPerform recursion at step 3
+[Feb  3 2025 14:34:51.954] [recursion.f90:1119]        [1m[32m<info> [0m[0mBlock recursion on progress for atom 1
+[Feb  3 2025 14:34:51.966] [recursion.f90:1119]        [1m[32m<info> [0m[0mBlock recursion on progress for atom 2
+[Feb  3 2025 14:35:02.361] [self.f90:813]              [1m[32m<info> [0m[0mCalculating the density of states and the new moment bands
+[Feb  3 2025 14:35:02.793] [bands.f90:251]             [1m[32m<info> [0m[0mValence is:       18.000000
+[Feb  3 2025 14:35:02.794] [bands.f90:807]             [1m[32m<info> [0m[0mSpin moment of atom   2 is   0.311422
+[Feb  3 2025 14:35:02.794] [bands.f90:817]             [1m[32m<info> [0m[0mSpin moment projections of atom   2 is  -0.000000  -0.000000  -0.311422
+[Feb  3 2025 14:35:02.810] [bands.f90:317]             [1m[32m<info> [0m[0mFree Fermi energy: -0.158747
+[Feb  3 2025 14:35:02.810] [bands.f90:807]             [1m[32m<info> [0m[0mSpin moment of atom   1 is   1.900873
+[Feb  3 2025 14:35:02.810] [bands.f90:817]             [1m[32m<info> [0m[0mSpin moment projections of atom   1 is  -0.000000  -0.000000  -1.900873
+[Feb  3 2025 14:35:02.810] [mix.f90:362]               [1m[32m<info> [0m[0mSpin moment at atom    2 is being considered induced
+[Feb  3 2025 14:35:02.814] [bands.f90:921]             [1m[32m<info> [0m[0mOrbital moment of atom   2 is   0.000000   0.000000  -0.116413
+[Feb  3 2025 14:35:02.832] [bands.f90:921]             [1m[32m<info> [0m[0mOrbital moment of atom   1 is  -0.000000  -0.000000  -0.086322
+[Feb  3 2025 14:35:02.832] [self.f90:722]              [1m[32m<info> [0m[0mMixtype is broyden
+[Feb  3 2025 14:35:02.832] [mix.f90:407]               [1m[32m<info> [0m[0mValence at atom   1 is   8.000000
+[Feb  3 2025 14:35:02.832] [mix.f90:410]               [1m[32m<info> [0m[0mCharge transfer at atom    1:   0.033748  -0.044597   0.078345
+[Feb  3 2025 14:35:02.832] [mix.f90:407]               [1m[32m<info> [0m[0mValence at atom   2 is  10.000000
+[Feb  3 2025 14:35:02.832] [mix.f90:410]               [1m[32m<info> [0m[0mCharge transfer at atom    2:  -0.033748   0.044799  -0.078548
+[Feb  3 2025 14:35:02.832] [mix.f90:417]               [1m[32m<info> [0m[0mMoment diff for atom:   1 is   0.065971
+[Feb  3 2025 14:35:02.832] [mix.f90:417]               [1m[32m<info> [0m[0mMoment diff for atom:   2 is   0.041633
+[Feb  3 2025 14:35:02.832] [self.f90:1047]             [1m[32m<info> [0m[0mFe
+[Feb  3 2025 14:35:02.832] [self.f90:1122]             [1m[32m<info> [0m[0mXC functional: B-H 11.2665793431972596E-004
+[Feb  3 2025 14:35:02.832] [self.f90:1152]             [1m[32m<info> [0m[0mF core check:0
+[Feb  3 2025 14:35:02.832] [self.f90:1122]             [1m[32m<info> [0m[0mXC functional: B-H 11.3806909436030355E-005
+[Feb  3 2025 14:35:02.832] [self.f90:1152]             [1m[32m<info> [0m[0mF core check:14
+[Feb  3 2025 14:35:02.917] [self.f90:869]              [1m[32m<info> [0m[0mAtomic SFC done for atom Fe
+[Feb  3 2025 14:35:02.980] [self.f90:869]              [1m[32m<info> [0m[0mAtomic SFC done for atom Pt
+[Feb  3 2025 14:35:02.980] [self.f90:893]              [1m[32m<info> [0m[0mFrom orthogonal to TB basis for atom Fe
+[Feb  3 2025 14:35:02.980] [self.f90:893]              [1m[32m<info> [0m[0mFrom orthogonal to TB basis for atom Pt
+[Feb  3 2025 14:35:02.980] [self.f90:755]              [1m[32m<info> [0m[0mNot converged! Diff= 0.0390045459
+[Feb  3 2025 14:35:02.980] [self.f90:769]              [1m[32m<info> [0m[0mPerform recursion at step 4
+[Feb  3 2025 14:35:03.085] [recursion.f90:1119]        [1m[32m<info> [0m[0mBlock recursion on progress for atom 2
+[Feb  3 2025 14:35:03.086] [recursion.f90:1119]        [1m[32m<info> [0m[0mBlock recursion on progress for atom 1
+[Feb  3 2025 14:35:11.198] [self.f90:813]              [1m[32m<info> [0m[0mCalculating the density of states and the new moment bands
+[Feb  3 2025 14:35:11.948] [bands.f90:251]             [1m[32m<info> [0m[0mValence is:       18.000000
+[Feb  3 2025 14:35:15.124] [bands.f90:807]             [1m[32m<info> [0m[0mSpin moment of atom   2 is   0.221518
+[Feb  3 2025 14:35:15.124] [bands.f90:817]             [1m[32m<info> [0m[0mSpin moment projections of atom   2 is   0.000000   0.000000  -0.221518
+[Feb  3 2025 14:35:15.141] [bands.f90:317]             [1m[32m<info> [0m[0mFree Fermi energy: -0.150016
+[Feb  3 2025 14:35:15.141] [bands.f90:807]             [1m[32m<info> [0m[0mSpin moment of atom   1 is   2.327362
+[Feb  3 2025 14:35:15.141] [bands.f90:817]             [1m[32m<info> [0m[0mSpin moment projections of atom   1 is   0.000000   0.000000  -2.327362
+[Feb  3 2025 14:35:15.141] [mix.f90:362]               [1m[32m<info> [0m[0mSpin moment at atom    2 is being considered induced
+[Feb  3 2025 14:35:15.145] [bands.f90:921]             [1m[32m<info> [0m[0mOrbital moment of atom   2 is   0.000000   0.000000  -0.086208
+[Feb  3 2025 14:35:15.161] [bands.f90:921]             [1m[32m<info> [0m[0mOrbital moment of atom   1 is  -0.000000  -0.000000  -0.081684
+[Feb  3 2025 14:35:15.161] [self.f90:722]              [1m[32m<info> [0m[0mMixtype is broyden
+[Feb  3 2025 14:35:15.161] [mix.f90:407]               [1m[32m<info> [0m[0mValence at atom   1 is   8.000000
+[Feb  3 2025 14:35:15.161] [mix.f90:410]               [1m[32m<info> [0m[0mCharge transfer at atom    1:  -0.281418  -0.103802  -0.177616
+[Feb  3 2025 14:35:15.161] [mix.f90:407]               [1m[32m<info> [0m[0mValence at atom   2 is  10.000000
+[Feb  3 2025 14:35:15.161] [mix.f90:410]               [1m[32m<info> [0m[0mCharge transfer at atom    2:   0.281418   0.103966   0.177451
+[Feb  3 2025 14:35:15.161] [mix.f90:417]               [1m[32m<info> [0m[0mMoment diff for atom:   1 is   0.092038
+[Feb  3 2025 14:35:15.161] [mix.f90:417]               [1m[32m<info> [0m[0mMoment diff for atom:   2 is   0.034081
+[Feb  3 2025 14:35:15.161] [self.f90:1122]             [1m[32m<info> [0m[0mXC functional: B-H 11.3806909436030355E-005
+[Feb  3 2025 14:35:15.161] [self.f90:1152]             [1m[32m<info> [0m[0mF core check:14
+[Feb  3 2025 14:35:15.161] [self.f90:1047]             [1m[32m<info> [0m[0mFe
+[Feb  3 2025 14:35:15.161] [self.f90:1122]             [1m[32m<info> [0m[0mXC functional: B-H 11.2665793431972596E-004
+[Feb  3 2025 14:35:15.161] [self.f90:1152]             [1m[32m<info> [0m[0mF core check:0
+[Feb  3 2025 14:35:15.242] [self.f90:869]              [1m[32m<info> [0m[0mAtomic SFC done for atom Fe
+[Feb  3 2025 14:35:15.306] [self.f90:869]              [1m[32m<info> [0m[0mAtomic SFC done for atom Pt
+[Feb  3 2025 14:35:15.306] [self.f90:893]              [1m[32m<info> [0m[0mFrom orthogonal to TB basis for atom Fe
+[Feb  3 2025 14:35:15.306] [self.f90:893]              [1m[32m<info> [0m[0mFrom orthogonal to TB basis for atom Pt
+[Feb  3 2025 14:35:15.306] [self.f90:755]              [1m[32m<info> [0m[0mNot converged! Diff= 0.0490726497
+[Feb  3 2025 14:35:15.306] [self.f90:769]              [1m[32m<info> [0m[0mPerform recursion at step 5
+[Feb  3 2025 14:35:15.437] [recursion.f90:1119]        [1m[32m<info> [0m[0mBlock recursion on progress for atom 2
+[Feb  3 2025 14:35:15.437] [recursion.f90:1119]        [1m[32m<info> [0m[0mBlock recursion on progress for atom 1
+[Feb  3 2025 14:35:27.114] [self.f90:813]              [1m[32m<info> [0m[0mCalculating the density of states and the new moment bands
+[Feb  3 2025 14:35:27.577] [bands.f90:251]             [1m[32m<info> [0m[0mValence is:       18.000000
+[Feb  3 2025 14:35:27.577] [bands.f90:807]             [1m[32m<info> [0m[0mSpin moment of atom   2 is   0.309472
+[Feb  3 2025 14:35:27.577] [bands.f90:817]             [1m[32m<info> [0m[0mSpin moment projections of atom   2 is  -0.000000  -0.000000  -0.309472
+[Feb  3 2025 14:35:27.595] [bands.f90:317]             [1m[32m<info> [0m[0mFree Fermi energy: -0.159456
+[Feb  3 2025 14:35:27.595] [bands.f90:807]             [1m[32m<info> [0m[0mSpin moment of atom   1 is   2.259550
+[Feb  3 2025 14:35:27.595] [bands.f90:817]             [1m[32m<info> [0m[0mSpin moment projections of atom   1 is  -0.000000  -0.000000  -2.259550
+[Feb  3 2025 14:35:27.595] [mix.f90:362]               [1m[32m<info> [0m[0mSpin moment at atom    2 is being considered induced
+[Feb  3 2025 14:35:27.598] [bands.f90:921]             [1m[32m<info> [0m[0mOrbital moment of atom   2 is   0.000000   0.000000  -0.099942
+[Feb  3 2025 14:35:27.615] [bands.f90:921]             [1m[32m<info> [0m[0mOrbital moment of atom   1 is  -0.000000  -0.000000  -0.095784
+[Feb  3 2025 14:35:27.616] [self.f90:722]              [1m[32m<info> [0m[0mMixtype is broyden
+[Feb  3 2025 14:35:27.616] [mix.f90:407]               [1m[32m<info> [0m[0mValence at atom   1 is   8.000000
+[Feb  3 2025 14:35:27.616] [mix.f90:410]               [1m[32m<info> [0m[0mCharge transfer at atom    1:   0.139879  -0.045063   0.184942
+[Feb  3 2025 14:35:27.616] [mix.f90:407]               [1m[32m<info> [0m[0mValence at atom   2 is  10.000000
+[Feb  3 2025 14:35:27.616] [mix.f90:410]               [1m[32m<info> [0m[0mCharge transfer at atom    2:  -0.139879   0.045188  -0.185067
+[Feb  3 2025 14:35:27.616] [mix.f90:417]               [1m[32m<info> [0m[0mMoment diff for atom:   1 is   0.060317
+[Feb  3 2025 14:35:27.616] [mix.f90:417]               [1m[32m<info> [0m[0mMoment diff for atom:   2 is   0.023187
+[Feb  3 2025 14:35:27.616] [self.f90:1122]             [1m[32m<info> [0m[0mXC functional: B-H 11.3806909436030355E-005
+[Feb  3 2025 14:35:27.616] [self.f90:1152]             [1m[32m<info> [0m[0mF core check:14
+[Feb  3 2025 14:35:27.616] [self.f90:1047]             [1m[32m<info> [0m[0mFe
+[Feb  3 2025 14:35:27.616] [self.f90:1122]             [1m[32m<info> [0m[0mXC functional: B-H 11.2665793431972596E-004
+[Feb  3 2025 14:35:27.616] [self.f90:1152]             [1m[32m<info> [0m[0mF core check:0
+[Feb  3 2025 14:35:27.698] [self.f90:869]              [1m[32m<info> [0m[0mAtomic SFC done for atom Fe
+[Feb  3 2025 14:35:27.762] [self.f90:869]              [1m[32m<info> [0m[0mAtomic SFC done for atom Pt
+[Feb  3 2025 14:35:27.762] [self.f90:893]              [1m[32m<info> [0m[0mFrom orthogonal to TB basis for atom Fe
+[Feb  3 2025 14:35:27.762] [self.f90:893]              [1m[32m<info> [0m[0mFrom orthogonal to TB basis for atom Pt
+[Feb  3 2025 14:35:27.762] [self.f90:755]              [1m[32m<info> [0m[0mNot converged! Diff= 0.0323101300
+[Feb  3 2025 14:35:27.763] [bands.f90:1092]            [1m[32m<info> [0m[0mMagnetic field on atom   1 is         0.000000         0.000000    -53601.600157
+[Feb  3 2025 14:35:27.763] [bands.f90:1093]            [1m[32m<info> [0m[0mMagnetic torque on atom   1 is        -0.000000         0.000000         0.000000
+[Feb  3 2025 14:35:27.763] [bands.f90:1092]            [1m[32m<info> [0m[0mMagnetic field on atom   2 is        -0.000000        -0.000000     -1248.421574
+[Feb  3 2025 14:35:27.763] [bands.f90:1093]            [1m[32m<info> [0m[0mMagnetic torque on atom   2 is         0.000000        -0.000000         0.000000
+[Feb  3 2025 14:35:27.763] [self.f90:940]              [1m[32m<info> [0m[0mCalculation finished. Report printed in report.out
+-------------------------------------------------------------------- TIMER REPORT ---------------------------------------------------------------------
+  CATEGORY                                            MEAN            MAX            MIN          TOTAL      TOTAL (%)         NCALLS   TOTAL NCALLS   
+  total                                                  -              -              -        66.2771          100.0              1            419   
+  └─ Calculation                                         -              -              -        66.2771          100.0              1            418   
+     ├─ Calculation*                                     -              -              -         0.9924            1.5              -              1   
+     ├─ pre-processing                                   -              -              -         4.2419            6.4              1              1   
+     └─ self-consistency                                 -              -              -        61.0429           92.1              1            416   
+        ├─ self-consistency*                             -              -              -         0.0015            0.0              -              1   
+        ├─ atomic-sfc                               0.1575         0.2112         0.1446         0.9449            1.4              6              6   
+        ├─ recursion                                     -              -              -        51.4173           77.6              1            400   
+        │  ├─ recursion*                                 -              -              -         0.9789            1.5              -              5   
+        │  ├─ H|PSI_n>                              0.3972         1.0721         0.0026        39.7249           59.9            100            100   
+        │  ├─ H|Psi_n-A_n|Psi_n-B_n|Psi_n-1         0.0566         0.1647         0.0002         5.6574            8.5            100            100   
+        │  ├─ B_n+1                                 0.0001         0.0002         0.0001         0.0097            0.0            100            100   
+        │  └─ <PSI|B_n+1|PSI>                       0.0505         0.1290         0.0001         5.0465            7.6            100            100   
+        └─ calculation-of-DOS                       1.7358         3.9634         0.4709         8.6791           13.1              5              5   
+------------------------------------------------------------------------------------------------------------------------------------------------------
+  * exclusive values to this label
+------------------------------------------------------------------------------------------------------------------------------------------------------
