@@ -2057,18 +2057,62 @@ Examples:
         lattice_path = os.path.join(args.data, "lattice.nml")
         input_path = os.path.join(args.data, "input.nml")
         out_dir = os.path.join(args.data, args.out) if args.data else args.out
-        ctrl_file = export_ctrl(
-            source=("rs_lmto", lattice_path, input_path),
-            out_dir=out_dir,
-            header="RS-tools export",
-            nspin=args.nspin,
-            lmx=args.lmx,
-            lattice_dist=args.lattice_dist,
-            basis_dist=args.basis_dist,
-            alat_scale=args.alat_scale,
-            seed=args.seed,
-        )
-        print(f"LMTO47 CTRL written to: {ctrl_file}")
+
+        staged_supercell = False
+        staged_lattice = os.path.join(args.data, ".rsutil_supercell_lattice.nml")
+        staged_input = os.path.join(args.data, ".rsutil_supercell_input.nml")
+
+        if args.supercell:
+            nx, ny, nz = args.supercell
+            if nx < 1 or ny < 1 or nz < 1:
+                print("ERROR: Supercell dimensions must be positive integers", file=sys.stderr)
+                sys.exit(1)
+
+            if args.in_place:
+                ok_sc = create_supercell(
+                    nx, ny, nz,
+                    lattice_path=lattice_path,
+                    input_path=input_path,
+                    output_lattice_path=lattice_path,
+                    output_input_path=input_path,
+                    in_place=True,
+                )
+            else:
+                ok_sc = create_supercell(
+                    nx, ny, nz,
+                    lattice_path=lattice_path,
+                    input_path=input_path,
+                    output_lattice_path=staged_lattice,
+                    output_input_path=staged_input,
+                    in_place=False,
+                )
+                staged_supercell = ok_sc
+
+            if not ok_sc:
+                print("ERROR: Failed to create supercell for LMTO47 export", file=sys.stderr)
+                sys.exit(1)
+
+        export_lattice = staged_lattice if staged_supercell else lattice_path
+        export_input = staged_input if staged_supercell else input_path
+        try:
+            ctrl_file = export_ctrl(
+                source=("rs_lmto", export_lattice, export_input),
+                out_dir=out_dir,
+                header="RS-tools export",
+                nspin=args.nspin,
+                lmx=args.lmx,
+                lattice_dist=args.lattice_dist,
+                basis_dist=args.basis_dist,
+                alat_scale=args.alat_scale,
+                seed=args.seed,
+            )
+            print(f"LMTO47 CTRL written to: {ctrl_file}")
+        finally:
+            if staged_supercell:
+                if Path(staged_lattice).exists():
+                    Path(staged_lattice).unlink()
+                if Path(staged_input).exists():
+                    Path(staged_input).unlink()
     # Export to UppASD if requested
     elif args.export:
         # default lattice path in data dir

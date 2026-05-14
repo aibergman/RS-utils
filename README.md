@@ -107,6 +107,9 @@ rsutil --export --jij jijso.out --dmi dmi --out uppasd_export
 # Export to LMTO47 CTRL format
 rsutil --lmto47 --nspin 2 --lmx 3 --out lmto47_out
 
+# Export LMTO47 from a staged 2x2x2 supercell (non-destructive by default)
+rsutil --lmto47 --supercell 2 2 2 --out lmto47_out
+
 # Apply reproducible random distortions and scale alat
 rsutil --setup --lattice-dist 0.01 --basis-dist 0.02 --alat-scale 1.01 --seed 1234
 ```

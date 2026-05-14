@@ -238,6 +238,7 @@ Supercell Notes
 - ``lattice.nml`` and ``input.nml`` are updated in-place during supercell creation; keep clean backups.
 - By default, ``--supercell`` is staged internally and original input files are restored after setup.
 - Use ``--in-place`` if you explicitly want to replace ``lattice.nml``/``input.nml``.
+- The same staged supercell behavior also applies when using ``--lmto47``.
 
 Setup Safety Workflow
 ~~~~~~~~~~~~~~~~~~~~~
@@ -381,6 +382,7 @@ The ``--lmto47`` flag exports RS-LMTO structure/input data into an LMTO47 ``CTRL
 - ``--basis-dist``: Gaussian std.dev for basis-vector distortion in units of ``alat``.
 - ``--alat-scale``: Scalar factor applied to ``alat`` before distortion.
 - ``--seed``: Integer seed for reproducible random distortions.
+- ``--supercell NX NY NZ``: Build CTRL from a repeated supercell input.
 
 **Example:**
 
@@ -395,6 +397,9 @@ The ``--lmto47`` flag exports RS-LMTO structure/input data into an LMTO47 ``CTRL
     # Distorted/scaled LMTO47 export with reproducible seed
     rsutil --lmto47 --data /path/to/simulation --lattice-dist 0.01 --basis-dist 0.02 \
            --alat-scale 1.01 --seed 1234 --out lmto47_out
+
+    # Supercell-aware LMTO47 export (non-destructive unless --in-place is set)
+    rsutil --lmto47 --data /path/to/simulation --supercell 2 2 2 --out lmto47_out
 
 
 LMAX Semantics
