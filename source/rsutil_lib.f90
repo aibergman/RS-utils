@@ -21,7 +21,7 @@
 
   integer :: i
 
-  contains 
+  contains
 subroutine process_lattice_impl()
    implicit none
   !-----------------------------------------------------------------
@@ -236,5 +236,14 @@ pure function cross3(v1, v2) result(v3)
   v3(2) = v1(3)*v2(1) - v1(1)*v2(3)
   v3(3) = v1(1)*v2(2) - v1(2)*v2(1)
 end function cross3
+
+real(rp) function det3(amat)
+  implicit none
+  real(rp), intent(in) :: amat(3, 3)
+  det3 = amat(1,1)*(amat(2,2)*amat(3,3)-amat(2,3)*amat(3,2)) - &
+         amat(1,2)*(amat(2,1)*amat(3,3)-amat(2,3)*amat(3,1)) + &
+         amat(1,3)*(amat(2,1)*amat(3,2)-amat(2,2)*amat(3,1))
+end function det3
+
 
 end module rsutil_lib

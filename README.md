@@ -14,6 +14,7 @@ RS-utils is a Python + Fortran toolkit for RS-LMTO workflows. It now includes a 
     - Namelist I/O and lattice processing
     - Exchange interaction mapping and export to UppASD
     - Export to LMTO47 CTRL format
+    - Supercell generation with optional all-site SQS assignment
     - CMake-based build of the Fortran library and tools
 
 ## Features
@@ -110,6 +111,10 @@ rsutil --lmto47 --nspin 2 --lmx 3 --out lmto47_out
 # Export LMTO47 from a staged 2x2x2 supercell (non-destructive by default)
 rsutil --lmto47 --supercell 2 2 2 --out lmto47_out
 
+# SQS on all supercell sites (requires --supercell)
+rsutil --setup --supercell 2 2 2 --sqs "Fe=0.5,Ni=0.3,Co=0.2" \
+       --sqs-shells 3 --sqs-steps 5000 --sqs-seed 1234
+
 # Apply reproducible random distortions and scale alat
 rsutil --setup --lattice-dist 0.01 --basis-dist 0.02 --alat-scale 1.01 --seed 1234
 ```
@@ -137,6 +142,24 @@ rsutil --setup --validate --summary
 # 2) Optional automatic replacement with backups
 rsutil --setup --in-place --backup
 ```
+
+SQS workflow (all-site substitution)
+------------------------------------
+
+SQS can be applied to all sites in a generated supercell:
+
+```bash
+rsutil --setup --supercell 2 2 2 \
+       --sqs "Fe=0.5,Ni=0.3,Co=0.2" \
+       --sqs-shells 3 --sqs-steps 5000 --sqs-seed 1234
+```
+
+Notes:
+
+- ``--sqs`` currently requires ``--supercell``.
+- Fractions are normalized internally if they do not sum exactly to 1.
+- Integer site counts are chosen to match the requested fractions as closely as possible for the given supercell size.
+- Distortions/scaling can be combined and are applied after SQS assignment.
 
 Namelist compatibility notes
 ----------------------------
