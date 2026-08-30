@@ -52,7 +52,7 @@ filenames remain local to that workspace.
 - [x] **HT-02** — Core contracts and safe path primitives
 - [x] **HT-03** — Isolate the legacy Fortran setup kernel
 - [x] **HT-04** — Extract `-S` behind the setup service
-- [ ] **HT-05** — Transactional and idempotent setup
+- [x] **HT-05** — Transactional and idempotent setup
 - [ ] **HT-06** — Setup validation, provenance, and machine reports
 - [ ] **HT-07** — Canonical periodic exchange pair identity
 - [ ] **HT-08** — Extract `-J` behind the exchange service
@@ -170,6 +170,24 @@ No scientific or functional code was changed for HT-00.
 - Material deviation: setup candidate publication is implemented in HT-04;
   the stronger rollback/idempotence guarantees for partial commit failures
   remain the focused scope of HT-05.
+
+### HT-05 decisions
+
+- Setup-service publication now stages validated worker candidates and
+  destination preimages on the destination filesystem, then atomically
+  replaces the complete file set. A commit failure restores every file that
+  was already replaced and removes newly created files/directories where
+  possible.
+- The library API exposes `collision_policy="error"` (default) and
+  `collision_policy="replace"`. The strict default refuses existing output
+  files; the legacy `-S` CLI explicitly selects `replace` for its familiar
+  interactive behavior. In-place replacement of the two source namelists is
+  authorized by `in_place=True`, while unrelated generated artifacts remain
+  collision-protected unless replacement is explicitly selected.
+- Backups are created only as part of the post-validation commit transaction,
+  so staging, worker, validation, and commit failures leave source inputs
+  byte-identical. Seed metadata records whether the setup is reproducible;
+  any unspecified setup/SQS seed is marked non-reproducible.
 
 ### HT-01 regression-harness decisions
 

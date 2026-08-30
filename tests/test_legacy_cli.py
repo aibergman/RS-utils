@@ -101,6 +101,21 @@ def test_setup_supercell_is_non_destructive_and_semantic(tmp_path: Path) -> None
     assert {name: (tmp_path / name).read_bytes() for name in original_inputs} == original_inputs
 
 
+def test_setup_in_place_preserves_cli_backups(tmp_path: Path) -> None:
+    _copy_setup_fixture(tmp_path)
+    original_inputs = {
+        name: (tmp_path / name).read_bytes() for name in ("lattice.nml", "input.nml")
+    }
+
+    result = run_rsutil(tmp_path, "-S", "--in-place", "--validate")
+
+    assert_cli_success(result)
+    assert (tmp_path / "lattice.nml.bak").read_bytes() == original_inputs["lattice.nml"]
+    assert (tmp_path / "input.nml.bak").read_bytes() == original_inputs["input.nml"]
+    assert not (tmp_path / "lattice_new.nml").exists()
+    assert not (tmp_path / "input_new.nml").exists()
+
+
 def test_seeded_sqs_setup_is_reproducible_in_isolated_runs(tmp_path: Path) -> None:
     first = tmp_path / "first"
     second = tmp_path / "second"

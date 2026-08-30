@@ -1868,6 +1868,9 @@ def _run_setup_cli(args):
         spec,
         in_place=args.in_place,
         backup=args.backup or args.in_place,
+        # Preserve the established interactive behavior for owned cwd output
+        # names while the library API defaults to collision-safe ``error``.
+        collision_policy="replace",
     )
     if not result.success:
         for diagnostic in result.diagnostics:

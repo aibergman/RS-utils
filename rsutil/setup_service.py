@@ -7,6 +7,7 @@ around that kernel; it never changes the caller's working directory.
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import sys
@@ -27,6 +28,9 @@ from .core.contracts import (
 )
 from .core.paths import Workspace
 from .setup_runner import FortranSetupRunner
+
+
+_COLLISION_POLICIES = frozenset({"error", "replace"})
 
 
 def _diagnostic(code: ErrorCode, message: str, **details: Any) -> Diagnostic:
@@ -366,7 +370,13 @@ def create_supercell(
 
 
 class SetupService:
-    """Execute setup from explicit source/destination directories."""
+    """Execute setup from explicit source/destination directories.
+
+    Candidate files are never published until the isolated worker has exited
+    successfully and validated its outputs.  The default ``error`` collision
+    policy protects existing destination files; callers that own the output
+    directory may explicitly request ``replace``.
+    """
 
     def __init__(self, runner: FortranSetupRunner | None = None) -> None:
         self.runner = runner or FortranSetupRunner()
@@ -380,11 +390,17 @@ class SetupService:
         in_place: bool = False,
         backup: bool = False,
         workspace: str | Path | None = None,
+        collision_policy: str = "error",
     ) -> SetupResult:
         source = Path(source_dir).resolve()
         destination = Path(destination_dir).resolve()
-        destination.mkdir(parents=True, exist_ok=True)
         try:
+            if collision_policy not in _COLLISION_POLICIES:
+                raise ValueError(
+                    f"collision_policy must be one of {sorted(_COLLISION_POLICIES)}"
+                )
+            if destination.exists() and not destination.is_dir():
+                raise ValueError(f"destination is not a directory: {destination}")
             setup_spec = spec if isinstance(spec, SetupSpec) else SetupSpec.from_dict(spec or {})
             validate_setup_parameters(setup_spec)
             lattice, input_nml = validate_setup_inputs(source)
@@ -393,10 +409,6 @@ class SetupService:
         except Exception as exc:
             return SetupResult(status=OperationStatus.FAILED, diagnostics=(_diagnostic(ErrorCode.INVALID_INPUT, f"invalid setup input: {exc}"),))
 
-        if backup:
-            for path in (destination / "lattice.nml", destination / "input.nml"):
-                if path.is_file():
-                    shutil.copy2(path, path.with_name(path.name + ".bak"))
         transform_workspace: Workspace | None = None
         runner_workspace: Workspace | None = None
         try:
@@ -416,23 +428,48 @@ class SetupService:
             result = self.runner.run(run_lattice, run_input, setup_spec, workspace=run_workspace)
             if not result.success:
                 return result
-            for relative_name in result.candidate_files:
-                candidate = run_workspace / relative_name
-                target = destination / relative_name
-                target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(candidate, target)
+
+            committed_files = _commit_setup_outputs(
+                run_workspace,
+                destination,
+                result.candidate_files,
+                in_place=in_place,
+                backup=backup or in_place,
+                collision_policy=collision_policy,
+            )
             provenance = dict(result.provenance)
-            provenance.update({"source_dir": str(source), "destination_dir": str(destination), "setup_spec": setup_spec.to_dict()})
+            reproducible = setup_spec.seed is not None and (
+                setup_spec.sqs is None or setup_spec.sqs_seed is not None
+            )
+            provenance.update(
+                {
+                    "source_dir": str(source),
+                    "destination_dir": str(destination),
+                    "setup_spec": setup_spec.to_dict(),
+                    "collision_policy": collision_policy,
+                    "in_place": in_place,
+                    "backup": backup or in_place,
+                    "committed_files": list(committed_files),
+                    "reproducible": reproducible,
+                    "randomness": {
+                        "seed": setup_spec.seed,
+                        "sqs_seed": setup_spec.sqs_seed,
+                        "reproducible": reproducible,
+                    },
+                }
+            )
             result = replace(result, provenance=provenance)
-            if in_place:
-                for generated_name, original_name in (("lattice_new.nml", "lattice.nml"), ("input_new.nml", "input.nml")):
-                    generated = destination / generated_name
-                    original = destination / original_name
-                    if generated.is_file():
-                        if original.is_file():
-                            shutil.copy2(original, original.with_name(original.name + ".bak"))
-                        generated.replace(original)
             return result
+        except _OutputCollisionError as exc:
+            return SetupResult(
+                status=OperationStatus.FAILED,
+                diagnostics=(_diagnostic(ErrorCode.OUTPUT_COLLISION, str(exc)),),
+            )
+        except _CommitError as exc:
+            return SetupResult(
+                status=OperationStatus.FAILED,
+                diagnostics=(_diagnostic(ErrorCode.COMMIT_FAILED, str(exc)),),
+            )
         except Exception as exc:
             return SetupResult(status=OperationStatus.FAILED, diagnostics=(_diagnostic(ErrorCode.WORKSPACE_ERROR, f"setup service failed: {exc}"),))
         finally:
@@ -442,6 +479,145 @@ class SetupService:
                 runner_workspace.cleanup()
 
     setup = run
+
+
+class _OutputCollisionError(RuntimeError):
+    """A destination contains a file that the selected policy will not replace."""
+
+
+class _CommitError(RuntimeError):
+    """Candidate publication failed after worker validation."""
+
+
+def _safe_candidate_name(name: str) -> Path:
+    candidate = Path(name)
+    if (
+        not name
+        or candidate.is_absolute()
+        or candidate == Path(".")
+        or ".." in candidate.parts
+    ):
+        raise _CommitError(f"unsafe candidate output path: {name!r}")
+    return candidate
+
+
+def _commit_setup_outputs(
+    runner_workspace: Path,
+    destination: Path,
+    candidate_files: tuple[str, ...],
+    *,
+    in_place: bool,
+    backup: bool,
+    collision_policy: str,
+) -> tuple[str, ...]:
+    """Publish validated worker outputs with all-or-nothing file replacement."""
+
+    mappings: list[tuple[str, Path]] = []
+    for name in sorted(candidate_files):
+        relative = _safe_candidate_name(name)
+        candidate = runner_workspace / relative
+        if not candidate.is_file():
+            raise _CommitError(f"validated candidate output is missing: {name}")
+        if in_place and name == "lattice_new.nml":
+            target = destination / "lattice.nml"
+        elif in_place and name == "input_new.nml":
+            target = destination / "input.nml"
+        else:
+            target = destination / relative
+        mappings.append((name, target))
+
+    targets = [target for _, target in mappings]
+    if len(set(targets)) != len(targets):
+        raise _CommitError("candidate outputs map to duplicate destination paths")
+
+    # In-place input replacement is the operation explicitly requested by the
+    # caller.  All other existing outputs still require an explicit replace
+    # policy, which protects unrelated atom files and reports.
+    allowed_existing = {destination / "lattice.nml", destination / "input.nml"} if in_place else set()
+    collisions = [
+        target.relative_to(destination).as_posix()
+        for target in targets
+        if target.exists() and target not in allowed_existing
+    ]
+    if collision_policy == "error" and collisions:
+        raise _OutputCollisionError(
+            "destination output collision; existing files require collision_policy='replace': "
+            + ", ".join(sorted(collisions))
+        )
+
+    backup_mappings: list[tuple[str, Path]] = []
+    if backup:
+        for original_name in ("lattice.nml", "input.nml"):
+            original = destination / original_name
+            if original.is_file():
+                backup_mappings.append((f"{original_name}.bak", original.with_name(original.name + ".bak")))
+
+    all_mappings = mappings + backup_mappings
+    if len({target for _, target in all_mappings}) != len(all_mappings):
+        raise _CommitError("candidate outputs and backups map to duplicate destination paths")
+
+    commit_workspace = Workspace.create(
+        same_filesystem_as=destination,
+        prefix=".rsutil-setup-commit-",
+    )
+    created_dirs: list[Path] = []
+    snapshots: list[tuple[Path, Path | None]] = []
+    staged: list[tuple[Path, Path]] = []
+    try:
+        payload_root = commit_workspace.path / "payload"
+        rollback_root = commit_workspace.path / "rollback"
+        for index, (name, target) in enumerate(all_mappings):
+            if target.exists() and target.is_dir():
+                raise _CommitError(f"destination target is a directory: {target}")
+            if name in dict(mappings):
+                source = runner_workspace / _safe_candidate_name(name)
+            else:
+                source = destination / name.removesuffix(".bak")
+            payload = payload_root / str(index)
+            payload.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, payload)
+            staged.append((payload, target))
+            snapshot = None
+            if target.exists():
+                snapshot = rollback_root / str(index)
+                snapshot.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(target, snapshot)
+            snapshots.append((target, snapshot))
+
+        for payload, target in staged:
+            missing: list[Path] = []
+            parent = target.parent
+            while not parent.exists():
+                missing.append(parent)
+                parent = parent.parent
+            if missing:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                created_dirs.extend(missing)
+            os.replace(payload, target)
+    except Exception as exc:
+        rollback_error: Exception | None = None
+        for target, snapshot in reversed(snapshots):
+            try:
+                if snapshot is not None and snapshot.exists():
+                    os.replace(snapshot, target)
+                elif target.exists():
+                    target.unlink()
+            except Exception as restore_exc:  # pragma: no cover - filesystem catastrophe
+                rollback_error = restore_exc
+        for directory in sorted(created_dirs, key=lambda path: len(path.parts), reverse=True):
+            try:
+                directory.rmdir()
+            except OSError:
+                pass
+        if rollback_error is not None:
+            raise _CommitError(f"commit failed ({exc}); rollback also failed ({rollback_error})") from exc
+        if isinstance(exc, _CommitError):
+            raise
+        raise _CommitError(f"commit failed: {exc}") from exc
+    finally:
+        commit_workspace.cleanup()
+
+    return tuple(name for name, _ in mappings)
 
 
 def run_setup(source_dir: str | Path, destination_dir: str | Path, spec: SetupSpec | Mapping[str, Any] | None = None, **kwargs: Any) -> SetupResult:

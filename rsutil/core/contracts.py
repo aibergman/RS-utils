@@ -36,6 +36,8 @@ class ErrorCode(str, Enum):
     WORKSPACE_ERROR = "workspace_error"
     WORKER_FAILED = "worker_failed"
     OUTPUT_VALIDATION_FAILED = "output_validation_failed"
+    OUTPUT_COLLISION = "output_collision"
+    COMMIT_FAILED = "commit_failed"
     PARSE_ERROR = "parse_error"
     EXCHANGE_ERROR = "exchange_error"
     UNKNOWN = "unknown"
