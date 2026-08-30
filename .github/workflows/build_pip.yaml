@@ -39,11 +39,14 @@ jobs:
         run: |
           pip install $(ls dist/*.whl)
 
+      - name: Install test runner
+        run: |
+          python -m pip install pytest
+
       - name: Verify installed package
         run: |
           unzip -l $(ls dist/*.whl) 
 
       - name: Run tests
         run: |
-          cd examples/FeCo
-          python -c "import rsutil; rsutil.process_lattice()"
+          python -m pytest -q

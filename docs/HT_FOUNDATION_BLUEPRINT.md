@@ -48,7 +48,7 @@ filenames remain local to that workspace.
 ## Task tracking
 
 - [x] **HT-00** — Freeze baseline and compatibility contract
-- [ ] **HT-01** — Legacy semantic regression harness
+- [x] **HT-01** — Legacy semantic regression harness
 - [ ] **HT-02** — Core contracts and safe path primitives
 - [ ] **HT-03** — Isolate the legacy Fortran setup kernel
 - [ ] **HT-04** — Extract `-S` behind the setup service
@@ -124,3 +124,15 @@ parser, and provenance APIs; it is not a general workflow engine.
   retained as notes, not treated as executable baseline evidence.
 
 No scientific or functional code was changed for HT-00.
+
+### HT-01 regression-harness decisions
+
+- The pytest suite stages only the selected files from the existing bccFe,
+  FeN, and FePt examples into temporary directories; tests never modify the
+  repository examples in place.
+- The baseline -J parser referenced undocumented-in-code --rij-out and
+  --rij-format attributes. These options were restored so the documented
+  mapping workflow is executable, and explicitly requested mapping-write
+  failures now produce a failed operation instead of a printed success path.
+- --unique/--soc coverage freezes availability and non-crash behavior only.
+  Scientific pair-equivalence expectations remain deferred to HT-09.

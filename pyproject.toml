@@ -7,5 +7,8 @@ before-build = "python -m pip install --upgrade numpy>1.19 ninja f90wrap scipy"
 # test-requires = ["pytest"]
 # test-command = "pytest {package}/tests"
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
 [tool.cibuildwheel.linux]
 before-all = "yum clean packages && yum install -y python3-devel ninja-build"

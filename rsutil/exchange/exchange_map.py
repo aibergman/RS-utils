@@ -745,7 +745,9 @@ def exchange_map(cutoff: float = 1.0, verbose: bool = False, unique: bool = Fals
             if verbose:
                 print(f"Wrote R_ij mappings to {rij_out} (format={rij_fmt})")
         except Exception as exc:
-            print(f"Failed to write R_ij mappings to {rij_out}: {exc}")
+            raise RuntimeError(
+                f"Failed to write R_ij mappings to {rij_out}: {exc}"
+            ) from exc
 
 
 if __name__ == "__main__":

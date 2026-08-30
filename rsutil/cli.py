@@ -1920,6 +1920,18 @@ Examples:
         help="Account for spin-orbit coupling in symmetry considerations",
     )
     parser.add_argument(
+        "--rij-out",
+        type=str,
+        default=None,
+        help="Write the legacy R_ij neighbor mapping to this file",
+    )
+    parser.add_argument(
+        "--rij-format",
+        choices=["json", "txt"],
+        default="json",
+        help="Format for --rij-out (default: json)",
+    )
+    parser.add_argument(
         "--export",
         "-E",
         action="store_true",

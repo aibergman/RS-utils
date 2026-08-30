@@ -43,6 +43,15 @@ cmake --build build
 
 This builds the Fortran library and executable targets (for example `rsutil.x` in the build tree).
 
+### Tests
+
+The active regression suite uses the development extra:
+
+```bash
+python -m pip install -e '.[dev]'
+python -m pytest
+```
+
 ## CLI Usage
 
 The installed CLI entrypoint is:
