@@ -49,14 +49,22 @@ import os
 import sys
 import glob
 import ctypes
+import importlib
 from typing import Optional
-
-# Import bands module for convenient access
-from . import bands
 
 __version__ = "0.10.0"
 
 __all__ = ['process_lattice', 'bands']
+
+
+def __getattr__(name):
+    """Load the optional, dependency-heavy bands package on first access."""
+
+    if name == "bands":
+        module = importlib.import_module(f"{__name__}.bands")
+        globals()[name] = module
+        return module
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 # Dynamically determine the correct shared library filename
 lib_filename: Optional[str] = None

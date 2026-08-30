@@ -49,7 +49,7 @@ filenames remain local to that workspace.
 
 - [x] **HT-00** — Freeze baseline and compatibility contract
 - [x] **HT-01** — Legacy semantic regression harness
-- [ ] **HT-02** — Core contracts and safe path primitives
+- [x] **HT-02** — Core contracts and safe path primitives
 - [ ] **HT-03** — Isolate the legacy Fortran setup kernel
 - [ ] **HT-04** — Extract `-S` behind the setup service
 - [ ] **HT-05** — Transactional and idempotent setup
@@ -124,6 +124,22 @@ parser, and provenance APIs; it is not a general workflow engine.
   retained as notes, not treated as executable baseline evidence.
 
 No scientific or functional code was changed for HT-00.
+
+### HT-02 decisions
+
+- Added a dependency-light `rsutil.core` package with library-native
+  `RSStructure`/site contracts, `SetupSpec`, structured diagnostics and
+  operation results. Site indices are canonical zero-based contiguous values;
+  coordinate convention and length unit are explicit.
+- Scientific setup parameters are kept separate from output and in-place
+  policy. Deterministic JSON/specification hashes exclude temporal provenance
+  fields, while file hashes cover content only.
+- Added owned temporary/staging workspaces, explicit file staging, and atomic
+  replacement helpers. They never change process CWD; same-filesystem staging
+  is created beside the eventual destination.
+- Made the existing top-level `bands` convenience import lazy so the
+  dependency-light core can be imported without loading optional plotting
+  dependencies. The public `rsutil.bands` attribute remains available.
 
 ### HT-01 regression-harness decisions
 
