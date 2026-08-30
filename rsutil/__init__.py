@@ -54,7 +54,9 @@ from typing import Optional
 
 __version__ = "0.10.0"
 
-__all__ = ['process_lattice', 'bands']
+from .setup_runner import FortranSetupRunner
+
+__all__ = ['process_lattice', 'bands', 'FortranSetupRunner']
 
 
 def __getattr__(name):
@@ -124,44 +126,28 @@ else:
     _rsutil = None
 
 
-def process_lattice(cluster_type: str = "periodic", empty_spheres: bool = False,
-                   min_empty_radius: float = 1.2, max_empty_radius: float = 2.5,
-                   lmx: int = 2, lattice_dist: float = 0.0, basis_dist: float = 0.0,
-                   alat_scale: float = 1.0, seed: Optional[int] = None,
-                   mode_2d: bool = False, z_iso_factor: Optional[float] = None,
-                   rec_steps: int = 20, rec_method: str = "block") -> None:
-    """
-    Python wrapper for the process_lattice() Fortran routine.
-    
-    Parameters
-    ----------
-    cluster_type : str, optional
-        Type of cluster: 'periodic' (default) or 'free'.
-        If 'periodic', sets pbc to .true.
-        If 'free', sets pbc to .false.
-    empty_spheres : bool, optional
-        Enable empty sphere calculations (default: False).
-    min_empty_radius : float, optional
-        Minimum empty sphere radius (default: 1.2).
-    max_empty_radius : float, optional
-        Maximum empty sphere radius (default: 2.5).
-    
-    Raises
-    ------
-    RuntimeError
-        If the shared library is not available.
+def _process_lattice_unsafe(cluster_type: str = "periodic", empty_spheres: bool = False,
+                            min_empty_radius: float = 1.2, max_empty_radius: float = 2.5,
+                            lmx: int = 2, lattice_dist: float = 0.0, basis_dist: float = 0.0,
+                            alat_scale: float = 1.0, seed: Optional[int] = None,
+                            mode_2d: bool = False, z_iso_factor: Optional[float] = None,
+                            rec_steps: int = 20, rec_method: str = "block") -> None:
+    """Invoke the legacy ctypes entry point in the current process.
+
+    This function is deliberately explicit about being unsafe: the Fortran
+    call graph contains ``STOP``/``ERROR STOP`` paths that can terminate the
+    Python interpreter.  The HT setup worker is the only new caller of this
+    function.  Keep the ctypes argument conversion here identical to the
+    historical public wrapper.
     """
     if _rsutil is None:
         raise RuntimeError("The rsutil shared library is not available. Please rebuild the package with: pip install .")
-    
-    if cluster_type not in ["periodic", "free"]:
-        raise ValueError(f"cluster_type must be 'periodic' or 'free', got '{cluster_type}'")
-    
+
     # Convert empty_spheres boolean to integer (0 or 1)
     empty_spheres_int = ctypes.c_int(1 if empty_spheres else 0)
     min_radius_dbl = ctypes.c_double(min_empty_radius)
     max_radius_dbl = ctypes.c_double(max_empty_radius)
-    
+
     lattice_dist_dbl = ctypes.c_double(lattice_dist)
     basis_dist_dbl = ctypes.c_double(basis_dist)
     alat_scale_dbl = ctypes.c_double(alat_scale)
@@ -173,7 +159,7 @@ def process_lattice(cluster_type: str = "periodic", empty_spheres: bool = False,
     rec_method_map = {"block": 0, "chebyshev": 1, "lanczos": 2}
     rec_method_flag = ctypes.c_int(rec_method_map.get(str(rec_method).lower(), 0))
 
-    # Call the Fortran routine with separate arguments
+    # Keep the low-level call signature and argument order unchanged.
     _rsutil.process_lattice(
         cluster_type.encode('utf-8'),
         empty_spheres_int,
@@ -189,4 +175,30 @@ def process_lattice(cluster_type: str = "periodic", empty_spheres: bool = False,
         z_iso_factor_dbl,
         rec_steps_int,
         rec_method_flag,
+    )
+
+
+def process_lattice(cluster_type: str = "periodic", empty_spheres: bool = False,
+                   min_empty_radius: float = 1.2, max_empty_radius: float = 2.5,
+                   lmx: int = 2, lattice_dist: float = 0.0, basis_dist: float = 0.0,
+                   alat_scale: float = 1.0, seed: Optional[int] = None,
+                   mode_2d: bool = False, z_iso_factor: Optional[float] = None,
+                   rec_steps: int = 20, rec_method: str = "block") -> None:
+    """Compatibility wrapper for the historical in-process setup call."""
+    if cluster_type not in ["periodic", "free"]:
+        raise ValueError(f"cluster_type must be 'periodic' or 'free', got '{cluster_type}'")
+    _process_lattice_unsafe(
+        cluster_type=cluster_type,
+        empty_spheres=empty_spheres,
+        min_empty_radius=min_empty_radius,
+        max_empty_radius=max_empty_radius,
+        lmx=lmx,
+        lattice_dist=lattice_dist,
+        basis_dist=basis_dist,
+        alat_scale=alat_scale,
+        seed=seed,
+        mode_2d=mode_2d,
+        z_iso_factor=z_iso_factor,
+        rec_steps=rec_steps,
+        rec_method=rec_method,
     )

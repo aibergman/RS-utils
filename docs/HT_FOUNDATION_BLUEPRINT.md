@@ -50,7 +50,7 @@ filenames remain local to that workspace.
 - [x] **HT-00** — Freeze baseline and compatibility contract
 - [x] **HT-01** — Legacy semantic regression harness
 - [x] **HT-02** — Core contracts and safe path primitives
-- [ ] **HT-03** — Isolate the legacy Fortran setup kernel
+- [x] **HT-03** — Isolate the legacy Fortran setup kernel
 - [ ] **HT-04** — Extract `-S` behind the setup service
 - [ ] **HT-05** — Transactional and idempotent setup
 - [ ] **HT-06** — Setup validation, provenance, and machine reports
@@ -141,14 +141,29 @@ No scientific or functional code was changed for HT-00.
   dependency-light core can be imported without loading optional plotting
   dependencies. The public `rsutil.bands` attribute remains available.
 
+### HT-03 decisions
+
+- Kept the numerical Fortran sources unchanged. The direct ctypes conversion
+  is now explicitly named `_process_lattice_unsafe`; `rsutil.worker` invokes
+  it only in a child process after changing into an owned workspace.
+- Added `FortranSetupRunner`, which stages only the two files used by the
+  inspected setup call graph (`lattice.nml` and `input.nml`), accepts explicit
+  future resources, captures worker output/exit status, and inventories
+  generated namelists and sphere files. It returns `SetupResult` diagnostics
+  and does not commit outputs; setup-service commit policy remains HT-04/05.
+- The runner defaults to no timeout so valid scientific setup work is not
+  rejected arbitrarily; callers can provide a positive timeout. A caller
+  supplied workspace is retained for inspection/commit, while auto-created
+  workspaces are cleaned up.
+
 ### HT-01 regression-harness decisions
 
 - The pytest suite stages only the selected files from the existing bccFe,
   FeN, and FePt examples into temporary directories; tests never modify the
   repository examples in place.
-- The baseline -J parser referenced undocumented-in-code --rij-out and
-  --rij-format attributes. These options were restored so the documented
+- The baseline `-J` parser referenced undocumented-in-code `--rij-out` and
+  `--rij-format` attributes. These options were restored so the documented
   mapping workflow is executable, and explicitly requested mapping-write
   failures now produce a failed operation instead of a printed success path.
-- --unique/--soc coverage freezes availability and non-crash behavior only.
+- `--unique`/`--soc` coverage freezes availability and non-crash behavior only.
   Scientific pair-equivalence expectations remain deferred to HT-09.
