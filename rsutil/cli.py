@@ -2099,6 +2099,12 @@ Examples:
         help="Format for --rij-out (default: json)",
     )
     parser.add_argument(
+        "--force-legacy-collision",
+        action="store_true",
+        default=False,
+        help="Allow explicit replacement of an unmarked legacy Atom_* directory",
+    )
+    parser.add_argument(
         "--export",
         "-E",
         action="store_true",
@@ -2537,6 +2543,8 @@ Examples:
                 rij_out=args.rij_out,
                 rij_fmt=args.rij_format,
                 source_dir=args.data,
+                collision_policy="replace_generated",
+                force_legacy_collision=args.force_legacy_collision,
             )
         except Exception as exc:
             print(f"ERROR: Exchange generation failed: {exc}", file=sys.stderr)

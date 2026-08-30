@@ -6,8 +6,16 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from rsutil.core import ExchangePair, PairKey
+from rsutil.core.hashing import hash_file, hash_json
 
-from .jobs import ExchangeJobSpec, construct_exchange_jobs, inventory_pairs, write_exchange_jobs
+from .jobs import (
+    ExchangeJobSpec,
+    ExchangeWriteResult,
+    construct_exchange_jobs,
+    inventory_pairs,
+    required_atom_files_from_input,
+    write_exchange_jobs,
+)
 from .neighbors import discover_neighbors
 from .pairs import legacy_displacement_mapping
 from .reference import ReferenceCalculation, read_reference_calculation
@@ -34,6 +42,7 @@ class ExchangeResult:
 
     plan: ExchangePlan
     mapping_path: Path | None = None
+    write_result: ExchangeWriteResult | None = None
 
     @property
     def pairs(self) -> tuple[ExchangePair, ...]:
@@ -67,6 +76,36 @@ def _legacy_mapping_records(plan: ExchangePlan) -> list[dict]:
     return records
 
 
+def _source_run_identity(reference: ReferenceCalculation, required_files: tuple[str, ...]) -> str:
+    """Hash the explicit source evidence used to construct every job."""
+
+    paths = (
+        reference.input_path,
+        reference.lattice_path,
+        reference.cluster_path,
+        reference.report_path,
+        *(reference.source_dir / name for name in required_files),
+    )
+    records = []
+    for path in paths:
+        if not path.is_file():
+            raise FileNotFoundError(f"required exchange source file is missing: {path}")
+        records.append(
+            {
+                "path": _logical_source_path(path, reference.source_dir),
+                "sha256": hash_file(path),
+            }
+        )
+    return hash_json(records)
+
+
+def _logical_source_path(path: Path, root: Path) -> str:
+    try:
+        return path.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return path.resolve().as_posix()
+
+
 class ExchangeService:
     """Plan and serialize exchange jobs without changing process CWD."""
 
@@ -98,6 +137,8 @@ class ExchangeService:
             report_path=report_path,
             verbose=verbose,
         )
+        required_files = required_atom_files_from_input(reference.input_nml)
+        source_identity = _source_run_identity(reference, required_files)
         neighbors = discover_neighbors(
             reference.cluster,
             reference.recursion_sites,
@@ -120,6 +161,14 @@ class ExchangeService:
             reference.canonical_structure,
             fermi_energy=reference.fermi_energy,
             output_root=self.source_dir,
+            cutoff=cutoff,
+            reduction="unique" if unique and not full_pairs else "full",
+            soc=soc,
+            magnetic_axis=magnetic_axis,
+            fermi_energy_source=_logical_source_path(reference.report_path, self.source_dir),
+            required_atom_files=required_files,
+            source_run_identity=source_identity,
+            source_run_hash=source_identity,
         )
         return ExchangePlan(
             reference=reference,
@@ -144,6 +193,8 @@ class ExchangeService:
         lattice_path: str | Path | None = None,
         cluster_path: str | Path | None = None,
         report_path: str | Path | None = None,
+        collision_policy: str = "error",
+        force_legacy_collision: bool = False,
     ) -> ExchangeResult:
         """Generate legacy ``Atom_*`` jobs and an optional mapping artifact."""
 
@@ -172,12 +223,18 @@ class ExchangeService:
             )
             if verbose:
                 print(f"Wrote R_ij mappings to {mapping_path} (format={rij_fmt})")
-        write_exchange_jobs(
+        write_result = write_exchange_jobs(
             plan.jobs,
             lattice_path=plan.reference.lattice_path,
             source_dir=self.source_dir,
+            collision_policy=collision_policy,
+            force_legacy_collision=force_legacy_collision,
         )
-        return ExchangeResult(plan=plan, mapping_path=mapping_path)
+        return ExchangeResult(
+            plan=plan,
+            mapping_path=mapping_path,
+            write_result=write_result,
+        )
 
 
 def plan_exchange_jobs(source_dir: str | Path = ".", **options) -> ExchangePlan:

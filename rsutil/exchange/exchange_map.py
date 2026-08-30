@@ -174,6 +174,8 @@ def exchange_map(
     rij_out: str | None = None,
     rij_fmt: str = "json",
     source_dir: str | Path = ".",
+    collision_policy: str = "error",
+    force_legacy_collision: bool = False,
 ) -> None:
     """Legacy entry point delegating to :class:`ExchangeService`."""
 
@@ -187,6 +189,8 @@ def exchange_map(
         magnetic_axis=magnetic_axis,
         rij_out=rij_out,
         rij_fmt=rij_fmt,
+        collision_policy=collision_policy,
+        force_legacy_collision=force_legacy_collision,
     )
 
 

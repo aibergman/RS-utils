@@ -17,7 +17,21 @@ from .pairs import (
 )
 from .fermi import FermiEnergyParseError, parse_fermi_energy, read_fermi_energy
 from .neighbors import discover_exact_unique_neighbors
-from .jobs import ExchangeJobSpec, build_exchange_input, construct_exchange_jobs
+from .jobs import (
+    EXCHANGE_MANIFEST_FILENAME,
+    EXCHANGE_MANIFEST_SCHEMA,
+    ExchangeCollisionError,
+    ExchangeJobError,
+    ExchangeJobSpec,
+    ExchangeManifestError,
+    ExchangeWriteResult,
+    build_exchange_input,
+    build_exchange_manifest,
+    construct_exchange_jobs,
+    read_exchange_manifest,
+    required_atom_files_from_input,
+    write_exchange_jobs,
+)
 from .reference import ReferenceCalculation, read_reference_calculation
 from .service import (
     ExchangePlan,
@@ -54,19 +68,29 @@ __all__ = [
     "reference_site_for_cluster_entry",
     "sort_pair_keys",
     "ExchangeJobSpec",
+    "ExchangeJobError",
+    "ExchangeCollisionError",
+    "ExchangeManifestError",
+    "ExchangeWriteResult",
+    "EXCHANGE_MANIFEST_FILENAME",
+    "EXCHANGE_MANIFEST_SCHEMA",
     "ExchangePlan",
     "ExchangeResult",
     "ExchangeService",
     "FermiEnergyParseError",
     "ReferenceCalculation",
     "build_exchange_input",
+    "build_exchange_manifest",
     "construct_exchange_jobs",
     "generate_exchange_jobs",
     "parse_fermi_energy",
     "plan_exchange_jobs",
     "read_fermi_energy",
     "read_reference_calculation",
+    "read_exchange_manifest",
+    "required_atom_files_from_input",
     "run_exchange",
+    "write_exchange_jobs",
     "discover_exact_unique_neighbors",
     "PairSymmetryReduction",
     "PeriodicSymmetryOperation",

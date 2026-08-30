@@ -57,7 +57,7 @@ filenames remain local to that workspace.
 - [x] **HT-07** — Canonical periodic exchange pair identity
 - [x] **HT-08** — Extract `-J` behind the exchange service
 - [x] **HT-09** — Correct exchange symmetry reduction
-- [ ] **HT-10** — Transactional exchange job writer and manifests
+- [x] **HT-10** — Transactional exchange job writer and manifests
 - [ ] **HT-11** — Result parser foundation and SCF model
 - [ ] **HT-12** — Exchange, DMI, and tensor result parsing
 - [ ] **HT-13** — Transport and damping result contracts
@@ -262,3 +262,20 @@ No scientific or functional code was changed for HT-00.
 - Added `--full-pairs`/`full_pairs=True` as a validation opt-out. The legacy
   `--shell-width` parameter remains accepted for compatibility but has no role
   in scientific equivalence. See `docs/HT_EXCHANGE_SYMMETRY.md`.
+
+### HT-10 decisions
+
+- Extended `ExchangeJobSpec` with the canonical pair inventory, cutoff and
+  reduction/SOC policy, explicit Fermi-energy source, required converged atom
+  files, and source-run identity/hash. Required `<label>_out.nml` files are
+  derived from the selected input namelist and copied by explicit name from
+  the selected source directory; unrestricted CWD globs are no longer used.
+- Exchange jobs are fully staged and semantically validated before publication.
+  The versioned `rsutil_exchange_manifest.json` records the canonical pair
+  list, one-based legacy `ijpair` semantics, deterministic specification hash,
+  source-run hash, and generated-file hashes.
+- The library exposes `error`, `replace_generated`, and `reuse_if_identical`
+  collision policies. Only valid rsutil-owned directories may be replaced or
+  reused by default; unmarked legacy/user directories require explicit
+  `force_legacy_collision=True`. Legacy `-J` retains the `Atom_*` layout and
+  uses the owned-directory replacement policy. See `docs/HT_EXCHANGE_JOBS.md`.
