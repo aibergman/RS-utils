@@ -51,7 +51,7 @@ filenames remain local to that workspace.
 - [x] **HT-01** — Legacy semantic regression harness
 - [x] **HT-02** — Core contracts and safe path primitives
 - [x] **HT-03** — Isolate the legacy Fortran setup kernel
-- [ ] **HT-04** — Extract `-S` behind the setup service
+- [x] **HT-04** — Extract `-S` behind the setup service
 - [ ] **HT-05** — Transactional and idempotent setup
 - [ ] **HT-06** — Setup validation, provenance, and machine reports
 - [ ] **HT-07** — Canonical periodic exchange pair identity
@@ -155,6 +155,21 @@ No scientific or functional code was changed for HT-00.
   rejected arbitrarily; callers can provide a positive timeout. A caller
   supplied workspace is retained for inspection/commit, while auto-created
   workspaces are cleaned up.
+
+### HT-04 decisions
+
+- Added `SetupService`/`run_setup` with explicit source and destination paths;
+  it owns setup-spec normalization, validation, supercell/SQS transforms,
+  worker orchestration, output inventory, and candidate-file publication.
+- Legacy `-S` now translates its existing flags into `SetupSpec`, calls the
+  service, and retains the expected `lattice_new.nml`, `input_new.nml`, sphere
+  outputs, console presentation, seeded SQS behavior, and `--in-place` flow.
+- Setup transforms and the safe worker never change the reusable caller's
+  process CWD. The legacy `process_lattice()` wrapper remains an explicit
+  compatibility entry point for direct in-process callers.
+- Material deviation: setup candidate publication is implemented in HT-04;
+  the stronger rollback/idempotence guarantees for partial commit failures
+  remain the focused scope of HT-05.
 
 ### HT-01 regression-harness decisions
 

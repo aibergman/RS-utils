@@ -47,11 +47,14 @@ import os
 import numpy as np
 import sys
 from pathlib import Path
-from . import process_lattice
 from .viz.rs_visualizer import rs_visualizer
 from .exchange.exchange_map import exchange_map
 from .export.uppasd import export_from_files
 from .export.lmto47 import export_ctrl
+from .core.contracts import SetupSpec
+from .setup_service import SetupService
+from .setup_service import validate_setup_inputs as service_validate_setup_inputs
+from .setup_service import validate_setup_parameters as service_validate_setup_parameters
 
 
 def _make_common_parser():
@@ -1774,6 +1777,139 @@ def print_summary_diff():
     """Print a summary of changes between old and new files."""
     print("\nSummary of Changes:")
     print("=" * 70)
+
+    old_lattice = Path('lattice.nml')
+    new_lattice = Path('lattice_new.nml')
+    if old_lattice.exists() and new_lattice.exists():
+        print(f"\nlattice.nml:")
+        print(f"  Old size: {old_lattice.stat().st_size} bytes")
+        print(f"  New size: {new_lattice.stat().st_size} bytes")
+        print(f"  Change:   {new_lattice.stat().st_size - old_lattice.stat().st_size:+d} bytes")
+    old_input = Path('input.nml')
+    new_input = Path('input_new.nml')
+    if old_input.exists() and new_input.exists():
+        print(f"\ninput.nml:")
+        print(f"  Old size: {old_input.stat().st_size} bytes")
+        print(f"  New size: {new_input.stat().st_size} bytes")
+        print(f"  Change:   {new_input.stat().st_size - old_input.stat().st_size:+d} bytes")
+    print("=" * 70)
+
+
+def _run_setup_cli(args):
+    """Translate legacy ``-S`` arguments, present results, and call the service."""
+    print("=" * 70)
+    print("RS-utils Lattice Setup")
+    print("=" * 70)
+    rec_steps = args.rec_steps
+    if rec_steps is None:
+        rec_steps = 200 if args.rec_method == "chebyshev" else 20
+    try:
+        spec = SetupSpec(
+            cluster_type=args.cluster,
+            empty_spheres=args.empty_spheres,
+            min_empty_radius=args.min_empty_radius,
+            max_empty_radius=args.max_empty_radius,
+            lmx=args.lmx,
+            rec_method=args.rec_method,
+            rec_steps=rec_steps,
+            lattice_dist=args.lattice_dist,
+            basis_dist=args.basis_dist,
+            alat_scale=args.alat_scale,
+            seed=args.seed,
+            mode_2d=args.mode_2d,
+            z_iso_factor=args.z_iso_factor,
+            supercell=tuple(args.supercell or (1, 1, 1)),
+            sqs=args.sqs,
+            sqs_shells=args.sqs_shells,
+            sqs_steps=args.sqs_steps,
+            sqs_seed=args.sqs_seed,
+        )
+        service_validate_setup_parameters(spec)
+        service_validate_setup_inputs(Path.cwd())
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+
+    print("\nConfiguration:")
+    print(f"  Cluster type:      {spec.cluster_type}")
+    print(f"  Empty spheres:     {'enabled' if spec.empty_spheres else 'disabled'}")
+    if spec.empty_spheres:
+        print(f"  Min radius:        {spec.min_empty_radius}")
+        print(f"  Max radius:        {spec.max_empty_radius}")
+    print(f"  LMAX override:     {spec.lmx}")
+    print(f"  Rec method:        {spec.rec_method}")
+    print(f"  Rec steps:         {spec.rec_steps}")
+    print(f"  Lattice dist:      {spec.lattice_dist} alat")
+    print(f"  Basis dist:        {spec.basis_dist} alat")
+    print(f"  Alat scale:        {spec.alat_scale}")
+    print(f"  2D mode:           {'enabled' if spec.mode_2d else 'disabled'}")
+    if spec.mode_2d:
+        rule = "(zmax-zmin) + 1.0*alat" if spec.z_iso_factor is None else f"isotropic (factor={spec.z_iso_factor})"
+        print(f"  2D z rule:         {rule}")
+    if spec.seed is not None:
+        print(f"  Seed:              {spec.seed}")
+    if spec.sqs is not None:
+        print(f"  SQS spec:          {spec.sqs}")
+        print(f"  SQS shells:        {spec.sqs_shells}")
+        print(f"  SQS steps:         {spec.sqs_steps}")
+        if spec.sqs_seed is not None:
+            print(f"  SQS seed:          {spec.sqs_seed}")
+    if args.supercell:
+        print(f"  Supercell:         {'×'.join(str(value) for value in spec.supercell)}")
+    for label, enabled in (("Verbose mode", args.verbose), ("Validation", args.validate), ("Summary", args.summary), ("Backup", args.backup), ("In-place update", args.in_place)):
+        if enabled:
+            print(f"  {label}:           enabled")
+    print()
+    if args.backup or args.in_place:
+        print("Creating backup files...\n")
+    result = SetupService().run(
+        Path.cwd(),
+        Path.cwd(),
+        spec,
+        in_place=args.in_place,
+        backup=args.backup or args.in_place,
+    )
+    if not result.success:
+        for diagnostic in result.diagnostics:
+            print(f"ERROR: {diagnostic.message}", file=sys.stderr)
+        if result.stderr:
+            print(result.stderr, file=sys.stderr, end="" if result.stderr.endswith("\n") else "\n")
+        return 1
+    if result.stdout:
+        print(result.stdout, end="" if result.stdout.endswith("\n") else "\n")
+    if args.verbose:
+        print("Starting lattice processing...")
+        print("Lattice processing completed.")
+    print("\n" + "=" * 70)
+    print("SUCCESS: Lattice processing completed")
+    print("=" * 70)
+    print("\nGenerated files:")
+    for filename in result.candidate_files:
+        path = Path(filename)
+        if path.is_file():
+            print(f"  ✓ {filename} ({path.stat().st_size} bytes)")
+    if args.validate:
+        print_validation_report(validate_output_files())
+    if args.summary:
+        print_summary_diff()
+    if args.in_place:
+        print("\nApplying in-place updates...")
+        print("\nUpdated 2 file(s) in place.")
+        print("Original files backed up with .bak extension.")
+    else:
+        print("\nNext steps:")
+        print("  1. Review the generated files")
+        if not args.validate:
+            print("     (run with --validate to check file integrity)")
+        if not args.summary:
+            print("     (run with --summary to see detailed changes)")
+        print("  2. Rename them to replace original files:")
+        print("     mv lattice_new.nml lattice.nml")
+        print("     mv input_new.nml input.nml")
+        print("     (or use --in-place flag to do this automatically)")
+        print("  3. Continue with exchange calculations:")
+        print("     rsutil --exchange --cutoff 2.5")
+    return 0
     
     # Compare lattice files
     old_lattice = Path('lattice.nml')
@@ -2111,6 +2247,9 @@ Examples:
     # Handle existing flag-based functionality (backward compatibility)
     # Process lattice if --setup flag is provided
     if args.setup:
+        return _run_setup_cli(args)
+        # Legacy implementation retained below only as historical context;
+        # all setup execution now goes through SetupService.
         print("=" * 70)
         print("RS-utils Lattice Setup")
         print("=" * 70)
@@ -2466,4 +2605,4 @@ Examples:
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

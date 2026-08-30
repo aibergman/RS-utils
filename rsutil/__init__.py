@@ -55,8 +55,9 @@ from typing import Optional
 __version__ = "0.10.0"
 
 from .setup_runner import FortranSetupRunner
+from .setup_service import SetupService, run_setup
 
-__all__ = ['process_lattice', 'bands', 'FortranSetupRunner']
+__all__ = ['process_lattice', 'bands', 'FortranSetupRunner', 'SetupService', 'run_setup']
 
 
 def __getattr__(name):
