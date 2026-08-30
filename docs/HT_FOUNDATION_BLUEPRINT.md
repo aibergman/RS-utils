@@ -55,7 +55,7 @@ filenames remain local to that workspace.
 - [x] **HT-05** — Transactional and idempotent setup
 - [x] **HT-06** — Setup validation, provenance, and machine reports
 - [x] **HT-07** — Canonical periodic exchange pair identity
-- [ ] **HT-08** — Extract `-J` behind the exchange service
+- [x] **HT-08** — Extract `-J` behind the exchange service
 - [ ] **HT-09** — Correct exchange symmetry reduction
 - [ ] **HT-10** — Transactional exchange job writer and manifests
 - [ ] **HT-11** — Result parser foundation and SCF model
@@ -231,3 +231,21 @@ No scientific or functional code was changed for HT-00.
 - Preserved the legacy `R_ij` mapping output, but label it explicitly as a
   Cartesian displacement. No symmetry reduction or `-J` generation behavior
   was changed; those remain HT-08/HT-09 scope.
+
+### HT-08 decisions
+
+- Added a path-explicit exchange service with focused reference-input,
+  structured Fermi parsing, neighbor discovery, canonical job planning, and
+  compatibility serialization modules. `ExchangePlan` exposes the canonical
+  `PairKey` inventory while `ExchangeJobSpec` retains the legacy one-based
+  cluster indices needed in generated `Atom_*` namelists.
+- Legacy `exchange_map()` and helper names remain as thin wrappers. The `-J`
+  CLI now routes through `ExchangeService`, honors `--data` as its source
+  directory, and reports exchange/parser/output failures as nonzero CLI
+  operations. Explicit mapping output is attempted before job publication so
+  a requested mapping failure does not create a successful-looking job set.
+- The pre-HT-09 `--unique`/`--soc` reduction algorithm remains available
+  behind an isolated reducer hook. Its symmetry-operation filtering is now
+  computed from public pymatgen operation data rather than mutating the
+  analyzer's private state; scientific reduction correctness remains HT-09
+  scope.

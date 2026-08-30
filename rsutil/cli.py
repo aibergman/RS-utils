@@ -2521,14 +2521,19 @@ Examples:
         rs_visualizer(args.data, clust=args.clust)
     # Create exchange input files if --exchange flag is provided
     elif args.exchange:
-        exchange_map(
-            cutoff=args.cutoff,
-            unique=args.unique,
-            shell_width=args.shell_width,
-            soc=args.soc,
-            rij_out=args.rij_out,
-            rij_fmt=args.rij_format,
-        )
+        try:
+            exchange_map(
+                cutoff=args.cutoff,
+                unique=args.unique,
+                shell_width=args.shell_width,
+                soc=args.soc,
+                rij_out=args.rij_out,
+                rij_fmt=args.rij_format,
+                source_dir=args.data,
+            )
+        except Exception as exc:
+            print(f"ERROR: Exchange generation failed: {exc}", file=sys.stderr)
+            sys.exit(1)
     # Export to LMTO47 CTRL if requested
     elif args.lmto47:
         if args.lmx < 0 or args.lmx > 3:

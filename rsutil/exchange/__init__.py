@@ -15,6 +15,17 @@ from .pairs import (
     reference_site_for_cluster_entry,
     sort_pair_keys,
 )
+from .fermi import FermiEnergyParseError, parse_fermi_energy, read_fermi_energy
+from .jobs import ExchangeJobSpec, build_exchange_input, construct_exchange_jobs
+from .reference import ReferenceCalculation, read_reference_calculation
+from .service import (
+    ExchangePlan,
+    ExchangeResult,
+    ExchangeService,
+    generate_exchange_jobs,
+    plan_exchange_jobs,
+    run_exchange,
+)
 
 __all__ = [
     "ExchangePair",
@@ -30,4 +41,18 @@ __all__ = [
     "reconstruct_cartesian_displacement",
     "reference_site_for_cluster_entry",
     "sort_pair_keys",
+    "ExchangeJobSpec",
+    "ExchangePlan",
+    "ExchangeResult",
+    "ExchangeService",
+    "FermiEnergyParseError",
+    "ReferenceCalculation",
+    "build_exchange_input",
+    "construct_exchange_jobs",
+    "generate_exchange_jobs",
+    "parse_fermi_energy",
+    "plan_exchange_jobs",
+    "read_fermi_energy",
+    "read_reference_calculation",
+    "run_exchange",
 ]
