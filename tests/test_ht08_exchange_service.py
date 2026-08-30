@@ -104,3 +104,15 @@ def test_explicit_rij_output_failure_fails_operation(tmp_path: Path) -> None:
     assert result.returncode != 0
     assert "Exchange generation failed" in result.stderr
     assert not (tmp_path / "Atom_1").exists()
+
+
+def test_full_pairs_opt_out_reproduces_unreduced_inventory(tmp_path: Path) -> None:
+    _copy_exchange_fixture(tmp_path)
+
+    reduced = ExchangeService(tmp_path).plan(cutoff=1.0, unique=True)
+    full = ExchangeService(tmp_path).plan(
+        cutoff=1.0, unique=True, full_pairs=True
+    )
+
+    assert len(full.pairs) > len(reduced.pairs)
+    assert all(len(job.pairs) > 1 for job in full.jobs)

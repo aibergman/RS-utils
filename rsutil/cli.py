@@ -2072,13 +2072,19 @@ Examples:
         "--shell-width",
         type=float,
         default=0.1,
-        help="Width of shells for grouping neighbors when using --unique (default: 0.1)",
+        help="Legacy shell metadata parameter; does not define equivalence (default: 0.1)",
     )
     parser.add_argument(
         "--soc",
         action="store_true",
         default=False,
-        help="Account for spin-orbit coupling in symmetry considerations",
+        help="Use conservative SOC symmetry with the legacy collinear z-axis reference",
+    )
+    parser.add_argument(
+        "--full-pairs",
+        action="store_true",
+        default=False,
+        help="Disable symmetry reduction and generate the complete pair set",
     )
     parser.add_argument(
         "--rij-out",
@@ -2527,6 +2533,7 @@ Examples:
                 unique=args.unique,
                 shell_width=args.shell_width,
                 soc=args.soc,
+                full_pairs=args.full_pairs,
                 rij_out=args.rij_out,
                 rij_fmt=args.rij_format,
                 source_dir=args.data,

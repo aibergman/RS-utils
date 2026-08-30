@@ -16,6 +16,7 @@ from .pairs import (
     sort_pair_keys,
 )
 from .fermi import FermiEnergyParseError, parse_fermi_energy, read_fermi_energy
+from .neighbors import discover_exact_unique_neighbors
 from .jobs import ExchangeJobSpec, build_exchange_input, construct_exchange_jobs
 from .reference import ReferenceCalculation, read_reference_calculation
 from .service import (
@@ -25,6 +26,17 @@ from .service import (
     generate_exchange_jobs,
     plan_exchange_jobs,
     run_exchange,
+)
+from .symmetry import (
+    PairSymmetryReduction,
+    PeriodicSymmetryOperation,
+    SymmetryMappingError,
+    allowed_public_symmetry_operations,
+    pair_key_orbit,
+    pair_key_transform,
+    periodic_symmetry_operations,
+    reduce_pair_keys,
+    reduce_pair_keys_with_orbits,
 )
 
 __all__ = [
@@ -55,4 +67,14 @@ __all__ = [
     "read_fermi_energy",
     "read_reference_calculation",
     "run_exchange",
+    "discover_exact_unique_neighbors",
+    "PairSymmetryReduction",
+    "PeriodicSymmetryOperation",
+    "SymmetryMappingError",
+    "allowed_public_symmetry_operations",
+    "pair_key_orbit",
+    "pair_key_transform",
+    "periodic_symmetry_operations",
+    "reduce_pair_keys",
+    "reduce_pair_keys_with_orbits",
 ]

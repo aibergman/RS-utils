@@ -12,9 +12,9 @@ If you need implementation-level API details, see :ref:`exchange_map_module`.
 
 - **Exchange Mapping**: Identifies and calculates magnetic exchange interactions (J_ij) between atomic sites
 - **Neighbor Analysis**: Automatically finds interacting neighbors within a specified cutoff distance
-- **Symmetry Handling**: Supports symmetry operations including spin-orbit coupling (SOC) effects
-- **Unique Neighbor Selection**: Option to identify only unique magnetic neighbors per shell to reduce computational complexity
-- **Shell Grouping**: Groups neighbors by distance with configurable shell width for organized output
+- **Symmetry Handling**: Uses exact periodic pair-key operations and conservative SOC filtering
+- **Unique Neighbor Selection**: Option to identify one representative per exact periodic orbit
+- **Shell Grouping**: Shell width is retained as a compatibility/presentation option, not an equivalence rule
 
 **Main Functions:**
 
@@ -47,8 +47,11 @@ Basic exchange interaction calculation:
     # Basic exchange calculation
     rsutil --exchange --cutoff 2.5
 
-    # Advanced: unique neighbors with SOC
+    # Advanced: exact unique neighbors with the legacy SOC reference
     rsutil --exchange --cutoff 3.0 --unique --soc --shell-width 0.15
+
+    # Full pair inventory for validation
+    rsutil --exchange --cutoff 3.0 --unique --full-pairs
 
     # From a specific directory
     rsutil --exchange --data /path/to/data --cutoff 2.0

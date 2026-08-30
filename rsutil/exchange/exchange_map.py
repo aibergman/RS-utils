@@ -169,6 +169,8 @@ def exchange_map(
     unique: bool = False,
     shell_width: float = 0.1,
     soc: bool = False,
+    full_pairs: bool = False,
+    magnetic_axis: tuple[float, float, float] | None = None,
     rij_out: str | None = None,
     rij_fmt: str = "json",
     source_dir: str | Path = ".",
@@ -181,6 +183,8 @@ def exchange_map(
         unique=unique,
         shell_width=shell_width,
         soc=soc,
+        full_pairs=full_pairs,
+        magnetic_axis=magnetic_axis,
         rij_out=rij_out,
         rij_fmt=rij_fmt,
     )

@@ -56,7 +56,7 @@ filenames remain local to that workspace.
 - [x] **HT-06** — Setup validation, provenance, and machine reports
 - [x] **HT-07** — Canonical periodic exchange pair identity
 - [x] **HT-08** — Extract `-J` behind the exchange service
-- [ ] **HT-09** — Correct exchange symmetry reduction
+- [x] **HT-09** — Correct exchange symmetry reduction
 - [ ] **HT-10** — Transactional exchange job writer and manifests
 - [ ] **HT-11** — Result parser foundation and SCF model
 - [ ] **HT-12** — Exchange, DMI, and tensor result parsing
@@ -249,3 +249,16 @@ No scientific or functional code was changed for HT-00.
   computed from public pymatgen operation data rather than mutating the
   analyzer's private state; scientific reduction correctness remains HT-09
   scope.
+
+### HT-09 decisions
+
+- Replaced shell-width/vector heuristics with exact periodic pair-key orbits.
+  Public pymatgen symmetry operations are compiled into site permutations and
+  integer cell-image shifts, applying `(i,j,R) -> (p(i),p(j),n(j)+W R-n(i))`.
+- Legacy `--soc` now means a collinear `+z` Cartesian magnetization reference.
+  Operations are filtered using axial-vector transformation and species/site
+  preservation; generic noncollinear magnetic symmetry is unsupported and is
+  not inferred from the Boolean flag.
+- Added `--full-pairs`/`full_pairs=True` as a validation opt-out. The legacy
+  `--shell-width` parameter remains accepted for compatibility but has no role
+  in scientific equivalence. See `docs/HT_EXCHANGE_SYMMETRY.md`.
