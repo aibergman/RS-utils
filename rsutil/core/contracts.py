@@ -546,7 +546,14 @@ class SetupReport:
 
 @dataclass(frozen=True)
 class PairKey:
-    """Canonical periodic pair identity ``(site_i, site_j, lattice_R)``."""
+    """Canonical periodic pair identity ``(site_i, site_j, lattice_R)``.
+
+    Site indices are zero-based and refer to the stable ordering of the
+    reference-cell :class:`RSStructure`.  ``R`` is an integer translation in
+    the reference lattice basis; it is never a Cartesian displacement.
+    One-based indices are accepted only at explicit RS/Fortran serialization
+    boundaries via :meth:`from_one_based` and :meth:`to_one_based`.
+    """
 
     i: int
     j: int
@@ -571,5 +578,123 @@ class PairKey:
     def reverse(self) -> "PairKey":
         return PairKey(self.j, self.i, tuple(-value for value in self.R))
 
+    @classmethod
+    def from_one_based(
+        cls, i: int, j: int, R: Sequence[int]
+    ) -> "PairKey":
+        """Construct a canonical key from one-based RS/Fortran site indices."""
+
+        if i < 1 or j < 1:
+            raise ValidationError("one-based pair site indices must be positive")
+        return cls(i - 1, j - 1, tuple(R))
+
+    def to_one_based(self) -> tuple[int, int, tuple[int, int, int]]:
+        """Return ``(i, j, R)`` with one-based site indices for serialization."""
+
+        return self.i + 1, self.j + 1, self.R
+
+    @property
+    def as_tuple(self) -> tuple[int, int, tuple[int, int, int]]:
+        """Tuple form useful for deterministic sorting and dictionary keys."""
+
+        return self.i, self.j, self.R
+
+    @property
+    def sort_key(self) -> tuple[int, int, int, int, int]:
+        """Stable lexicographic ordering key."""
+
+        return (self.i, self.j, *self.R)
+
+    def to_dict(self, *, one_based: bool = False) -> dict[str, Any]:
+        i, j, R = self.to_one_based() if one_based else self.as_tuple
+        return {"i": i, "j": j, "R": list(R)}
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "PairKey":
+        return cls(i=int(data["i"]), j=int(data["j"]), R=tuple(data["R"]))
+
+
+@dataclass(frozen=True)
+class ExchangePair:
+    """A canonical pair together with derived geometry and provenance."""
+
+    key: PairKey
+    cartesian_displacement: tuple[float, float, float]
+    distance: float
+    species_i: str
+    species_j: str
+    label_i: str | None = None
+    label_j: str | None = None
+    cluster_index: int | None = None
+    shell: int | float | str | None = None
+    shell_metadata: Mapping[str, Any] = field(default_factory=dict)
+    provenance: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.key, PairKey):
+            raise ValidationError("ExchangePair.key must be a PairKey")
+        object.__setattr__(
+            self,
+            "cartesian_displacement",
+            _vector(self.cartesian_displacement, "cartesian displacement"),
+        )
+        distance = float(self.distance)
+        if not math.isfinite(distance) or distance < 0:
+            raise ValidationError("pair distance must be a finite non-negative number")
+        object.__setattr__(self, "distance", distance)
+        for name in ("species_i", "species_j"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValidationError(f"{name} must be a non-empty string")
+            object.__setattr__(self, name, value.strip())
+        if self.cluster_index is not None and (
+            not isinstance(self.cluster_index, int)
+            or isinstance(self.cluster_index, bool)
+            or self.cluster_index < 0
+        ):
+            raise ValidationError("cluster_index must be a non-negative integer")
+        object.__setattr__(self, "shell_metadata", _mapping(self.shell_metadata))
+        object.__setattr__(self, "provenance", _mapping(self.provenance))
+
+    @property
+    def displacement(self) -> tuple[float, float, float]:
+        """Compatibility alias for the derived Cartesian displacement."""
+
+        return self.cartesian_displacement
+
+    @property
+    def pair_key(self) -> PairKey:
+        """Descriptive alias for the canonical identity."""
+
+        return self.key
+
     def to_dict(self) -> dict[str, Any]:
-        return {"i": self.i, "j": self.j, "R": list(self.R)}
+        return {
+            "key": self.key.to_dict(),
+            "cartesian_displacement": list(self.cartesian_displacement),
+            "distance": self.distance,
+            "species_i": self.species_i,
+            "species_j": self.species_j,
+            "label_i": self.label_i,
+            "label_j": self.label_j,
+            "cluster_index": self.cluster_index,
+            "shell": self.shell,
+            "shell_metadata": dict(self.shell_metadata),
+            "provenance": dict(self.provenance),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "ExchangePair":
+        return cls(
+            key=PairKey.from_dict(data["key"]),
+            cartesian_displacement=data["cartesian_displacement"],
+            distance=float(data["distance"]),
+            species_i=str(data["species_i"]),
+            species_j=str(data["species_j"]),
+            label_i=data.get("label_i"),
+            label_j=data.get("label_j"),
+            cluster_index=data.get("cluster_index"),
+            shell=data.get("shell"),
+            shell_metadata=data.get("shell_metadata"),
+            provenance=data.get("provenance"),
+        )

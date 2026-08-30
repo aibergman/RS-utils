@@ -39,6 +39,18 @@ from pymatgen.core import Lattice, Molecule, Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 import json
 
+from .pairs import (
+    ExchangePair,
+    PairKey,
+    PairMappingError,
+    legacy_displacement_mapping,
+    legacy_displacement_mappings,
+    map_cluster_neighbor,
+    map_cluster_neighbors,
+    pair_key_from_cluster_neighbor,
+    reconstruct_cartesian_displacement,
+)
+
 
 def read_rs_clust(clust_file: str, input_file: str) -> Molecule:
     """
@@ -392,6 +404,10 @@ def get_Rij_mappings(cluster: Molecule, neighbors: dict, one_based: bool = True)
     Construct a flat list of R_ij records for each center atom from neighbor lists.
 
     Each record has fields: i, j, R_ij (list), distance, species_i, species_j.
+    ``R_ij`` is a Cartesian displacement for legacy compatibility, and is
+    explicitly labeled with ``R_ij_kind``. It is not a periodic lattice
+    translation; canonical periodic identities are provided by
+    :mod:`rsutil.exchange.pairs`.
 
     Parameters
     ----------
@@ -419,6 +435,7 @@ def get_Rij_mappings(cluster: Molecule, neighbors: dict, one_based: bool = True)
                 "i": int(i_idx),
                 "j": int(j_idx),
                 "R_ij": [float(x) for x in R],
+                "R_ij_kind": "cartesian_displacement",
                 "distance": float(neighbor.nn_distance),
                 "species_i": str(species_i),
                 "species_j": str(neighbor.species_string),
@@ -466,6 +483,7 @@ def write_Rij_mappings(mappings: dict, filename: str, fmt: str = "json") -> None
         # Human readable plain-text format
         with open(filename, "w", encoding="utf-8") as fh:
             # fixed-width columns: i(4) j(4) Rx(12.8f) Ry(12.8f) Rz(12.8f) dist(12.8f) species_i(10) species_j(10)
+            fh.write("# R_ij is Cartesian displacement; canonical identity is a PairKey\n")
             fh.write("# i j R_x R_y R_z distance species_i species_j\n")
             fmt_line = "{:4d} {:4d} {:12.8f} {:12.8f} {:12.8f} {:12.8f} {:10s} {:10s}\n"
             for rec in records:

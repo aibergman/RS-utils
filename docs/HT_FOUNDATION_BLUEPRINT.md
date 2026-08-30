@@ -54,7 +54,7 @@ filenames remain local to that workspace.
 - [x] **HT-04** — Extract `-S` behind the setup service
 - [x] **HT-05** — Transactional and idempotent setup
 - [x] **HT-06** — Setup validation, provenance, and machine reports
-- [ ] **HT-07** — Canonical periodic exchange pair identity
+- [x] **HT-07** — Canonical periodic exchange pair identity
 - [ ] **HT-08** — Extract `-J` behind the exchange service
 - [ ] **HT-09** — Correct exchange symmetry reduction
 - [ ] **HT-10** — Transactional exchange job writer and manifests
@@ -218,3 +218,16 @@ No scientific or functional code was changed for HT-00.
   failures now produce a failed operation instead of a printed success path.
 - `--unique`/`--soc` coverage freezes availability and non-crash behavior only.
   Scientific pair-equivalence expectations remain deferred to HT-09.
+
+### HT-07 decisions
+
+- Added immutable, zero-based `PairKey(i, j, R)` and explicit one-based
+  RS/Fortran conversion helpers. `R` is always an integer translation in the
+  reference lattice basis; Cartesian geometry is derived separately.
+- Added `ExchangePair` and a dependency-light mapper that resolves cluster
+  centers/neighbors against `RSStructure` sites by species and lattice
+  geometry. Non-unique or inconsistent matches fail explicitly, and mapped
+  pairs are sorted by canonical key.
+- Preserved the legacy `R_ij` mapping output, but label it explicitly as a
+  Cartesian displacement. No symmetry reduction or `-J` generation behavior
+  was changed; those remain HT-08/HT-09 scope.
