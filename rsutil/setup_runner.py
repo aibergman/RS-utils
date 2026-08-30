@@ -20,6 +20,7 @@ from .core.contracts import (
     ValidationResult,
 )
 from .core.paths import Workspace, stage_file
+from .setup_validation import validate_setup_outputs
 
 
 _WORKER_PARAMETERS = (
@@ -237,8 +238,27 @@ class FortranSetupRunner:
                 started=started,
             )
 
-        validation = self._validate_outputs(workspace)
-        diagnostics = () if validation.valid else tuple(validation.diagnostics)
+        validation = self._validate_outputs(workspace, source_paths, spec)
+        diagnostics = () if validation.valid else tuple(
+            Diagnostic(
+                severity=diagnostic.severity,
+                code=(
+                    ErrorCode.OUTPUT_VALIDATION_FAILED.value
+                    if diagnostic.code
+                    in {
+                        ErrorCode.OUTPUT_MISSING.value,
+                        ErrorCode.OUTPUT_UNREADABLE.value,
+                        ErrorCode.OUTPUT_NAMELIST_INVALID.value,
+                        ErrorCode.SPHERE_OUTPUT_INVALID.value,
+                    }
+                    else diagnostic.code
+                ),
+                message=diagnostic.message,
+                path=diagnostic.path,
+                details=diagnostic.details,
+            )
+            for diagnostic in validation.diagnostics
+        )
         return self._result(
             status=OperationStatus.SUCCESS if validation.valid else OperationStatus.FAILED,
             diagnostics=diagnostics,
@@ -262,25 +282,19 @@ class FortranSetupRunner:
         )
 
     @staticmethod
-    def _validate_outputs(workspace: Path) -> ValidationResult:
-        diagnostics: list[Diagnostic] = []
-        for name in _REQUIRED_OUTPUTS:
-            path = workspace / name
-            if not path.is_file() or path.stat().st_size == 0:
-                diagnostics.append(_diagnostic(ErrorCode.OUTPUT_VALIDATION_FAILED, f"missing or empty output: {name}"))
-        for name in ("lattice_new.nml", "input_new.nml"):
-            path = workspace / name
-            if path.is_file() and "&" not in path.read_text(encoding="utf-8", errors="replace"):
-                diagnostics.append(_diagnostic(ErrorCode.OUTPUT_VALIDATION_FAILED, f"output is not a namelist: {name}"))
-        radii = workspace / "radii.out"
-        if radii.is_file():
-            first_line = next((line.strip() for line in radii.read_text(encoding="utf-8", errors="replace").splitlines() if line.strip()), "")
-            try:
-                if int(first_line) <= 0:
-                    raise ValueError
-            except ValueError:
-                diagnostics.append(_diagnostic(ErrorCode.OUTPUT_VALIDATION_FAILED, "radii.out does not start with a positive atom count"))
-        return ValidationResult(valid=not diagnostics, diagnostics=tuple(diagnostics))
+    def _validate_outputs(
+        workspace: Path,
+        source_paths: tuple[Path, Path],
+        spec: SetupSpec,
+    ) -> ValidationResult:
+        """Apply semantic validation to the complete candidate output set."""
+
+        return validate_setup_outputs(
+            workspace,
+            lattice_path=source_paths[0],
+            input_path=source_paths[1],
+            spec=spec,
+        )
 
     @staticmethod
     def _text(value: str | bytes | None) -> str:

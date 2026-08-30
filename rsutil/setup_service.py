@@ -28,6 +28,7 @@ from .core.contracts import (
 )
 from .core.paths import Workspace
 from .setup_runner import FortranSetupRunner
+from .setup_validation import build_run_manifest, validate_setup_namelists, validate_setup_outputs
 
 
 _COLLISION_POLICIES = frozenset({"error", "replace"})
@@ -407,7 +408,25 @@ class SetupService:
         except FileNotFoundError as exc:
             return SetupResult(status=OperationStatus.FAILED, diagnostics=(_diagnostic(ErrorCode.MISSING_INPUT, "required setup input is missing", paths=str(exc)),))
         except Exception as exc:
-            return SetupResult(status=OperationStatus.FAILED, diagnostics=(_diagnostic(ErrorCode.INVALID_INPUT, f"invalid setup input: {exc}"),))
+            code = ErrorCode.SETUP_SPEC_INVALID if isinstance(spec, Mapping) else ErrorCode.INVALID_INPUT
+            return SetupResult(status=OperationStatus.FAILED, diagnostics=(_diagnostic(code, f"invalid setup input: {exc}"),))
+
+        preflight_validation = validate_setup_namelists(
+            lattice,
+            input_nml,
+            spec=setup_spec,
+        )
+        if not preflight_validation.valid:
+            failed = SetupResult(
+                status=OperationStatus.FAILED,
+                diagnostics=tuple(
+                    diagnostic
+                    for diagnostic in preflight_validation.diagnostics
+                    if diagnostic.severity is DiagnosticSeverity.ERROR
+                ),
+                semantic_validation=preflight_validation,
+            )
+            return self._with_manifest(failed, source, input_nml, setup_spec)
 
         transform_workspace: Workspace | None = None
         runner_workspace: Workspace | None = None
@@ -427,7 +446,51 @@ class SetupService:
                 run_workspace.mkdir(parents=True, exist_ok=True)
             result = self.runner.run(run_lattice, run_input, setup_spec, workspace=run_workspace)
             if not result.success:
-                return result
+                return self._with_manifest(result, source, input_nml, setup_spec)
+
+            if result.semantic_validation is not None:
+                semantic_validation = ValidationResult(
+                    valid=preflight_validation.valid and result.semantic_validation.valid,
+                    diagnostics=preflight_validation.diagnostics + result.semantic_validation.diagnostics,
+                )
+                result = replace(result, semantic_validation=semantic_validation)
+                if not semantic_validation.valid:
+                    return self._with_manifest(
+                        replace(
+                            result,
+                            status=OperationStatus.FAILED,
+                            diagnostics=tuple(
+                                diagnostic
+                                for diagnostic in semantic_validation.diagnostics
+                                if diagnostic.severity is DiagnosticSeverity.ERROR
+                            ),
+                        ),
+                        source,
+                        input_nml,
+                        setup_spec,
+                    )
+
+            if isinstance(self.runner, FortranSetupRunner) and setup_spec.supercell != (1, 1, 1):
+                expansion_validation = validate_setup_outputs(
+                    run_workspace,
+                    lattice_path=lattice,
+                    input_path=input_nml,
+                    spec=setup_spec,
+                    check_supercell_expansion=True,
+                )
+                expansion_errors = tuple(
+                    diagnostic
+                    for diagnostic in expansion_validation.diagnostics
+                    if diagnostic.code == ErrorCode.SUPERCELL_INVALID.value
+                    and diagnostic.severity is DiagnosticSeverity.ERROR
+                )
+                if expansion_errors:
+                    return self._with_manifest(
+                        replace(result, status=OperationStatus.FAILED, diagnostics=expansion_errors),
+                        source,
+                        input_nml,
+                        setup_spec,
+                    )
 
             committed_files = _commit_setup_outputs(
                 run_workspace,
@@ -440,6 +503,25 @@ class SetupService:
             provenance = dict(result.provenance)
             reproducible = setup_spec.seed is not None and (
                 setup_spec.sqs is None or setup_spec.sqs_seed is not None
+            )
+            output_paths = {
+                name: (
+                    destination / "lattice.nml"
+                    if in_place and name == "lattice_new.nml"
+                    else destination / "input.nml"
+                    if in_place and name == "input_new.nml"
+                    else destination / name
+                )
+                for name in committed_files
+            }
+            manifest = build_run_manifest(
+                lattice,
+                input_nml,
+                setup_spec,
+                status=result.status,
+                validation=result.semantic_validation,
+                output_paths=output_paths,
+                base_provenance=result.provenance,
             )
             provenance.update(
                 {
@@ -456,6 +538,7 @@ class SetupService:
                         "sqs_seed": setup_spec.sqs_seed,
                         "reproducible": reproducible,
                     },
+                    "manifest": manifest.to_dict(),
                 }
             )
             result = replace(result, provenance=provenance)
@@ -477,6 +560,31 @@ class SetupService:
                 transform_workspace.cleanup()
             if runner_workspace is not None:
                 runner_workspace.cleanup()
+
+    @staticmethod
+    def _with_manifest(
+        result: SetupResult,
+        source: Path,
+        input_path: Path,
+        spec: SetupSpec,
+    ) -> SetupResult:
+        """Attach the same machine-readable provenance to success and failure."""
+
+        try:
+            manifest = build_run_manifest(
+                source / "lattice.nml",
+                input_path,
+                spec,
+                status=result.status,
+                validation=result.semantic_validation,
+                base_provenance=result.provenance,
+            )
+            provenance = dict(result.provenance)
+            provenance["manifest"] = manifest.to_dict()
+            return replace(result, provenance=provenance)
+        except Exception:
+            # Provenance must never hide the original scientific/setup result.
+            return result
 
     setup = run
 

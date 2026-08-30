@@ -51,10 +51,11 @@ from .viz.rs_visualizer import rs_visualizer
 from .exchange.exchange_map import exchange_map
 from .export.uppasd import export_from_files
 from .export.lmto47 import export_ctrl
-from .core.contracts import SetupSpec
+from .core.contracts import Diagnostic, DiagnosticSeverity, ErrorCode, OperationStatus, SetupResult, SetupSpec
 from .setup_service import SetupService
 from .setup_service import validate_setup_inputs as service_validate_setup_inputs
 from .setup_service import validate_setup_parameters as service_validate_setup_parameters
+from .setup_validation import write_setup_report
 
 
 def _make_common_parser():
@@ -1828,6 +1829,21 @@ def _run_setup_cli(args):
         service_validate_setup_inputs(Path.cwd())
     except (FileNotFoundError, ValueError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
+        if args.json_report:
+            try:
+                failed_result = SetupResult(
+                    status=OperationStatus.FAILED,
+                    diagnostics=(
+                        Diagnostic(
+                            DiagnosticSeverity.ERROR,
+                            ErrorCode.MISSING_INPUT if isinstance(exc, FileNotFoundError) else ErrorCode.SETUP_SPEC_INVALID,
+                            str(exc),
+                        ),
+                    ),
+                )
+                write_setup_report(failed_result, args.json_report)
+            except OSError as report_exc:
+                print(f"ERROR: could not write JSON setup report: {report_exc}", file=sys.stderr)
         return 1
 
     print("\nConfiguration:")
@@ -1872,9 +1888,15 @@ def _run_setup_cli(args):
         # names while the library API defaults to collision-safe ``error``.
         collision_policy="replace",
     )
+    if args.json_report:
+        try:
+            write_setup_report(result, args.json_report)
+        except OSError as exc:
+            print(f"ERROR: could not write JSON setup report: {exc}", file=sys.stderr)
+            return 1
     if not result.success:
         for diagnostic in result.diagnostics:
-            print(f"ERROR: {diagnostic.message}", file=sys.stderr)
+            print(f"{diagnostic.severity.value.upper()}: {diagnostic.message}", file=sys.stderr)
         if result.stderr:
             print(result.stderr, file=sys.stderr, end="" if result.stderr.endswith("\n") else "\n")
         return 1
@@ -2223,6 +2245,10 @@ Examples:
     parser.add_argument(
         '--validate', action='store_true', default=False,
         help='Validate output files after generation'
+    )
+    parser.add_argument(
+        '--json-report', type=str, default=None, metavar='PATH',
+        help='Write a versioned machine-readable setup report to PATH'
     )
     parser.add_argument(
         '--backup', action='store_true', default=False,

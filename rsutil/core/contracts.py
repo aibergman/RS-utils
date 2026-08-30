@@ -40,6 +40,25 @@ class ErrorCode(str, Enum):
     COMMIT_FAILED = "commit_failed"
     PARSE_ERROR = "parse_error"
     EXCHANGE_ERROR = "exchange_error"
+    SETUP_SPEC_INVALID = "setup_spec_invalid"
+    NAMELIST_PARSE_ERROR = "namelist_parse_error"
+    NAMELIST_GROUP_MISSING = "namelist_group_missing"
+    NAMELIST_FIELD_MISSING = "namelist_field_missing"
+    LATTICE_NONFINITE = "lattice_nonfinite"
+    LATTICE_SINGULAR = "lattice_singular"
+    NONPOSITIVE_SCALE = "nonpositive_scale"
+    COUNT_MISMATCH = "count_mismatch"
+    LABEL_COUNT_MISMATCH = "label_count_mismatch"
+    LABEL_ELEMENT_UNKNOWN = "label_element_unknown"
+    LABEL_ELEMENT_DETERMINED = "label_element_determined"
+    RECURSION_INVALID = "recursion_invalid"
+    SUPERCELL_INVALID = "supercell_invalid"
+    TWO_D_INVALID = "two_d_invalid"
+    OUTPUT_MISSING = "output_missing"
+    OUTPUT_UNREADABLE = "output_unreadable"
+    OUTPUT_NAMELIST_INVALID = "output_namelist_invalid"
+    SPHERE_OUTPUT_INVALID = "sphere_output_invalid"
+    UNSEEDED_SETUP = "unseeded_setup"
     UNKNOWN = "unknown"
 
 
@@ -341,15 +360,21 @@ class Diagnostic:
 class ValidationResult:
     valid: bool
     diagnostics: tuple[Diagnostic, ...] = ()
+    schema_version: str = "rsutil-validation-v1"
 
     def to_dict(self) -> dict[str, Any]:
-        return {"valid": self.valid, "diagnostics": [item.to_dict() for item in self.diagnostics]}
+        return {
+            "schema_version": self.schema_version,
+            "valid": self.valid,
+            "diagnostics": [item.to_dict() for item in self.diagnostics],
+        }
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> "ValidationResult":
         return cls(
             valid=bool(data["valid"]),
             diagnostics=tuple(Diagnostic.from_dict(item) for item in data.get("diagnostics", ())),
+            schema_version=str(data.get("schema_version", "rsutil-validation-v1")),
         )
 
 
@@ -401,6 +426,122 @@ class SetupResult(OperationResult):
             }
         )
         return result
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "SetupResult":
+        return cls(
+            status=data.get("status", OperationStatus.SUCCESS),
+            diagnostics=tuple(Diagnostic.from_dict(item) for item in data.get("diagnostics", ())),
+            stdout=str(data.get("stdout", "")),
+            stderr=str(data.get("stderr", "")),
+            provenance=data.get("provenance"),
+            candidate_files=tuple(data.get("candidate_files", ())),
+            semantic_validation=(
+                None
+                if data.get("semantic_validation") is None
+                else ValidationResult.from_dict(data["semantic_validation"])
+            ),
+            sphere_outputs=data.get("sphere_outputs"),
+        )
+
+
+@dataclass(frozen=True)
+class RunManifest:
+    """Versioned, machine-readable provenance for one scientific operation."""
+
+    schema_version: str = "rsutil-run-v1"
+    operation: str = "setup"
+    status: OperationStatus | str = OperationStatus.SUCCESS
+    input_hashes: Mapping[str, Any] = field(default_factory=dict)
+    output_hashes: Mapping[str, Any] = field(default_factory=dict)
+    normalized_setup_spec: Mapping[str, Any] = field(default_factory=dict)
+    structure_hash: str | None = None
+    setup_identity_hash: str | None = None
+    software: Mapping[str, Any] = field(default_factory=dict)
+    environment: Mapping[str, Any] = field(default_factory=dict)
+    timestamps: Mapping[str, str] = field(default_factory=dict)
+    validation: Mapping[str, Any] = field(default_factory=dict)
+    stochastic: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not self.schema_version.strip():
+            raise ValidationError("manifest schema_version must not be empty")
+        if not self.operation.strip():
+            raise ValidationError("manifest operation must not be empty")
+        try:
+            object.__setattr__(self, "status", OperationStatus(self.status))
+        except ValueError as exc:
+            raise ValidationError("manifest status must be a known operation status") from exc
+        for name in (
+            "input_hashes",
+            "output_hashes",
+            "normalized_setup_spec",
+            "software",
+            "environment",
+            "timestamps",
+            "validation",
+            "stochastic",
+        ):
+            object.__setattr__(self, name, _mapping(getattr(self, name)))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "operation": self.operation,
+            "status": self.status.value,
+            "input_hashes": dict(self.input_hashes),
+            "output_hashes": dict(self.output_hashes),
+            "normalized_setup_spec": dict(self.normalized_setup_spec),
+            "structure_hash": self.structure_hash,
+            "setup_identity_hash": self.setup_identity_hash,
+            "software": dict(self.software),
+            "environment": dict(self.environment),
+            "timestamps": dict(self.timestamps),
+            "validation": dict(self.validation),
+            "stochastic": dict(self.stochastic),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "RunManifest":
+        return cls(
+            schema_version=str(data.get("schema_version", "rsutil-run-v1")),
+            operation=str(data.get("operation", "setup")),
+            status=data.get("status", OperationStatus.SUCCESS),
+            input_hashes=data.get("input_hashes"),
+            output_hashes=data.get("output_hashes"),
+            normalized_setup_spec=data.get("normalized_setup_spec"),
+            structure_hash=data.get("structure_hash"),
+            setup_identity_hash=data.get("setup_identity_hash"),
+            software=data.get("software"),
+            environment=data.get("environment"),
+            timestamps=data.get("timestamps"),
+            validation=data.get("validation"),
+            stochastic=data.get("stochastic"),
+        )
+
+
+@dataclass(frozen=True)
+class SetupReport:
+    """Versioned report envelope; the core result remains a typed object."""
+
+    schema_version: str = "rsutil-setup-report-v1"
+    result: SetupResult = field(default_factory=SetupResult)
+    manifest: RunManifest = field(default_factory=RunManifest)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "result": self.result.to_dict(),
+            "manifest": self.manifest.to_dict(),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "SetupReport":
+        return cls(
+            schema_version=str(data.get("schema_version", "rsutil-setup-report-v1")),
+            result=SetupResult.from_dict(data["result"]),
+            manifest=RunManifest.from_dict(data["manifest"]),
+        )
 
 
 @dataclass(frozen=True)

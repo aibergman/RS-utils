@@ -53,7 +53,7 @@ filenames remain local to that workspace.
 - [x] **HT-03** — Isolate the legacy Fortran setup kernel
 - [x] **HT-04** — Extract `-S` behind the setup service
 - [x] **HT-05** — Transactional and idempotent setup
-- [ ] **HT-06** — Setup validation, provenance, and machine reports
+- [x] **HT-06** — Setup validation, provenance, and machine reports
 - [ ] **HT-07** — Canonical periodic exchange pair identity
 - [ ] **HT-08** — Extract `-J` behind the exchange service
 - [ ] **HT-09** — Correct exchange symmetry reduction
@@ -188,6 +188,24 @@ No scientific or functional code was changed for HT-00.
   so staging, worker, validation, and commit failures leave source inputs
   byte-identical. Seed metadata records whether the setup is reproducible;
   any unspecified setup/SQS seed is marked non-reproducible.
+
+### HT-06 decisions
+
+- Added versioned `ValidationResult`, `RunManifest`, and `SetupReport` models
+  with JSON-compatible serialization. Setup validation is exposed through the
+  Python API and is applied both before the worker and to generated candidates.
+- Semantic checks cover namelist structure, lattice geometry, counts/labels,
+  recursion fields, supercell expansion, 2D output flags, generated output
+  readability, and radius/sphere records. Diagnostics have stable codes and
+  severity values; human console text is not used as a downstream contract.
+- Added optional legacy CLI `--json-report PATH` output and documented the
+  HT-safe Python/CLI setup usage in `docs/HT_SETUP.md`. Manifests record raw
+  input/output hashes, deterministic structure/setup identity hashes, software
+  and platform metadata, timestamps, validation evidence, and seed provenance.
+- The legacy kernel currently emits `lld=21` for the default setup even when
+  the normalized Python spec carries `rec_steps=20`. This remains a warning
+  rather than a failure to preserve valid historical `-S` behavior; invalid
+  recursion values and missing fields still fail semantically.
 
 ### HT-01 regression-harness decisions
 
