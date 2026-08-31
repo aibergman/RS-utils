@@ -13,6 +13,7 @@ from rsutil.results import (
     DampingResult,
     DIMENSIONLESS,
     MissingResultFileError,
+    PARSER_REGISTRY,
     ParserProvenance,
     Quantity,
     RYDBERG,
@@ -47,6 +48,36 @@ def test_damping_alias_does_not_reinterpret_an_ambiguous_file() -> None:
 
     assert result.status is TransportSupport.UNSUPPORTED_AMBIGUOUS
     assert "no values were parsed" in result.reason
+
+
+@pytest.mark.parametrize("name", ["cond_total.out", "Fe_cond.out", "cond_total_orb_real.out"])
+def test_fable_v4_conductivity_filenames_are_detected_but_not_guessed(tmp_path: Path, name: str) -> None:
+    (tmp_path / name).write_text("0.0 1.0 2.0\n", encoding="utf-8")
+
+    result = parse_conductivity_result(tmp_path)
+
+    assert result.status is TransportSupport.UNSUPPORTED_AMBIGUOUS
+    assert not result.supported
+    assert "no values were parsed" in result.reason
+
+
+@pytest.mark.parametrize("name", ["damping-energy.out", "alldampings.out"])
+def test_fable_v4_damping_filenames_are_detected_but_not_guessed(tmp_path: Path, name: str) -> None:
+    (tmp_path / name).write_text("# ambiguous damping output\n", encoding="utf-8")
+
+    result = parse_damping_result(tmp_path)
+
+    assert result.status is TransportSupport.UNSUPPORTED_AMBIGUOUS
+    assert not result.supported
+    assert "no values were parsed" in result.reason
+
+
+def test_registry_records_source_audited_unsupported_evidence() -> None:
+    evidence = {spec.observable.value: spec.evidence for spec in PARSER_REGISTRY}
+
+    assert "conductivity.f90" in evidence["conductivity"]
+    assert "exchange_dynamics.f90" in evidence["damping"]
+    assert all(spec.status is TransportSupport.UNSUPPORTED_AMBIGUOUS for spec in PARSER_REGISTRY)
 
 
 def test_missing_transport_file_is_not_reported_as_a_partial_result(tmp_path: Path) -> None:

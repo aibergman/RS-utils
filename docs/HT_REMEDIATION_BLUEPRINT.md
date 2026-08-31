@@ -70,7 +70,7 @@ pre-remediation implementation.
 - [x] **HT-R03** — Implement scientific campaign state and execution evidence
 - [x] **HT-R04** — Harden manifests, pair identity, and reuse integrity
 - [x] **HT-R05** — Bound and harden exchange symmetry/magnetic-reference semantics
-- [ ] **HT-R06** — Complete transport/damping source audit against `fable_v4`
+- [x] **HT-R06** — Complete transport/damping source audit against `fable_v4`
 - [ ] **HT-R07** — Provenance, ASE, path, indexing, and dead-code cleanup
 - [ ] **HT-R08** — Make packaging, test environment, and CI reproducible
 - [ ] **HT-R09** — True adversarial HT closeout and pilot evidence
@@ -331,4 +331,50 @@ tests/test_ht08_exchange_service.py    6 passed
 tests/test_ht09_exchange_symmetry.py    8 passed
 tests/test_ht10_exchange_jobs.py        7 passed
 full feasible suite                   126 passed, 12 warnings
+```
+
+## HT-R06 decision and evidence
+
+The required current public `fable_v4` source audit was completed against
+commit `faf71320c14afd680ce6973fb48fe4b6f8a25529`. The previous HT-13 claim
+that no conductivity or damping source/writer existed was disproved.
+
+The audit found a KPM/Kubo-style conductivity writer in
+`source/conductivity.f90::calculate_conductivity_tensor`, with controls in
+`&calculation post_processing='conductivity'`, `&control cond_type`,
+`cond_calctype`, `cond_ll`, and `random_vec_num`. The source emits total,
+per-type, and orbital real/imaginary files for charge, spin, orbital,
+accumulation, and torque operator modes. It writes energy-relative-to-Fermi,
+real, and imaginary numeric columns, but no units, headers, component map,
+operator/channel metadata, broadening record, or frequency axis. The active
+prefactor also omits the computed volume; the physical-constant alternatives
+are comments. These outputs remain `UNSUPPORTED_AMBIGUOUS`, not a guessed
+conductivity result.
+
+The audit also found `source/exchange_dynamics.f90::calculate_gilbert_damping`
+and its `alldampings.out` / `damping-energy.out` writers, gated through
+`&calculation do_damping=.true.` and SOC/`nsp=2` conditions. Pair tensor order,
+energy-relative-to-Fermi output, pair indexing, and the separate experimental
+moment-of-inertia files were traced. The damping files do not emit units,
+normalization, Green-function route/broadening, SOC/torque provenance, or run
+identity; the inertia source explicitly calls its kernel raw and experimental.
+They therefore remain `UNSUPPORTED_AMBIGUOUS` and are not exposed as a
+`DampingResult`. Phenomenological LLG `alpha`, relaxation rates, and generic
+imaginary response were explicitly kept distinct from ab-initio Gilbert
+damping.
+
+`docs/HT_TRANSPORT_DAMPING_FORMATS.md` now contains the source-grounded
+inventory, exact output/control details, unsupported/absent classifications,
+and a proposed upstream machine-readable contract. `rsutil.results.transport`
+records the audited evidence and recognizes the actual fable_v4 filenames,
+while continuing to return no guessed values. Focused regression coverage
+checks that conductivity and damping filenames are detected but remain
+fail-closed, and that registry evidence names the audited source files.
+
+Required verification:
+
+```text
+tests/test_ht13_transport_results.py  17 passed
+tests/test_ht11_results.py              6 passed
+full feasible suite                    132 passed, 12 warnings
 ```

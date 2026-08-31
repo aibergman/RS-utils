@@ -1,10 +1,11 @@
 """Evidence-first contracts for RS-LMTO transport and damping results.
 
-The checked-out RS-utils/RS-LMTO sources do not provide a transport or damping
-output schema.  This module therefore provides the versioned result shape and
-an intentionally small registry, but does not guess at legacy text columns.
-Files that cannot be identified as a documented stable format produce an
-explicit :class:`UnsupportedTransportResult`.
+The public fable_v4 source contains legacy conductivity and damping writers,
+but their text outputs do not carry enough machine-readable units and context
+for safe HT parsing.  This module therefore provides the versioned result
+shape and an intentionally small registry, but does not guess at legacy text
+columns.  Files that cannot be identified as a documented stable format
+produce an explicit :class:`UnsupportedTransportResult`.
 """
 
 from __future__ import annotations
@@ -312,13 +313,21 @@ PARSER_REGISTRY: tuple[ParserSpec, ...] = (
         name="rs-lmto-conductivity-text",
         observable=TransportObservable.CONDUCTIVITY,
         status=TransportSupport.UNSUPPORTED_AMBIGUOUS,
-        evidence="No conductivity.f90, Kubo/KPM writer, header, or fixture is present in this checkout.",
+        evidence=(
+            "fable_v4 source/conductivity.f90::calculate_conductivity_tensor writes "
+            "energy/real/imag text, but the files do not declare units, operator "
+            "channel, tensor convention, or calculation options."
+        ),
     ),
     ParserSpec(
         name="rs-lmto-damping-text",
         observable=TransportObservable.DAMPING,
         status=TransportSupport.UNSUPPORTED_AMBIGUOUS,
-        evidence="No Gilbert/magnetic-damping implementation, writer, header, or fixture is present in this checkout.",
+        evidence=(
+            "fable_v4 source/exchange_dynamics.f90::calculate_gilbert_damping writes "
+            "pair and energy damping tables, but the files do not declare units, "
+            "normalization, SOC/input identity, or a complete run context."
+        ),
     ),
 )
 
@@ -335,6 +344,21 @@ _CANDIDATE_NAMES = {
 }
 
 
+def _is_candidate_name(name: str) -> bool:
+    """Return whether *name* is a known legacy or fable_v4 result filename."""
+
+    lower = name.lower()
+    if lower in _CANDIDATE_NAMES:
+        return True
+    return lower in {
+        "cond_total.out",
+        "cond_total_orb_real.out",
+        "cond_total_orb_im.out",
+        "damping-energy.out",
+        "alldampings.out",
+    } or lower.endswith(("_cond.out", "_cond_orb_real.out", "_cond_orb_im.out"))
+
+
 def parse_transport_result(path: str | Path, *, observable: TransportObservable | str | None = None) -> UnsupportedTransportResult:
     """Inspect a transport/damping result without guessing an unstable schema.
 
@@ -347,7 +371,7 @@ def parse_transport_result(path: str | Path, *, observable: TransportObservable 
     requested = TransportObservable.UNKNOWN if observable is None else TransportObservable(observable)
     if supplied.is_dir():
         root = supplied.resolve()
-        candidates = tuple(sorted(item for item in root.iterdir() if item.is_file() and item.name.lower() in _CANDIDATE_NAMES))
+        candidates = tuple(sorted(item for item in root.iterdir() if item.is_file() and _is_candidate_name(item.name)))
         if not candidates:
             raise MissingResultFileError(f"no transport/damping result candidate found in {root}")
         source = candidates[0]
