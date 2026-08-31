@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
+
+from rsutil.core import ExchangePair, PairKey
 
 from .units import Quantity, Unit
 
@@ -317,6 +319,171 @@ class SCFResult(ElectronicResult):
         return cls.from_dict(json.loads(value))
 
 
+@dataclass(frozen=True)
+class InteractionRecord:
+    """Magnetic interaction data for one canonical periodic pair.
+
+    The three observables are intentionally independent.  A scalar exchange
+    value is not a substitute for a DMI vector or an exchange tensor, even
+    when a particular upstream calculation happens to emit more than one of
+    them for the same pair.
+    """
+
+    key: PairKey
+    isotropic_exchange: Quantity | None = None
+    dmi_vector: Quantity | None = None
+    exchange_tensor: Quantity | None = None
+    pair: ExchangePair | None = None
+    method: str | None = None
+    channel: str | None = None
+    soc: bool | None = None
+    provenance: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.key, PairKey):
+            raise ValueError("interaction key must be a PairKey")
+        if self.pair is not None and self.pair.key != self.key:
+            raise ValueError("interaction pair geometry has a different PairKey")
+        for name, expected in (
+            ("dmi_vector", 3),
+            ("exchange_tensor", 3),
+        ):
+            quantity = getattr(self, name)
+            if quantity is None:
+                continue
+            if not isinstance(quantity, Quantity):
+                raise ValueError(f"{name} must be a Quantity")
+            shape = _shape(quantity.value)
+            if name == "dmi_vector" and shape != (3,):
+                raise ValueError("dmi_vector must contain exactly three components")
+            if name == "exchange_tensor" and shape != (3, 3):
+                raise ValueError("exchange_tensor must be a 3x3 matrix")
+        if self.isotropic_exchange is not None and not isinstance(self.isotropic_exchange, Quantity):
+            raise ValueError("isotropic_exchange must be a Quantity")
+        if self.method is not None:
+            object.__setattr__(self, "method", str(self.method))
+        if self.channel is not None:
+            object.__setattr__(self, "channel", str(self.channel))
+        object.__setattr__(self, "provenance", _json_value(dict(self.provenance)))
+
+    @property
+    def J(self) -> Quantity | None:
+        """Short alias for the isotropic exchange quantity."""
+
+        return self.isotropic_exchange
+
+    @property
+    def D(self) -> Quantity | None:
+        """Short alias for the DMI vector quantity."""
+
+        return self.dmi_vector
+
+    @property
+    def tensor(self) -> Quantity | None:
+        """Short alias for the full exchange tensor quantity."""
+
+        return self.exchange_tensor
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "key": self.key.to_dict(),
+            "isotropic_exchange": _quantity_dict(self.isotropic_exchange),
+            "dmi_vector": _quantity_dict(self.dmi_vector),
+            "exchange_tensor": _quantity_dict(self.exchange_tensor),
+            "pair": None if self.pair is None else self.pair.to_dict(),
+            "method": self.method,
+            "channel": self.channel,
+            "soc": self.soc,
+            "provenance": _json_value(self.provenance),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "InteractionRecord":
+        return cls(
+            key=PairKey.from_dict(data["key"]),
+            isotropic_exchange=_quantity_from(data.get("isotropic_exchange")),
+            dmi_vector=_quantity_from(data.get("dmi_vector")),
+            exchange_tensor=_quantity_from(data.get("exchange_tensor")),
+            pair=None if data.get("pair") is None else ExchangePair.from_dict(data["pair"]),
+            method=data.get("method"),
+            channel=data.get("channel"),
+            soc=data.get("soc"),
+            provenance=data.get("provenance", {}),
+        )
+
+
+@dataclass(frozen=True)
+class ExchangeSet:
+    """Versioned, pair-keyed magnetic interaction result set."""
+
+    records: Mapping[PairKey, InteractionRecord] | Sequence[InteractionRecord] = field(default_factory=dict)
+    schema_version: str = "rsutil-exchange-result-v1"
+    diagnostics: tuple[ParseDiagnostic, ...] = ()
+    validation: ParseValidation = field(default_factory=lambda: ParseValidation(True))
+    provenance: ParserProvenance = field(
+        default_factory=lambda: ParserProvenance(source_path="", content_hash="", format="rs-lmto-exchange")
+    )
+    run_manifest: Mapping[str, Any] | None = None
+
+    def __post_init__(self) -> None:
+        normalized: dict[PairKey, InteractionRecord] = {}
+        source = self.records.items() if isinstance(self.records, Mapping) else ((record.key, record) for record in self.records)
+        for key, record in source:
+            if not isinstance(key, PairKey) or not isinstance(record, InteractionRecord):
+                raise ValueError("ExchangeSet records must map PairKey to InteractionRecord")
+            if key != record.key:
+                raise ValueError("ExchangeSet record key does not match InteractionRecord.key")
+            if key in normalized:
+                raise ValueError(f"duplicate interaction PairKey: {key}")
+            normalized[key] = record
+        object.__setattr__(self, "records", normalized)
+        object.__setattr__(self, "diagnostics", tuple(self.diagnostics))
+        if self.run_manifest is not None:
+            object.__setattr__(self, "run_manifest", _json_value(dict(self.run_manifest)))
+
+    @property
+    def interactions(self) -> tuple[InteractionRecord, ...]:
+        return tuple(self.records[key] for key in sorted(self.records, key=lambda item: item.sort_key))
+
+    @property
+    def pair_keys(self) -> tuple[PairKey, ...]:
+        return tuple(item.key for item in self.interactions)
+
+    def get(self, key: PairKey, default: InteractionRecord | None = None) -> InteractionRecord | None:
+        return self.records.get(key, default)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "records": [item.to_dict() for item in self.interactions],
+            "diagnostics": [item.to_dict() for item in self.diagnostics],
+            "validation": self.validation.to_dict(),
+            "provenance": self.provenance.to_dict(),
+            "run_manifest": _json_value(self.run_manifest),
+        }
+
+    def to_json(self, *, indent: int | None = None) -> str:
+        return json.dumps(self.to_dict(), sort_keys=True, indent=indent, separators=None if indent else (",", ":"))
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "ExchangeSet":
+        records = [InteractionRecord.from_dict(value) for value in data.get("records", ())]
+        return cls(
+            records=records,
+            schema_version=str(data.get("schema_version", "rsutil-exchange-result-v1")),
+            diagnostics=tuple(ParseDiagnostic.from_dict(item) for item in data.get("diagnostics", ())),
+            validation=ParseValidation.from_dict(data.get("validation", {"valid": True})),
+            provenance=ParserProvenance.from_dict(
+                data.get("provenance", {"source_path": "", "content_hash": "", "format": "rs-lmto-exchange"})
+            ),
+            run_manifest=data.get("run_manifest"),
+        )
+
+    @classmethod
+    def from_json(cls, value: str) -> "ExchangeSet":
+        return cls.from_dict(json.loads(value))
+
+
 def _quantity_dict(value: Quantity | None) -> dict[str, Any] | None:
     return None if value is None else value.to_dict()
 
@@ -339,9 +506,22 @@ def _json_value(value: Any) -> Any:
     return value
 
 
+def _shape(value: Any) -> tuple[int, ...]:
+    if isinstance(value, (tuple, list)):
+        if not value:
+            return (0,)
+        first = _shape(value[0])
+        if any(_shape(item) != first for item in value):
+            return (-1,)
+        return (len(value), *first)
+    return ()
+
+
 __all__ = [
     "ConvergenceState",
     "ElectronicResult",
+    "ExchangeSet",
+    "InteractionRecord",
     "ParseDiagnostic",
     "ParseSeverity",
     "ParseValidation",

@@ -33,8 +33,16 @@ class MalformedResultError(ResultParserError):
     error_code = code
 
 
+class InteractionMappingError(MalformedResultError):
+    """An interaction row cannot be mapped to exactly one canonical pair."""
+
+    code = "interaction_mapping_error"
+    error_code = code
+
+
 __all__ = [
     "MalformedResultError",
+    "InteractionMappingError",
     "MissingResultFileError",
     "ResultParserError",
     "UnsupportedResultFormatError",

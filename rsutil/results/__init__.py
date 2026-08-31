@@ -1,6 +1,7 @@
 """Versioned, unit-aware result parsing for RS-LMTO runs."""
 
 from .errors import (
+    InteractionMappingError,
     MalformedResultError,
     MissingResultFileError,
     ResultParserError,
@@ -9,6 +10,8 @@ from .errors import (
 from .models import (
     ConvergenceState,
     ElectronicResult,
+    ExchangeSet,
+    InteractionRecord,
     ParseDiagnostic,
     ParseSeverity,
     ParseValidation,
@@ -19,6 +22,15 @@ from .models import (
     SourceFile,
 )
 from .parser import parse_report, parse_run, parse_scf
+from .exchange import (
+    parse_exchange,
+    parse_exchange_file,
+    parse_exchange_results,
+    parse_exchange_set,
+    parse_interactions,
+    validate_exchange_set,
+    write_exchange_json,
+)
 from .units import (
     ELECTRONS,
     MU_B,
@@ -35,6 +47,9 @@ __all__ = [
     "ConvergenceState",
     "ELECTRONS",
     "ElectronicResult",
+    "ExchangeSet",
+    "InteractionMappingError",
+    "InteractionRecord",
     "MU_B",
     "MalformedResultError",
     "MissingResultFileError",
@@ -54,8 +69,15 @@ __all__ = [
     "Unit",
     "UnsupportedResultFormatError",
     "parse_report",
+    "parse_exchange",
+    "parse_exchange_file",
+    "parse_exchange_results",
+    "parse_exchange_set",
+    "parse_interactions",
     "parse_run",
     "parse_scf",
     "scalar",
     "vector",
+    "validate_exchange_set",
+    "write_exchange_json",
 ]
