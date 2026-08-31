@@ -1,19 +1,32 @@
-# RS-utils HT readiness report
+# RS-utils HT readiness report — historical HT-18 evidence
+
+> **REMEDIATION REQUIRED — THIS BRANCH IS NOT HT-READY FOR SCIENTIFIC
+> PRODUCTION.**
+>
+> This document preserves the prior HT-18 closeout as historical evidence.
+> The adversarial audit identified unresolved release blockers in source
+> units, setup validation semantics, campaign state, execution evidence,
+> manifest/reuse integrity, magnetic symmetry scope, source-format evidence,
+> provenance, ASE setup policy, and clean-checkout reproducibility. See
+> [`HT_REMEDIATION_BLUEPRINT.md`](HT_REMEDIATION_BLUEPRINT.md) for the frozen
+> acceptance criteria and remediation ledger. The statuses and test results
+> below must not be interpreted as a current production-readiness claim.
 
 ## Scope and provenance
 
-This is the HT-18 closeout for the `HT` branch. The HT-18 work started from
+This is the historical HT-18 closeout for the `HT` branch, retained for
+baseline evidence only. The HT-18 work started from
 the HT-17 tip `f40aa010710363c8a878f1d960c9b1b0799e5c15`; its immediate
 parent is `be03295a953c4da8c94240962e83271dc293dddc`. The branch shares base
 commit `e4a536d9660e3172ee5e6b4168eacf7b58331b4b` with `origin/main`.
 
-The closeout was run on 2026-08-31 in the repository checkout with Python
+The historical closeout was run on 2026-08-31 in the repository checkout with Python
 3.11 and the existing compiled RS-utils library. The supplied untracked
 `docs/dev/RSUTIL_HT_LUNA_BLUEPRINT_PACK/` directory was treated as campaign
 input and was not modified. The protected Fortran sources under `source/`
 were not changed.
 
-## Completed task ledger
+## Historical HT-18 task ledger
 
 | Task | Completed scope | Evidence |
 | --- | --- | --- |
@@ -132,7 +145,8 @@ used as the identity.
 
 ## Parser coverage matrix
 
-Statuses mean `READY` is evidenced by a checked-in stable fixture and tests;
+Statuses in this historical matrix mean `READY` was claimed by HT-18 based on
+a checked-in stable fixture and tests;
 `EXPERIMENTAL` is implemented but lacks complete upstream fixture evidence;
 `DEFERRED` requires an upstream contract or future campaign work; and
 `UNSUPPORTED` is deliberately fail-closed.
@@ -208,7 +222,7 @@ array map and shell-quoted run paths.
 This validates generation, render, fake execution, status, and collection
 without claiming that Slurm was submitted or queried.
 
-## Full verification
+## Historical full verification
 
 The full local suite passed:
 
@@ -220,7 +234,8 @@ python -m pytest -q
 The repository's existing CI workflows remain in `.github/workflows/`,
 including `build.yaml` and `build_pip.yaml` (the latter runs `pytest -q`). No
 remote CI run was available to this checkout; the local full-suite result is
-the measured closeout evidence.
+historical closeout evidence only. It does not satisfy the current
+clean-checkout/CI release gate.
 
 ## Known limitations and deferred work
 
