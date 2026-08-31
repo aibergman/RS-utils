@@ -65,7 +65,7 @@ filenames remain local to that workspace.
 - [x] **HT-15** — ASE structure interoperability
 - [x] **HT-16** — Deterministic campaign specification and generation
 - [x] **HT-17** — Slurm array rendering, status, and collection
-- [ ] **HT-18** — HT readiness closeout and pilot evidence
+- [x] **HT-18** — HT readiness closeout and pilot evidence
 
 ## Dependency summary
 
@@ -385,3 +385,18 @@ No scientific or functional code was changed for HT-00.
   hashes, manifest identity/content hashes, and exchange-subjob canonical pair
   references. No retry, restart, dependency, daemon, or workflow-engine
   behavior was added; those remain a future AiiDA boundary.
+
+### HT-18 decisions
+
+- Closed the foundation with the measured readiness report in
+  `docs/HT_READINESS_REPORT.md` and the reproducible four-entry pilot
+  specification in `examples/campaigns/ht18_pilot.json`.
+- The pilot evidence combines real setup generation, checked-in electronic,
+  exchange/DMI, versioned TB, and fail-closed transport fixtures. A stable
+  transport/damping output format is not present in this checkout, so that
+  mode remains explicitly unsupported rather than being promoted by the
+  closeout.
+- The report records the direct-vs-worker golden comparison, legacy `-S`/`-J`
+  semantic corpus, atomicity/failure-injection tests, deterministic campaign
+  regeneration, and fake-executable Slurm/status/collection dry-run. AiiDA
+  and UppASD workflow integration remain outside scope.

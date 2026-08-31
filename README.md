@@ -120,6 +120,32 @@ rsutil --clust --data .
 rsutil --exchange --cutoff 3.0 --unique --rij-out rij_map.txt --rij-format txt
 ```
 
+### Recommended high-throughput workflow
+
+The established `-S` and `-J` flags remain supported for individual legacy
+runs. For reproducible batch preparation, validate and generate a versioned
+campaign first, then render a site-specific Slurm array for review:
+
+```bash
+rsutil -S --validate --summary                 # non-destructive legacy setup
+rsutil -J --cutoff 3.0 --unique                # legacy exchange jobs
+
+rsutil campaign validate examples/campaigns/ht18_pilot.json
+rsutil campaign create examples/campaigns/ht18_pilot.json --destination ht18-runs
+rsutil campaign render-slurm ht18-runs/campaign_index.json \
+    --executable /path/to/rs-lmto --launcher 'srun --exclusive' \
+    --time 02:00:00 --resource cpus_per_task=8
+rsutil campaign status ht18-runs
+rsutil campaign collect ht18-runs --csv ht18-runs/results.csv
+```
+
+Campaign generation is setup-only and does not submit jobs. Inspect the
+rendered script and supply the executable, launcher, modules, and resources
+for the target site. `status` and `collect` use filesystem evidence only;
+they do not query Slurm or retry jobs. See [HT_CAMPAIGNS.md](docs/HT_CAMPAIGNS.md)
+and [HT_READINESS_REPORT.md](docs/HT_READINESS_REPORT.md) for the support
+matrix and closeout evidence.
+
 ### Bands and DOS workflows (pure Python)
 
 ```bash

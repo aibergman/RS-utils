@@ -1,0 +1,46 @@
+{
+  "schema_version": "rsutil-campaign-v1",
+  "name": "rsutil-ht18-pilot",
+  "destination_naming": "runs/{name}--{entry_id}",
+  "structures": {
+    "bcc-fe": "../bccFe/Dist",
+    "fen": "../FeN",
+    "fept": "../FePt"
+  },
+  "setup_template": {
+    "cluster_type": "periodic",
+    "rec_method": "block",
+    "rec_steps": 20
+  },
+  "entries": [
+    {
+      "name": "bcc-fe-reference",
+      "structure": "bcc-fe",
+      "setup": {"seed": 1801},
+      "calculation": {"mode": "scf", "label": "elemental-bcc-fe"}
+    },
+    {
+      "name": "fen-multisite-reference",
+      "structure": "fen",
+      "setup": {"seed": 1802},
+      "calculation": {"mode": "scf", "label": "multisite-fen"}
+    },
+    {
+      "name": "fept-soc-reference",
+      "structure": "fept",
+      "setup": {"seed": 1803},
+      "calculation": {"mode": "scf", "label": "soc-fept"},
+      "exchange": {"enabled": true, "channel": "soc"}
+    },
+    {
+      "name": "bcc-fe-seeded-supercell",
+      "structure": "bcc-fe",
+      "setup": {
+        "seed": 1804,
+        "supercell": [2, 1, 1],
+        "lattice_dist": 0.01
+      },
+      "calculation": {"mode": "scf", "label": "seeded-supercell"}
+    }
+  ]
+}
