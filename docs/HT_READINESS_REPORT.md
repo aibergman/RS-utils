@@ -1,12 +1,12 @@
 # RS-utils HT readiness report — HT-R10…R14 closeout
 
-> **HT FOUNDATION NOT READY FOR PILOT USE — HT-R14
-> REMAIN OPEN.**
+> **HT FOUNDATION READY FOR PILOT USE WITHIN THE SUPPORT MATRIX — HT-R14
+> COMPLETE.**
 >
 > The earlier R09 conclusion is superseded/reopened by the post-R09
 > self-review. Its historical evidence is retained below, but it must not be
-> read as an unconditional readiness claim. The protected Fortran numerical
-> kernel was not modified.
+> be read as universal RS-LMTO feature coverage. The protected Fortran
+> numerical kernel was not modified.
 
 ## Historical R09 closeout (superseded)
 
@@ -84,32 +84,41 @@ and `UNSUPPORTED`.
 
 | Capability | Status | Evidence and boundary |
 | --- | --- | --- |
-| Bulk setup | READY | Real Fortran worker and bcc/FeN/FePt fixtures pass; isolated and transactional. |
-| HCP setup | RESTRICTED | Generic lattice validation is covered, but no checked-in HCP end-to-end worker fixture is part of this closeout. |
-| Surface/impurity setup | RESTRICTED | Source-derived unequal-count surface and impurity semantics validate; surface potential generation is not claimed. |
-| Scalar exchange | READY | Canonical pair generation, manifests, and real MnSi result parsing pass. |
-| DMI | READY | MnSi `jijso.out` fixture parses with explicit mRy provenance. |
-| Full tensor exchange | EXPERIMENTAL | Explicit tensor parsing exists; unverified sources retain unknown units and require review. |
-| SOC symmetry | RESTRICTED | Source `nsp` controls SOC; reduction is proven only for explicit collinear-FM references with an explicit axial magnetization axis. |
-| AFM/ferrimagnetic symmetry | RESTRICTED | Conservative identity/full-pair behavior is covered; no general magnetic reduction is claimed. |
-| Generic noncollinear symmetry | UNSUPPORTED | No general equivalence theorem is asserted; retain full inventory and require domain-specific review. |
+| Ordinary bulk setup | READY | Real Fortran worker and bcc/FeN/FePt fixtures pass; isolated and transactional; `tests/test_fortran_setup_runner.py`, `tests/test_setup_validation.py`. |
+| HCP setup | RESTRICTED | Generic lattice validation is covered, but no checked-in HCP end-to-end worker fixture is part of this closeout; `tests/test_setup_validation.py`. |
+| Supercell setup | READY | Seeded supercell generation is deterministic and non-destructive; `tests/test_legacy_cli.py`, `tests/test_setup_validation.py`. |
+| Surface setup | RESTRICTED | Source-derived unequal-count semantics validate; surface potential generation is not claimed; `tests/test_setup_validation.py`. |
+| Impurity/defect setup | RESTRICTED | Source-derived impurity label/count semantics validate; no broad defect workflow claim; `tests/test_setup_validation.py`. |
+| Stochastic transformations/SQS | READY | Seeded transformations reproduce; active unseeded stochastic generation is rejected; `tests/test_setup_validation.py`, `tests/test_legacy_cli.py`, `tests/test_ht16_campaign.py`. |
+| Scalar exchange J | READY | Canonical pair generation, manifests, and real MnSi result parsing preserve source mRy; `tests/test_ht12_exchange_results.py`, `tests/test_ht07_pair_identity.py`. |
+| DMI vector D | READY | Real MnSi `dijso.out` parses with source mRy provenance; `tests/test_ht12_exchange_results.py`. |
+| Raw anisotropic A tensor | EXPERIMENTAL | Source-faithful meaning and ordering are tested, but unverified external tensor sources retain unknown units; `tests/test_ht12_exchange_results.py`. |
+| Derived full exchange tensor | EXPERIMENTAL | Exact `J I + D(antisym) + A` derivation and missing-component failure are tested; broader production tensor coverage remains bounded; `tests/test_ht12_exchange_results.py`. |
+| Pair geometry | READY | Distance and displacement retain explicit length units/conventions through JSON/text export; `tests/test_ht12_exchange_results.py`, `tests/test_legacy_cli.py`. |
+| No-SOC FM symmetry | READY | Exact reduction is enabled only by explicit collinear-FM context; `tests/test_ht12_magnetic_reference.py`, `tests/test_ht09_exchange_symmetry.py`. |
+| SOC FM symmetry | RESTRICTED | Source `nsp` controls SOC; reduction additionally requires an explicit collinear-FM reference and axial magnetization axis; `tests/test_ht12_magnetic_reference.py`, `tests/test_ht09_exchange_symmetry.py`. |
+| AFM/ferrimagnetic symmetry | RESTRICTED | Conservative identity/full-pair behavior is covered; no general magnetic reduction is claimed; `tests/test_ht08_exchange_service.py`, `tests/test_ht09_exchange_symmetry.py`. |
+| Generic noncollinear symmetry | UNSUPPORTED | No general equivalence theorem is asserted; full inventory and domain review are required. |
 | SCF parsing/convergence | READY | Converged, non-converged, malformed, unknown, and execution-failure states are distinct and tested. |
 | Conductivity | UNSUPPORTED | Source audit found insufficient machine-readable unit/operator context; parser fails closed. |
 | Damping | UNSUPPORTED | Source audit found insufficient validated format/context; no scientific readiness claim. |
+| Legacy interaction output formats | RESTRICTED | Audited scalar/DMI current formats are ready; legacy or unverified tensor variants require explicit review; `tests/test_ht12_exchange_results.py`. |
+| Versioned current interaction formats | READY | Versioned result schemas preserve source units, provenance, and tensor meaning for the supported scalar/DMI paths; `tests/test_ht12_exchange_results.py`. |
 | Versioned TB | READY | Versioned metadata, index base, units, provenance, and export tests pass. |
 | Legacy TB | RESTRICTED | Exact conversion/fail-closed geometry checks pass; legacy source formats require explicit review. |
 | ASE structure interop | READY | `Atoms <-> RSStructure` conversion and identity/unit contracts pass. |
 | ASE automatic setup | EXPERIMENTAL | Requires explicit opt-in and is documented as placeholder policy, not production setup generation. |
-| Campaign generation | READY | Deterministic identity, collision, reuse, and independent-root pilot checks pass. |
+| Campaign generation | READY | Deterministic identity, collision, seeded reproducibility, and independent-root pilot checks pass; `tests/test_ht16_campaign.py`. |
+| Authoritative campaign/exchange reuse | READY | Fresh regeneration rejects scientific-file plus historical-manifest coordinated tampering; `tests/test_ht10_exchange_jobs.py`, `tests/test_ht16_campaign.py`. |
 | Slurm rendering | READY | Shell-safe array script/run-list rendering is tested locally. |
 | Slurm execution evidence | RESTRICTED | Controlled local execution evidence passes; no scheduler or remote cluster execution was available. |
-| Status/collection | READY | Filesystem-only status, parse failures, sidecars, hashes, and continuation behavior pass. |
+| Convergence-aware status/collection | READY | Filesystem-only status, parse failures, sidecars, hashes, continuation, stale-report, and execution-state behavior pass; `tests/test_ht17_campaign.py`. |
 | AiiDA/UppASD integration | UNSUPPORTED | Outside the validated R00-R09 foundation boundary. |
 
-The R09 gate was recorded as satisfied for pilot use, but that conclusion is
-superseded/reopened by the post-R09 self-review. R10 and R11 are now closed
-below; R12-R14 remain release blockers. The historical HT-18 claims below are
-retained for traceability only.
+The R09 gate was recorded as satisfied for pilot use, but that conclusion was
+superseded/reopened by the post-R09 self-review. R10-R14 are now closed for
+pilot use within this matrix. The historical HT-18 claims below are retained
+for traceability only.
 
 ## Current HT-R10 closeout
 
@@ -131,8 +140,8 @@ python -m pytest -q
 144 passed, 12 warnings
 ```
 
-This does not close the overall HT gate: magnetic reference context (R12),
-installed-wheel verification (R13), and final falsification (R14) remain open.
+This section records the R10 evidence; the later R12-R14 sections record the
+remaining closeout work and final decision.
 
 ## Current HT-R11 closeout
 
@@ -152,7 +161,7 @@ python -m pytest -q tests/test_ht10_exchange_jobs.py tests/test_ht16_campaign.py
 21 passed, 1 warning
 ```
 
-R14 remains an open release blocker.
+The final R14 decision is recorded below.
 
 ## Current HT-R12 closeout
 
@@ -171,7 +180,7 @@ python -m pytest -q tests/test_ht12_magnetic_reference.py tests/test_ht08_exchan
 45 passed
 ```
 
-R14 remains the only final-closeout release blocker.
+R14 is addressed by the final closeout below.
 
 ## Current HT-R13 closeout
 
@@ -193,7 +202,75 @@ pip check: No broken requirements found
 pytest: 162 passed, 15 warnings
 ```
 
-R14 remains the only final-closeout release blocker.
+## Current HT-R14 closeout
+
+HT-R14 is closed for pilot use within the support matrix above. The final
+falsification pass was evaluated against code commit
+`8840afa6b0ac0ef707e2a414d8d205112faff866`; the closeout documentation is
+committed separately.
+
+### Installed-artifact and full-suite evidence
+
+The exact wheel was
+`rsutil-0.10.0-cp311-cp311-macosx_26_0_arm64.whl`. It was installed with
+the `test` extra into an external Python 3.11.16 virtual environment, with
+`PYTHONPATH` removed and tests/examples copied outside the checkout. Both
+`rsutil.__file__` and `rsutil.rsutil` resolved from that environment's
+`site-packages`; `pip check` passed. The external full suite passed **162
+tests, 15 warnings**. The source-checkout suite independently passed the same
+162 tests and 15 warnings.
+
+The warnings are the known spglib deprecation/user warnings recorded by the
+focused symmetry tests; no test was skipped or suppressed for this closeout.
+The local toolchain was Python 3.11.16, gfortran 16.2.0, and CMake 4.4.3 on
+macOS arm64.
+
+### Negative-control summary
+
+| Control | Result | Evidence |
+| --- | --- | --- |
+| C1 interaction units | Contradictory known-format `Ry` headers reject; mRy remains source-preserved; conversion is factor 1000. | `tests/test_ht12_exchange_results.py` |
+| C2 tensor semantics | Raw `aij` remains distinct from derived full tensor; distinct nine-value ordering and missing-component failures are covered. | `tests/test_ht12_exchange_results.py` |
+| C3 pair geometry | Distance/displacement exports retain explicit length units. | `tests/test_ht12_exchange_results.py`, `tests/test_legacy_cli.py` |
+| C4 setup semantics | Valid unequal-count surface/impurity relationships pass; malformed counts fail. | `tests/test_setup_validation.py` |
+| C5 execution/convergence | Zero/converged, zero/non-converged, zero/unknown, malformed, nonzero, stale-report, and signaled cases remain distinct. | `tests/test_ht17_campaign.py` |
+| C6 authoritative reuse | Scientific-file edits, coordinated with historical manifest/hash edits, are rejected; runtime outputs and seeded stochastic reuse pass; unseeded stochastic reuse is rejected. | `tests/test_ht10_exchange_jobs.py`, `tests/test_ht16_campaign.py` |
+| C7 pair manifest | Canonical/compatibility pair-list tampering is rejected. | `tests/test_ht10_exchange_jobs.py`, `tests/test_ht12_exchange_results.py` |
+| C8 magnetic reference | `nsp=1..4`, missing `nsp`, conflicting SOC, noncollinearity, absent axes, and accidental FM inference are covered conservatively. | `tests/test_ht12_magnetic_reference.py`, `tests/test_ht09_exchange_symmetry.py` |
+| C9 Fortran containment | Worker fatal exit leaves the parent alive; failed candidates are not published. | `tests/test_fortran_setup_runner.py`, `tests/test_ht10_exchange_jobs.py` |
+| C10 provenance/randomness | Deterministic setup has reproducible identity without a meaningless seed; active unseeded stochastic setup is non-reproducible. | `tests/test_setup_validation.py` |
+| C11 paths/indexes | Unsafe paths and ambiguous index bases are rejected. | `tests/test_core_contracts.py`, `tests/test_ht09_exchange_symmetry.py` |
+| C12 installed artifact | Package and compiled extension resolve from external site-packages with no source shadowing. | R13 wheel lane; external full-suite run above |
+
+### Pilot and legacy compatibility
+
+`examples/campaigns/pilot.json` was generated twice into independent
+temporary roots. All three entry IDs, `lattice_new.nml` hashes,
+`input_new.nml` hashes, and scientific manifest fields matched, including the
+seeded SQS entry. The HT-17 controlled fixtures exercised both successful and
+intentional failure outcomes; they are state-machine evidence, not a claim of
+scientific RS-LMTO convergence.
+
+The installed-wheel legacy regression suite passed semantically for `rsutil
+-S` and `rsutil -J`, covering ordinary bulk, multisite/multispecies, seeded
+supercell/SQS, exchange generation, and the supported non-crashing unique/SOC
+interface. Compatibility is workflow/semantic compatibility, not byte-for-
+byte output identity.
+
+### Provenance and limitations
+
+No remote CI result was available from this checkout. The latest available
+remote branch reference is `origin/HT` at
+`54a279b6e00b5a51009626d94a16d1964149fc45`, which predates the closeout
+commits; no remote pass is claimed. CI configuration for the source and
+installed-wheel lanes is in `.github/workflows/build_pip.yaml`.
+
+Pilot readiness is restored only within the support matrix above. HCP and
+surface/impurity workflows remain restricted; full tensor exchange and
+automatic ASE setup remain experimental; generic noncollinear symmetry,
+conductivity, damping, AiiDA/UppASD integration, database backend, and ML
+training remain unsupported. The earlier R09 and HT-18 readiness claims are
+historical and superseded; they are preserved below for traceability.
 
 ## Historical HT-18 evidence (preserved)
 

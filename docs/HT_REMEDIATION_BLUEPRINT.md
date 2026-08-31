@@ -78,7 +78,7 @@ pre-remediation implementation.
 - [x] **HT-R11** — Authoritative regeneration-based reuse
 - [x] **HT-R12** — Magnetic-reference-aware symmetry contract
 - [x] **HT-R13** — Installed-wheel clean-environment verification
-- [ ] **HT-R14** — Final falsification closeout
+- [x] **HT-R14** — Final falsification closeout
 
 No task may be marked complete before its acceptance tests pass. The historical
 R09 checkbox is reopened because the post-R09 self-review found additional
@@ -563,13 +563,14 @@ the foundation is **ready for pilot use** within the support matrix in
 The earlier R09 conclusion is **superseded/reopened by the post-R09
 self-review**. Its historical evidence remains above and in
 [`HT_READINESS_REPORT.md`](HT_READINESS_REPORT.md); it is not current
-readiness evidence while the final closeout campaign is open.
+readiness evidence. The final closeout evidence below supersedes that
+historical decision within the stated support matrix.
 
 - [x] **HT-R10** — Interaction scientific contract closeout
 - [x] **HT-R11** — Authoritative regeneration-based reuse
 - [x] **HT-R12** — Magnetic-reference-aware symmetry contract
 - [x] **HT-R13** — Installed-wheel clean-environment verification
-- [ ] **HT-R14** — Final falsification closeout
+- [x] **HT-R14** — Final falsification closeout
 
 ### HT-R10 decision and evidence
 
@@ -699,4 +700,35 @@ pip check: No broken requirements found
 pytest: 162 passed, 15 warnings
 ```
 
-HT-R14 remains the only unchecked final-closeout item.
+### HT-R14 decision and evidence
+
+HT-R14 is closed. The final falsification pass was evaluated against code
+commit `8840afa6b0ac0ef707e2a414d8d205112faff866`, with the documentation
+closeout committed separately. The source checkout passed 162 tests with 15
+known spglib deprecation/user warnings. The clean external wheel environment
+also passed 162 tests with the same 15 warnings; `pip check` was clean and
+both the Python package and native extension resolved from site-packages.
+
+The mandatory negative controls were exercised by the focused suites and the
+full artifact suite: contradictory known-format units, raw-versus-derived
+tensor semantics and Fortran ordering, explicit pair geometry units, valid
+and malformed unequal-count setup relationships, every execution/convergence
+state, coordinated campaign/exchange tampering, pair-manifest tampering,
+all four `nsp` modes and conservative magnetic reduction, worker failure and
+transactional publication, seeded/unseeded reproducibility, path/index
+boundaries, and installed-artifact import provenance. No repaired contract
+collapsed into a misleading success.
+
+The deterministic `examples/campaigns/pilot.json` campaign was generated in
+two independent temporary roots. Entry IDs, generated scientific input
+hashes, and scientific manifest fields matched for all three entries,
+including the seeded SQS case. The existing HT-17 controlled execution
+fixtures cover converged, non-converged, unknown, malformed, nonzero-exit,
+stale-report, and signaled outcomes. Legacy `rsutil -S` and `rsutil -J`
+regressions passed semantically through the installed-wheel suite.
+
+No remote CI result was available from this checkout: `origin/HT` remains at
+`54a279b6e00b5a51009626d94a16d1964149fc45`, before the closeout commits. This
+is recorded as unavailable evidence, not as a remote pass claim. The support
+boundary and remaining unsupported domains are recorded in
+`docs/HT_READINESS_REPORT.md`.
