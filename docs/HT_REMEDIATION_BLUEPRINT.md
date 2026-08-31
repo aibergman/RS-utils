@@ -73,10 +73,11 @@ pre-remediation implementation.
 - [x] **HT-R06** — Complete transport/damping source audit against `fable_v4`
 - [x] **HT-R07** — Provenance, ASE, path, indexing, and dead-code cleanup
 - [x] **HT-R08** — Make packaging, test environment, and CI reproducible
-- [ ] **HT-R09** — True adversarial HT closeout and pilot evidence
+- [x] **HT-R09** — True adversarial HT closeout and pilot evidence
 
-No task may be marked complete before its acceptance tests pass. R04-R09 remain
-intentionally unchecked until their respective repairs are completed.
+No task may be marked complete before its acceptance tests pass. R09 is checked
+only because the closeout evidence below records its acceptance tests and
+pilot gate.
 
 ## Frozen adversarial blockers
 
@@ -454,3 +455,100 @@ The clean-environment commands are documented and wired into CI. The built
 wheel includes the compiled extension and imports successfully outside the
 source checkout; the temporary wheel check used the existing installed runtime
 libraries and did not claim a second dependency installation.
+
+## HT-R09 decision and evidence
+
+HT-R09 was completed as a falsification attempt against the R00-R08 release
+gates. No protected Fortran numerical source, algorithm, constant, tolerance,
+or formula was changed. The current readiness decision and support matrix are
+in [`HT_READINESS_REPORT.md`](HT_READINESS_REPORT.md); the historical HT-18
+evidence remains preserved there under its own heading.
+
+### Reproducible full-suite environment
+
+The closeout was run from the R08 environment using the repository's isolated
+PEP 517 wheel-build path and the documented test extra. The observed local
+environment was:
+
+```text
+Python 3.11.16       /Users/andersb/envs/p311/bin/python
+platform             macOS-26.5.2-arm64-arm-64bit (arm64)
+gfortran             GNU Fortran (Homebrew GCC 16.2.0)
+cmake                4.4.3
+install/build path   python -m build --wheel; temporary venv wheel import;
+                     pip install -e '.[test]' for the checkout test run
+```
+
+`python -m pytest -q` passed with **137 passed, 12 warnings** in 57.51 s.
+The warnings are the known spglib deprecation warnings listed by pytest. The
+focused adversarial/legacy suites passed with **86 passed, 12 warnings** in
+49.50 s, and the legacy CLI plus setup compatibility subset passed with
+**22 passed** in 37.73 s. No remote CI service was available from this
+environment; CI workflow configuration was inspected but no remote run is
+claimed.
+
+### Negative-control matrix
+
+The focused suite and direct parser control covered the required failure
+boundaries:
+
+| Control | Evidence | Result |
+| --- | --- | --- |
+| Ry/mRy mismatch or mixed declaration | `tests/test_ht12_exchange_results.py`; direct `jijso.out` mixed `Ry mRy` parser control | conflicting units rejected; conversion is explicit and `1 mRy = 0.001 Ry` |
+| Valid unequal counts / inconsistent counts | `tests/test_setup_validation.py::test_source_derived_surface_counts_can_differ`; `...::test_recursion_array_count_is_still_rejected`; `...::test_inconsistent_ntype_is_coded_as_a_semantic_error` | pass / rejected |
+| Exit 0 + `Not converged` | `tests/test_ht17_campaign.py::test_nonconverged_report_is_not_a_scientific_success` | non-converged |
+| Nonzero exit with stale good report | `tests/test_ht17_campaign.py::test_nonzero_exit_cannot_be_hidden_by_stale_parseable_report` | execution failure |
+| Malformed report | `tests/test_ht17_campaign.py::test_zero_exit_with_malformed_report_is_parser_failure` | parser invalid |
+| Unknown convergence | `tests/test_ht17_campaign.py::test_zero_exit_with_unknown_convergence_remains_explicit` | unknown, never success |
+| Reuse unchanged / mutated / missing materialized input | `tests/test_ht16_campaign.py` reuse parametrization and missing-input tests | unchanged reused; mutation/missing rejected |
+| Exchange duplicate, stale, or unauthenticated pair mapping | `tests/test_ht10_exchange_jobs.py` and `tests/test_ht12_exchange_results.py` tamper tests | rejected without replacement |
+| AFM/noncollinear symmetry; RS identity | `tests/test_ht08_exchange_service.py`, `tests/test_ht09_exchange_symmetry.py` | no unproven reduction; site/type identity preserved |
+| Worker `STOP`/failure isolation and partial publication | `tests/test_fortran_setup_runner.py` | parent survives; failed destination is not published |
+| Deterministic vs active stochastic unseeded setup | `tests/test_setup_validation.py` deterministic/stochastic manifest tests | deterministic reproducible; active stochastic marked nonreproducible |
+| Path escape and ambiguous indexing | `tests/test_core_contracts.py`; `tests/test_ht09_exchange_symmetry.py::test_reference_indices_require_an_explicit_index_base` | rejected |
+
+### Legacy compatibility
+
+`tests/test_legacy_cli.py` and the setup-validation compatibility cases passed
+for `rsutil -S`, `rsutil -J`, simple bulk, multisite/multispecies, seeded
+supercell, exchange jobs, and a source-derived valid unequal-count surface
+mode. Compatibility is semantic/workflow compatibility, not byte identity.
+
+### Independent pilot evidence
+
+A fresh controlled pilot was generated in two independent temporary roots.
+It contained bcc Fe, FeN multisite/multispecies, FePt SOC, seeded bcc
+`2x1x1` supercell/distortion, and a valid source-derived unequal-count
+surface mode. The real Fortran setup runner generated the first four cases;
+the surface fixture used a controlled setup runner because its purpose was to
+exercise the validated count semantics without asserting a scientific surface
+potential. The calculation stage used a deliberately controlled executable,
+not a scientific RS-LMTO run.
+
+The `lattice_new.nml` and `input_new.nml` SHA-256 hashes matched between both
+roots for every entry. The pipeline was exercised as generate -> render
+`submit_array.sbatch` -> execute controlled fixtures -> status -> collect.
+The controlled outcomes in each root were:
+
+```text
+returns             [0, 0, 0, 9, 0]
+statuses             COMPLETED_VALID, COMPLETED_NOT_CONVERGED,
+                     COMPLETED_INVALID, FAILED, COMPLETED_UNKNOWN
+scientific states    CONVERGED, NOT_CONVERGED, UNKNOWN,
+                     NOT_APPLICABLE, UNKNOWN
+scheduler state      not_queried
+collected success    bcc-fe only
+```
+
+The converged, non-converged, malformed, nonzero-exit, and unknown fixtures
+were intentional controls. They are evidence for state separation and
+collection behavior, not evidence of scientific convergence. No scheduler
+execution was claimed.
+
+### R09 gate decision
+
+R00-R08 are checked and their evidence sections were reread before this
+closeout. The full suite, focused negative controls, legacy compatibility
+subset, and independent deterministic pilot hash comparison passed. Therefore
+the foundation is **ready for pilot use** within the support matrix in
+`HT_READINESS_REPORT.md`; it is not a blanket production-readiness claim.

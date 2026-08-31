@@ -1,4 +1,117 @@
-# RS-utils HT readiness report — historical HT-18 evidence
+# RS-utils HT readiness report — current adversarial HT-R09 closeout
+
+> **HT FOUNDATION READY FOR PILOT USE — RESTRICTED BY THE SUPPORT MATRIX
+> BELOW; NOT A BLANKET SCIENTIFIC-PRODUCTION CLAIM.**
+>
+> HT-R09 re-ran the closeout as a falsification attempt after R00-R08. The
+> historical HT-18 record is retained below and is explicitly superseded for
+> current readiness decisions by this section. The protected Fortran numerical
+> kernel was not modified.
+
+## Current R09 closeout
+
+### Reproducible environment and test result
+
+The closeout ran from the R08 environment:
+
+```text
+Python 3.11.16       /Users/andersb/envs/p311/bin/python
+platform             macOS-26.5.2-arm64-arm-64bit (arm64)
+gfortran             GNU Fortran (Homebrew GCC 16.2.0)
+cmake                4.4.3
+build/install        python -m build --wheel; temporary venv wheel import;
+                     pip install -e '.[test]' for the checkout test run
+```
+
+The required full command, `python -m pytest -q`, passed: **137 passed, 12
+warnings** in 57.51 s. The warnings are known spglib deprecation warnings.
+The focused adversarial suites passed: **86 passed, 12 warnings** in 49.50 s;
+the legacy CLI/setup subset passed: **22 passed** in 37.73 s. No remote CI
+service was available, so no remote CI run is claimed; CI workflow coverage is
+documented by R08.
+
+### Negative controls
+
+| Contract boundary | Result and evidence |
+| --- | --- |
+| Units: wrong/mixed Ry vs mRy | Explicit conversion is required; `1 mRy -> 0.001 Ry`. A mixed `Ry mRy` `jijso.out` declaration was rejected. See `tests/test_ht12_exchange_results.py`. |
+| Unequal setup counts | Valid source-derived surface counts passed; missing recursion entries and inconsistent `ntype` were rejected. See `tests/test_setup_validation.py`. |
+| Execution/state separation | Exit 0 + `Not converged` => `COMPLETED_NOT_CONVERGED`; nonzero exit, including stale good output => `FAILED`; malformed => `COMPLETED_INVALID`; unknown convergence never succeeds. See `tests/test_ht17_campaign.py`. |
+| Reuse and identity | Unchanged materialized input reused; mutation or missing input rejected. See `tests/test_ht16_campaign.py`. |
+| Exchange mapping | Duplicate/stale/tampered or unauthenticated pair views rejected without replacement. See `tests/test_ht10_exchange_jobs.py` and `tests/test_ht12_exchange_results.py`. |
+| Magnetic symmetry and RS identity | AFM/noncollinear cases do not receive unproven reduction; site/type and distinct RS labels remain identity-bearing. See `tests/test_ht08_exchange_service.py` and `tests/test_ht09_exchange_symmetry.py`. |
+| Worker failure and publication | Worker failure/`STOP` is isolated from the parent and partial destinations are not published. See `tests/test_fortran_setup_runner.py`. |
+| Randomness | Unseeded deterministic setup is reproducible; active unseeded stochastic setup is marked nonreproducible. See `tests/test_setup_validation.py`. |
+| Paths and indexing | Absolute/`..`/symlink escapes and implicit index-base ambiguity are rejected. See `tests/test_core_contracts.py` and `tests/test_ht09_exchange_symmetry.py`. |
+
+### Legacy compatibility
+
+The legacy CLI/setup subset passed for `rsutil -S`, `rsutil -J`, simple bulk,
+multisite/multispecies, seeded supercell, exchange jobs, and a valid
+source-derived unequal-count surface mode. Compatibility is semantic and
+workflow-oriented, not byte-for-byte identity.
+
+### Independent controlled pilot
+
+The pilot was regenerated from scratch in two independent temporary roots. It
+contained bcc Fe, FeN multisite/multispecies, FePt SOC, seeded bcc `2x1x1`
+supercell/distortion, and a valid source-derived unequal-count surface mode.
+The real Fortran setup runner generated the first four cases. The surface
+fixture used a controlled setup runner to exercise count semantics without
+claiming a scientific surface-potential result. The calculation executable was
+deliberately controlled and is not a scientific RS-LMTO run.
+
+| Entry | `lattice_new.nml` SHA-256 | `input_new.nml` SHA-256 |
+| --- | --- | --- |
+| bcc-fe | `cc100ed40943999ef6c71c82f80af1c0d64bf7bc63bfc4e396e0da31db9fdb4d` | `482b23fcdde989a98ebb7a538f9b65b87166106f9d4844aebe362a99510cb41b` |
+| fen-multisite | `f38d20539652cf184c4932c86a3cdf2542f9c280ff2ab4d7221ef36345e80039` | `24e6536c6cab38eb99ff48730d65833b627667c57898070e1950dc66f4e183c0` |
+| fept-soc | `59c618d67a9c54c9060d001c8c78fc9d0bb97d0b7b91a5bde08f93a7ff0a36cd` | `038e56451fe05600347d8d99927da87c57b585124d119692083210503f9baf9a` |
+| bcc-seeded-supercell | `8e57ac5fe9efed5ff0e89fb8f9225cc4b48839a56d1e4b5910a442b1783bd6e4` | `4013b633cce85fa7a890b6016f256c1267a3f09befc864c86bb3a723d37efd3f` |
+| surface-unequal-counts | `186c3026e9dd288d554919b7d159abf809b41eee5fc9e71492756ab5828388d5` | `ed6e1819c39e9ffabf95ee74ffac73dfc67a2389a0093ca3f8bcf6f7a196148e` |
+
+Both roots matched byte hashes for every listed scientific input. The
+pipeline was exercised as `generate -> render -> fake/controlled execute ->
+status -> collect`; the rendered scheduler state remained `not_queried`.
+Controlled returns were `[0, 0, 0, 9, 0]`, producing respectively
+`COMPLETED_VALID`, `COMPLETED_NOT_CONVERGED`, `COMPLETED_INVALID`, `FAILED`,
+and `COMPLETED_UNKNOWN`. Only bcc Fe was collected as successful. These are
+state-machine controls, not scientific convergence evidence.
+
+## Current support matrix
+
+Statuses are deliberately limited to `READY`, `RESTRICTED`, `EXPERIMENTAL`,
+and `UNSUPPORTED`.
+
+| Capability | Status | Evidence and boundary |
+| --- | --- | --- |
+| Bulk setup | READY | Real Fortran worker and bcc/FeN/FePt fixtures pass; isolated and transactional. |
+| HCP setup | RESTRICTED | Generic lattice validation is covered, but no checked-in HCP end-to-end worker fixture is part of this closeout. |
+| Surface/impurity setup | RESTRICTED | Source-derived unequal-count surface and impurity semantics validate; surface potential generation is not claimed. |
+| Scalar exchange | READY | Canonical pair generation, manifests, and real MnSi result parsing pass. |
+| DMI | READY | MnSi `jijso.out` fixture parses with explicit mRy provenance. |
+| Full tensor exchange | EXPERIMENTAL | Explicit tensor parsing exists; unverified sources retain unknown units and require review. |
+| SOC symmetry | RESTRICTED | Proven only for the documented axial-`+z` collinear domain; axis-flipping operations are excluded. |
+| AFM/ferrimagnetic symmetry | RESTRICTED | Conservative identity/full-pair behavior is covered; no general magnetic reduction is claimed. |
+| Generic noncollinear symmetry | UNSUPPORTED | No general equivalence theorem is asserted; retain full inventory and require domain-specific review. |
+| SCF parsing/convergence | READY | Converged, non-converged, malformed, unknown, and execution-failure states are distinct and tested. |
+| Conductivity | UNSUPPORTED | Source audit found insufficient machine-readable unit/operator context; parser fails closed. |
+| Damping | UNSUPPORTED | Source audit found insufficient validated format/context; no scientific readiness claim. |
+| Versioned TB | READY | Versioned metadata, index base, units, provenance, and export tests pass. |
+| Legacy TB | RESTRICTED | Exact conversion/fail-closed geometry checks pass; legacy source formats require explicit review. |
+| ASE structure interop | READY | `Atoms <-> RSStructure` conversion and identity/unit contracts pass. |
+| ASE automatic setup | EXPERIMENTAL | Requires explicit opt-in and is documented as placeholder policy, not production setup generation. |
+| Campaign generation | READY | Deterministic identity, collision, reuse, and independent-root pilot checks pass. |
+| Slurm rendering | READY | Shell-safe array script/run-list rendering is tested locally. |
+| Slurm execution evidence | RESTRICTED | Controlled local execution evidence passes; no scheduler or remote cluster execution was available. |
+| Status/collection | READY | Filesystem-only status, parse failures, sidecars, hashes, and continuation behavior pass. |
+| AiiDA/UppASD integration | UNSUPPORTED | Outside the validated R00-R09 foundation boundary. |
+
+The R09 gate is satisfied for pilot use because R00-R08 are checked and the
+full suite, adversarial controls, compatibility subset, and independent pilot
+hash comparison all passed. This matrix is the operative current boundary;
+the historical HT-18 claims below are retained for traceability only.
+
+## Historical HT-18 evidence (preserved)
 
 > **REMEDIATION REQUIRED — THIS BRANCH IS NOT HT-READY FOR SCIENTIFIC
 > PRODUCTION.**

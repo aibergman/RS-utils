@@ -35,6 +35,14 @@ That repository is not modified by this task.
 The detailed contract is in [`HT_COMPATIBILITY_CONTRACT.md`](HT_COMPATIBILITY_CONTRACT.md).
 The checked-out-code inventory is in [`HT_BASELINE_INVENTORY.md`](HT_BASELINE_INVENTORY.md).
 
+## Adversarial remediation
+
+The historical HT-18 closeout is superseded for current readiness decisions by
+the adversarial remediation ledger in
+[`HT_REMEDIATION_BLUEPRINT.md`](HT_REMEDIATION_BLUEPRINT.md) and the current
+evidence report in [`HT_READINESS_REPORT.md`](HT_READINESS_REPORT.md). The
+historical HT-18 record remains preserved in that report.
+
 ## Protected Fortran-kernel policy
 
 The legacy Fortran sphere, empty-sphere, lattice/input I/O, and potential
