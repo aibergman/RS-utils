@@ -196,6 +196,29 @@ class RSStructure:
     def positions(self) -> tuple[tuple[float, float, float], ...]:
         return tuple(site.position for site in self.sites)
 
+    @classmethod
+    def from_ase(cls, atoms: Any) -> "RSStructure":
+        """Convert an ASE ``Atoms`` object through the optional adapter.
+
+        The import is deliberately local: importing :mod:`rsutil.core` does
+        not require ASE to be installed.  The implementation lives in
+        :mod:`rsutil.ase` so the core data model remains ASE-independent.
+        """
+
+        from rsutil.ase import from_ase
+
+        result = from_ase(atoms)
+        if not isinstance(result, cls):  # pragma: no cover - adapter contract guard
+            raise TypeError("ASE adapter returned an unexpected structure type")
+        return result
+
+    def to_ase(self) -> Any:
+        """Convert this structure through the optional ASE adapter."""
+
+        from rsutil.ase import to_ase
+
+        return to_ase(self)
+
     @property
     def elements(self) -> tuple[str, ...]:
         return tuple(site.element for site in self.sites)

@@ -69,6 +69,7 @@ setup(
         "spglib>=2.0.0",       # NEW - for symmetry operations
     ],
     extras_require={
+        "ase": ["ase>=3.22"],
         "full": ["pymatgen>=2022.0.0"],
         "dev": ["pytest>=6.0.0", "black", "flake8"],
     },
@@ -78,4 +79,3 @@ setup(
         ],
     },
 )
-

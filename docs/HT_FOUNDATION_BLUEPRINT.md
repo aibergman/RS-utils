@@ -62,7 +62,7 @@ filenames remain local to that workspace.
 - [x] **HT-12** — Exchange, DMI, and tensor result parsing
 - [x] **HT-13** — Transport and damping result contracts
 - [x] **HT-14** — Versioned TB model and ML export
-- [ ] **HT-15** — ASE structure interoperability
+- [x] **HT-15** — ASE structure interoperability
 - [ ] **HT-16** — Deterministic campaign specification and generation
 - [ ] **HT-17** — Slurm array rendering, status, and collection
 - [ ] **HT-18** — HT readiness closeout and pilot evidence
@@ -338,3 +338,14 @@ No scientific or functional code was changed for HT-00.
 - The upstream repository provides the writer but no committed generated
   versioned TB output fixture; the local fixture is an exact-schema,
   complex-valued regression fixture derived from that writer contract.
+
+### HT-15 decisions
+
+- Added an isolated, lazy-importing `rsutil.ase` adapter.  ASE Cartesian
+  positions/cells are recorded in explicit Å units; cell rows, PBC flags,
+  species, atom order, JSON-compatible `Atoms.info`, and per-atom arrays are
+  preserved without placing ASE objects in core contracts or manifests.
+- Added `ASESetupSource`/`run_setup_from_ase`, which serializes only the
+  existing `lattice.nml`/`input.nml` source contract and delegates execution to
+  `SetupService`.  Element potential files are not guessed and must be passed
+  as explicit runner resources.  No ASE calculator was added.

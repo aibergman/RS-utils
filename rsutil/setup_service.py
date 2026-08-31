@@ -13,7 +13,7 @@ import shutil
 import sys
 from dataclasses import replace
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Iterable, Mapping
 
 import numpy as np
 
@@ -392,6 +392,7 @@ class SetupService:
         backup: bool = False,
         workspace: str | Path | None = None,
         collision_policy: str = "error",
+        resources: Iterable[str | Path] = (),
     ) -> SetupResult:
         source = Path(source_dir).resolve()
         destination = Path(destination_dir).resolve()
@@ -444,7 +445,13 @@ class SetupService:
             else:
                 run_workspace = Path(workspace).resolve()
                 run_workspace.mkdir(parents=True, exist_ok=True)
-            result = self.runner.run(run_lattice, run_input, setup_spec, workspace=run_workspace)
+            runner_kwargs: dict[str, Any] = {"workspace": run_workspace}
+            # Keep compatibility with small injected test/custom runners that
+            # implement the pre-resource runner signature.
+            resource_paths = tuple(resources)
+            if resource_paths:
+                runner_kwargs["resources"] = resource_paths
+            result = self.runner.run(run_lattice, run_input, setup_spec, **runner_kwargs)
             if not result.success:
                 return self._with_manifest(result, source, input_nml, setup_spec)
 
