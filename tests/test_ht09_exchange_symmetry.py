@@ -234,6 +234,21 @@ def test_distinct_rs_labels_block_same_element_site_merging() -> None:
     assert all(operation.site_permutation == (0, 1) for operation in operations)
 
 
+def test_explicit_rs_type_indices_block_same_element_site_merging() -> None:
+    structure = Structure(
+        Lattice.cubic(2.86),
+        ["Mn", "Mn"],
+        [[0, 0, 0], [0.5, 0.5, 0.5]],
+    )
+    operations = periodic_symmetry_operations(
+        structure,
+        SpacegroupAnalyzer(structure),
+        site_identities=(("Mn", "Mn", 1), ("Mn", "Mn", 2)),
+    )
+
+    assert all(operation.site_permutation == (0, 1) for operation in operations)
+
+
 def test_missing_symmetry_analyzer_keeps_all_neighbors() -> None:
     structure = _bcc_fe()
     cluster = Molecule(

@@ -170,7 +170,7 @@ def discover_exact_unique_neighbors(
         magnetic_context=magnetic_context,
         magnetic_reference=magnetic_reference,
         site_identities=tuple(
-            (site.element, site.rs_label, site.rs_type)
+            (site.element, site.rs_label, site.rs_type_index)
             for site in canonical.sites
         ),
         tolerance=tolerance,

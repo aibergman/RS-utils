@@ -7,6 +7,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+import f90nml
 
 from rsutil.core import PairKey, RSStructure, StructureSite
 from rsutil.core.hashing import hash_json
@@ -28,23 +29,39 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def _mnsi_fixture_structure() -> RSStructure:
-    # The positions are the four-site Cartesian reference used by the real
-    # MnSi result rows; the table itself is intentionally not synthetic.
+    # The real export contains the four Mn RS types (1..4) as exchange
+    # endpoints.  Read their actual primitive-cell positions from the
+    # checked-in lattice fixture and preserve the source labels explicitly.
+    lattice = f90nml.read(str(ROOT / "examples" / "export" / "MnSi" / "lattice.nml"))["lattice"]
+    positions = lattice["crd"][:4]
+    type_indices = tuple(int(value) for value in lattice["izp"][:4])
+    labels = {index: f"Mn{index}" for index in type_indices}
     return RSStructure(
-        lattice_vectors=((1, 0, 0), (0, 1, 0), (0, 0, 1)),
+        lattice_vectors=tuple(tuple(float(value) for value in row) for row in lattice["a"]),
         length_unit="lattice",
         coordinate_convention="cartesian",
-        sites=(
-            StructureSite(0, (0, 0, 0), "Mn"),
-            StructureSite(1, (-0.5, 0.2238, -0.2762), "Si"),
-            StructureSite(2, (0.2238, -0.2762, -0.5), "Mn"),
-            StructureSite(3, (-0.2762, -0.5, 0.2238), "Si"),
+        sites=tuple(
+            StructureSite(
+                index,
+                tuple(float(value) for value in position),
+                "Mn",
+                rs_label=labels[type_index],
+                rs_type_index=type_index,
+            )
+            for index, (type_index, position) in enumerate(zip(type_indices, positions))
         ),
     )
 
 
 def test_real_jij_and_dmi_fixtures_map_to_periodic_pair_keys() -> None:
-    result = parse_exchange_results(ROOT / "examples" / "export" / "MnSi", structure=_mnsi_fixture_structure())
+    structure = _mnsi_fixture_structure()
+    assert [(site.rs_label, site.rs_type_index) for site in structure.sites] == [
+        ("Mn1", 1),
+        ("Mn2", 2),
+        ("Mn3", 3),
+        ("Mn4", 4),
+    ]
+    result = parse_exchange_results(ROOT / "examples" / "export" / "MnSi", structure=structure)
 
     assert len(result.records) == 584
     periodic = result.get(PairKey(0, 0, (-2, 0, 0)))
@@ -53,6 +70,9 @@ def test_real_jij_and_dmi_fixtures_map_to_periodic_pair_keys() -> None:
     assert periodic.J.value == pytest.approx(-0.00587)
     assert periodic.D is not None and periodic.D.unit is MILLI_RYDBERG
     assert periodic.D.value == pytest.approx((0.000054, -0.000041, 0.000138))
+    assert periodic.pair is not None
+    assert (periodic.pair.label_i, periodic.pair.label_j) == ("Mn1", "Mn1")
+    assert (periodic.pair.rs_type_i, periodic.pair.rs_type_j) == (1, 1)
     assert periodic.channel == "so"
     assert result.validation.valid
 

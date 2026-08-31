@@ -124,7 +124,7 @@ def build_rs_structure(lattice_nml: dict, input_nml: dict) -> RSStructure:
             rs_label=labels[type_index - 1],
             rs_type_index=type_index,
         )
-        for index, (type_index, position) in enumerate(zip(type_indices, basis, strict=True))
+        for index, (type_index, position) in enumerate(zip(type_indices, basis))
     )
     return RSStructure(
         lattice_vectors=tuple(tuple(float(value) for value in row) for row in lattice),
