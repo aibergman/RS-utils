@@ -61,7 +61,7 @@ filenames remain local to that workspace.
 - [x] **HT-11** — Result parser foundation and SCF model
 - [x] **HT-12** — Exchange, DMI, and tensor result parsing
 - [x] **HT-13** — Transport and damping result contracts
-- [ ] **HT-14** — Versioned TB model and ML export
+- [x] **HT-14** — Versioned TB model and ML export
 - [ ] **HT-15** — ASE structure interoperability
 - [ ] **HT-16** — Deterministic campaign specification and generation
 - [ ] **HT-17** — Slurm array rendering, status, and collection
@@ -313,3 +313,28 @@ No scientific or functional code was changed for HT-00.
 - The checked-out RS-utils tree contains no `fable_v4` source, conductivity/Kubo/KPM implementation, Gilbert-damping implementation, transport/damping writer, or corresponding fixture. No transport or damping text format is therefore production-supported; the evidence and future upstream requirement are recorded in `docs/HT_TRANSPORT_DAMPING_FORMATS.md`.
 - Added `rsutil.results.transport` with explicit `ConductivityResult` and `DampingResult` contracts. They require units, axes, component/index ordering, method, channel, approximation, and parser provenance, and validate the declared value shape.
 - Added a deliberately small registry and fail-closed parser entry points. Candidate files return `UNSUPPORTED_AMBIGUOUS` with output/input/lattice/manifest hashes and no guessed values; missing files remain explicit missing-file errors. No RS-LMTO scientific source was changed.
+
+### HT-14 decisions
+
+- Verified the external `fable_v4/source/hamiltonian_paoflow_io.f90` writer and
+  implemented its `rs-tb-meta-v1`/`rs-tb-hoppings-v1` pair. Metadata uses
+  Cartesian lattice/site coordinates, eV hopping values, one-based text
+  indices, and hopping records keyed by integer target-cell translation plus
+  site/local/global orbital fields. The exact schema is documented in
+  `docs/HT_TIGHT_BINDING.md`.
+- Added a dependency-light `TightBindingModel` with deterministic `H(R)`
+  identity/order, complex `H(k)` reconstruction, bands, provenance, and
+  optional Fermi metadata. The upstream versioned writer does not emit an
+  overlap matrix, so overlap remains absent rather than guessed.
+- Added deterministic compressed NPZ plus JSON ML export preserving
+  `(R, site_i, site_j, orbital_i, orbital_j)` and native complex values. No
+  HDF5/Zarr dependency was added. Legacy `rs2txt.dat` reading remains
+  unchanged; conversion is available only when periodic identity is
+  unambiguous.
+- `control%nsp` is not present in the current TB metadata writer. When an
+  input namelist is supplied, RS-utils records the explicit RS-LMTO rule:
+  `nsp=1` is magnetic collinear without SOC (GBT-compatible), while `nsp=2`
+  or `4` enables SOC. Missing `nsp` is reported as not encoded.
+- The upstream repository provides the writer but no committed generated
+  versioned TB output fixture; the local fixture is an exact-schema,
+  complex-valued regression fixture derived from that writer contract.
