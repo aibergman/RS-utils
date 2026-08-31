@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from rsutil.core import PairKey, RSStructure, StructureSite
+from rsutil.core.hashing import hash_json
 from rsutil.results import (
     InteractionMappingError,
     MILLI_RYDBERG,
@@ -96,6 +97,25 @@ def test_manifest_mapping_accepts_periodic_image_without_using_row_order(tmp_pat
     }
     result = parse_exchange_results(table, manifest, _mnsi_fixture_structure())
     assert result.pair_keys == (PairKey(0, 0, (-2, 0, 0)),)
+
+
+def test_parser_rejects_tampered_duplicate_pair_view(tmp_path: Path) -> None:
+    table = tmp_path / "jijso.out"
+    table.write_text("1 1 -2 0 0 -0.005870 2\n", encoding="utf-8")
+    manifest = {
+        "schema_version": "rsutil-exchange-v2",
+        "spec": {
+            "pair_keys": [{"i": 0, "j": 0, "R": [-2, 0, 0]}],
+            "legacy_ijpair": [[1], [1]],
+        },
+        "spec_hash": hash_json({
+            "pair_keys": [{"i": 0, "j": 0, "R": [-2, 0, 0]}],
+            "legacy_ijpair": [[1], [1]],
+        }),
+        "canonical_pair_list": [{"i": 0, "j": 0, "R": [2, 0, 0]}],
+    }
+    with pytest.raises(MalformedResultError, match="canonical_pair_list"):
+        parse_exchange_results(table, manifest=manifest, structure=_mnsi_fixture_structure())
 
 
 def test_tensor_rows_require_explicit_tensor_format_and_keep_field_distinct(tmp_path: Path) -> None:

@@ -68,7 +68,7 @@ pre-remediation implementation.
 - [x] **HT-R01** — Correct exchange/DMI/tensor units and unit evidence
 - [x] **HT-R02** — Restore complete RS-LMTO setup/lattice validation semantics
 - [x] **HT-R03** — Implement scientific campaign state and execution evidence
-- [ ] **HT-R04** — Harden manifests, pair identity, and reuse integrity
+- [x] **HT-R04** — Harden manifests, pair identity, and reuse integrity
 - [ ] **HT-R05** — Bound and harden exchange symmetry/magnetic-reference semantics
 - [ ] **HT-R06** — Complete transport/damping source audit against `fable_v4`
 - [ ] **HT-R07** — Provenance, ASE, path, indexing, and dead-code cleanup
@@ -265,3 +265,33 @@ tests/test_ht11_results.py    6 passed
 
 The authoritative evidence is the public `fable_v4` source links recorded in
 the contract above; the protected numerical Fortran kernel was not modified.
+
+## HT-R04 decision and evidence
+
+Exchange manifest schema `rsutil-exchange-v2` now treats the hashed
+`spec.pair_keys` list as the only authoritative pair identity. The retained
+top-level `canonical_pair_list`, `pair_keys`, and `legacy_ijpair` fields are
+validated compatibility views; both the job reader and result parser reject
+tampered or inconsistent views. Unambiguous v1 manifests remain readable,
+but no duplicated view is trusted without consistency validation.
+
+Campaign run manifests now use the `rsutil-campaign-run-v2` contract and
+record every setup-generated file in `campaign.materialized_inputs`, including
+its SHA-256 and size. `reuse_if_identical` verifies the requested entry and
+manifest identity, the materialized-input contract, every current file hash,
+the campaign integrity digest, and unexpected `.nml` files. It rejects missing, modified, or unrecorded
+scientific inputs with `OWNED_FILE_MISSING`, `INPUT_MODIFIED`, or
+`UNEXPECTED_OWNED_FILE` evidence. Runtime files such as reports and logs are
+outside this identity set and do not prevent valid reuse.
+
+Regression coverage includes tampered top-level and authoritative pair data,
+modified and missing generated campaign inputs, valid reuse, and runtime
+output added after generation. The required focused suites pass:
+
+```text
+tests/test_ht10_exchange_jobs.py      7 passed
+tests/test_ht12_exchange_results.py  10 passed
+tests/test_ht16_campaign.py           7 passed
+tests/test_ht17_campaign.py          12 passed
+full feasible suite                 120 passed, 10 warnings
+```

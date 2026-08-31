@@ -42,11 +42,13 @@ only when a header explicitly states it; it is not inferred from a filename.
 ## Pair mapping and validation
 
 Rows are mapped using the one-based indices plus Cartesian displacement against
-the canonical pair list in `rsutil_exchange_manifest.json` and the supplied
-reference structure.  A missing or mismatched/ambiguous mapping is fatal.  If
-no manifest is supplied, a reference structure is still required so the
-integer translation can be reconstructed from the displacement.  Row order
-and `Atom_*` directory names are never scientific identity.
+the authoritative `spec.pair_keys` list in `rsutil_exchange_manifest.json` and
+the supplied reference structure.  The manifest specification hash and any
+retained top-level compatibility pair views are checked before mapping. A
+missing or mismatched/ambiguous mapping is fatal. If no manifest is supplied,
+a reference structure is still required so the integer translation can be
+reconstructed from the displacement. Row order and `Atom_*` directory names
+are never scientific identity.
 
 Parser failures are raised as result-parser errors.  Physics validation is
 stored separately in `ExchangeSet.validation`: when both directions are

@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from ..core.hashing import hash_file
+from ..exchange.jobs import read_exchange_manifest
 from ..results import ConvergenceState, UnsupportedResultFormatError, parse_exchange_results, parse_run
 from .generation import CAMPAIGN_INDEX_FILENAME
 from .models import CampaignIndex, CampaignIndexEntry
@@ -655,10 +656,8 @@ def _exchange_subjobs(root: Path, run_dir: Path, entry_id: str, sidecar_root: Pa
             "manifest_hash": hash_file(manifest_path),
         }
         try:
-            manifest = _read_json(manifest_path)
-            pairs = manifest.get("canonical_pair_list", manifest.get("pair_keys", []))
-            if not isinstance(pairs, list):
-                raise ValueError("exchange manifest canonical pair list is not a list")
+            manifest = read_exchange_manifest(manifest_path)
+            pairs = manifest["spec"]["pair_keys"]
             item["canonical_pair_list"] = pairs
             result_paths = sorted(path for path in manifest_path.parent.iterdir() if path.is_file() and path.name.lower() in _EXCHANGE_RESULT_NAMES)
             if result_paths:

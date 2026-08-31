@@ -26,6 +26,7 @@ from .models import Campaign, CampaignEntry, CampaignIndex, CampaignIndexEntry
 
 CAMPAIGN_INDEX_FILENAME = "campaign_index.json"
 RUN_MANIFEST_FILENAME = "run_manifest.json"
+CAMPAIGN_RUN_MANIFEST_SCHEMA = "rsutil-campaign-run-v2"
 
 
 class CampaignError(RuntimeError):
@@ -226,6 +227,96 @@ def _read_run_manifest(path: Path) -> Mapping[str, Any]:
     return data
 
 
+def _campaign_manifest_hash(entry_id: str) -> str:
+    """Return the stable identity marker used by campaign run manifests."""
+
+    return scientific_hash({
+        "schema_version": CAMPAIGN_RUN_MANIFEST_SCHEMA,
+        "entry_id": entry_id,
+    })
+
+
+def _campaign_integrity_hash(manifest: Mapping[str, Any]) -> str:
+    """Hash the campaign identity and setup scientific identity fields."""
+
+    campaign = dict(manifest.get("campaign", {}))
+    campaign.pop("integrity_hash", None)
+    return scientific_hash({
+        "campaign": campaign,
+        "normalized_setup_spec": manifest.get("normalized_setup_spec"),
+        "structure_hash": manifest.get("structure_hash"),
+        "setup_identity_hash": manifest.get("setup_identity_hash"),
+        "input_hashes": manifest.get("input_hashes"),
+        "output_hashes": manifest.get("output_hashes"),
+    })
+
+
+def _validate_reusable_run(
+    run_dir: Path,
+    manifest: Mapping[str, Any],
+    *,
+    entry_id: str,
+    manifest_hash: str,
+) -> None:
+    """Prove that a generated run still owns the same scientific inputs."""
+
+    campaign_data = manifest.get("campaign")
+    if not isinstance(campaign_data, Mapping):
+        raise CampaignCollisionError(f"MANIFEST_MISMATCH: campaign metadata is missing: {run_dir}")
+    if campaign_data.get("schema_version") != CAMPAIGN_RUN_MANIFEST_SCHEMA:
+        raise CampaignCollisionError(
+            f"MANIFEST_MISMATCH: run manifest has no authenticated materialized-input contract: {run_dir}"
+        )
+    if campaign_data.get("entry_id") != entry_id or campaign_data.get("manifest_hash") != manifest_hash:
+        raise CampaignCollisionError(f"MANIFEST_MISMATCH: existing run is not the requested entry: {run_dir}")
+    if campaign_data.get("integrity_hash") != _campaign_integrity_hash(manifest):
+        raise CampaignCollisionError(f"MANIFEST_MISMATCH: campaign manifest integrity check failed: {run_dir}")
+
+    materialized = campaign_data.get("materialized_inputs")
+    output_hashes = manifest.get("output_hashes")
+    if not isinstance(materialized, Mapping) or not isinstance(output_hashes, Mapping):
+        raise CampaignCollisionError(f"MANIFEST_MISMATCH: materialized input hashes are missing: {run_dir}")
+    if dict(materialized) != dict(output_hashes):
+        raise CampaignCollisionError(
+            f"MANIFEST_MISMATCH: materialized input hashes disagree with the setup manifest: {run_dir}"
+        )
+
+    expected_names: set[str] = set()
+    for raw_name, record in materialized.items():
+        name = str(raw_name)
+        relative = Path(name)
+        if (
+            not name
+            or relative.is_absolute()
+            or ".." in relative.parts
+            or len(relative.parts) != 1
+            or not isinstance(record, Mapping)
+            or not isinstance(record.get("sha256"), str)
+        ):
+            raise CampaignCollisionError(f"MANIFEST_MISMATCH: invalid materialized input record {name!r}")
+        path = run_dir / relative
+        expected_names.add(name)
+        if path.is_symlink() or not path.is_file():
+            raise CampaignCollisionError(f"OWNED_FILE_MISSING: materialized input is missing: {path}")
+        try:
+            current_hash = hash_file(path)
+            current_size = path.stat().st_size
+        except OSError as exc:
+            raise CampaignCollisionError(f"OWNED_FILE_MISSING: cannot inspect materialized input: {path}") from exc
+        if current_hash != record["sha256"] or (
+            record.get("size") is not None and current_size != record["size"]
+        ):
+            raise CampaignCollisionError(f"INPUT_MODIFIED: materialized input differs from its manifest: {path}")
+
+    # Setup-generated namelists are scientific inputs.  Unexpected namelists
+    # are rejected, while runtime artifacts (.out, execution records, logs,
+    # etc.) remain outside the generation identity and may be added later.
+    if run_dir.is_dir():
+        for path in run_dir.rglob("*.nml"):
+            if path.is_file() and path.relative_to(run_dir).as_posix() not in expected_names:
+                raise CampaignCollisionError(f"UNEXPECTED_OWNED_FILE: unrecorded scientific input: {path}")
+
+
 def _logicalize_manifest_paths(value: Any, *, lattice: Path, input_nml: Path) -> Any:
     """Remove machine-local paths from diagnostic records in a run manifest."""
 
@@ -326,7 +417,7 @@ class CampaignGenerator:
             run_dir = (root / run_path).resolve()
             if root not in run_dir.parents:
                 raise CampaignError(f"destination naming escapes campaign root: {relative_run!r}")
-            manifest_hash = scientific_hash({"schema_version": "rsutil-run-v1", "entry_id": entry_id})
+            manifest_hash = _campaign_manifest_hash(entry_id)
             manifest_path = run_dir / RUN_MANIFEST_FILENAME
             if run_dir.exists():
                 if collision_policy == "error":
@@ -334,9 +425,12 @@ class CampaignGenerator:
                 if not manifest_path.is_file():
                     raise CampaignCollisionError(f"existing run directory has no campaign manifest: {run_dir}")
                 existing = _read_run_manifest(manifest_path)
-                existing_campaign = existing["campaign"]
-                if existing_campaign.get("entry_id") != entry_id or existing_campaign.get("manifest_hash") != manifest_hash:
-                    raise CampaignCollisionError(f"existing run directory is incompatible with entry {entry.name!r}: {run_dir}")
+                _validate_reusable_run(
+                    run_dir,
+                    existing,
+                    entry_id=entry_id,
+                    manifest_hash=manifest_hash,
+                )
                 index_entries.append(CampaignIndexEntry(
                     entry_id=entry_id,
                     name=entry.name,
@@ -364,10 +458,12 @@ class CampaignGenerator:
             run_manifest.setdefault("operation", "setup")
             run_manifest.setdefault("status", OperationStatus.SUCCESS.value)
             run_manifest["campaign"] = {
+                "schema_version": CAMPAIGN_RUN_MANIFEST_SCHEMA,
                 "campaign_name": campaign.name,
                 "entry_name": entry.name,
                 "entry_id": entry_id,
                 "manifest_hash": manifest_hash,
+                "materialized_inputs": dict(run_manifest.get("output_hashes", {})),
                 "source": _logical_source(campaign, entry, base),
                 "calculation": dict(campaign.calculation_template) | dict(entry.calculation),
                 "exchange": None if entry.exchange is None else dict(entry.exchange),
@@ -375,6 +471,7 @@ class CampaignGenerator:
             run_manifest = _logicalize_manifest_paths(
                 run_manifest, lattice=lattice, input_nml=input_nml
             )
+            run_manifest["campaign"]["integrity_hash"] = _campaign_integrity_hash(run_manifest)
             _atomic_json(manifest_path, run_manifest)
             index_entries.append(CampaignIndexEntry(
                 entry_id=entry_id,

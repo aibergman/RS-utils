@@ -9,7 +9,9 @@ import pytest
 
 from rsutil.exchange.jobs import (
     EXCHANGE_MANIFEST_FILENAME,
+    EXCHANGE_MANIFEST_SCHEMA,
     ExchangeCollisionError,
+    ExchangeManifestError,
     read_exchange_manifest,
 )
 from rsutil.exchange.service import ExchangeService
@@ -43,7 +45,7 @@ def test_manifest_is_canonical_and_identical_reuse_is_non_mutating(tmp_path: Pat
     before = manifest_path.read_bytes()
     manifest = read_exchange_manifest(manifest_path)
 
-    assert manifest["schema_version"] == "rsutil-exchange-v1"
+    assert manifest["schema_version"] == EXCHANGE_MANIFEST_SCHEMA
     assert manifest["canonical_pair_list"] == sorted(
         manifest["canonical_pair_list"],
         key=lambda item: (item["i"], item["j"], *item["R"]),
@@ -125,3 +127,27 @@ def test_manifest_ijpair_matches_generated_input(tmp_path: Path) -> None:
         generated = f90nml.read(atom / "input.nml")
         assert manifest["legacy_ijpair"] == generated["lattice"]["ijpair"]
         assert generated["lattice"]["njij"] == len(manifest["canonical_pair_list"])
+
+
+def test_tampered_compatibility_pair_view_is_rejected(tmp_path: Path) -> None:
+    _copy_exchange_fixture(tmp_path)
+    ExchangeService(tmp_path).generate(cutoff=1.0)
+    manifest_path = tmp_path / "Atom_1" / EXCHANGE_MANIFEST_FILENAME
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    payload["canonical_pair_list"][0]["R"][0] += 1
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ExchangeManifestError, match="canonical_pair_list|pair-list"):
+        read_exchange_manifest(manifest_path)
+
+
+def test_tampered_authoritative_pair_list_without_hash_update_is_rejected(tmp_path: Path) -> None:
+    _copy_exchange_fixture(tmp_path)
+    ExchangeService(tmp_path).generate(cutoff=1.0)
+    manifest_path = tmp_path / "Atom_1" / EXCHANGE_MANIFEST_FILENAME
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    payload["spec"]["pair_keys"][0]["R"][0] += 1
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ExchangeManifestError, match="specification hash"):
+        read_exchange_manifest(manifest_path)

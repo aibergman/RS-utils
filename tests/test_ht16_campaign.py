@@ -119,3 +119,64 @@ def test_modified_spec_under_explicit_same_name_path_is_a_collision(tmp_path: Pa
     generator.generate(first, tmp_path / "output", base_dir=tmp_path)
     with pytest.raises(CampaignCollisionError):
         generator.generate(second, tmp_path / "output", base_dir=tmp_path)
+
+
+@pytest.mark.parametrize("filename", ["lattice_new.nml", "input_new.nml"])
+def test_reuse_rejects_modified_materialized_input(tmp_path: Path, filename: str) -> None:
+    _source(tmp_path, "bccFe", "bcc")
+    _source(tmp_path, "FeN", "fen")
+    campaign = _campaign(tmp_path)
+    generator = CampaignGenerator(setup_service=SetupService(runner=_FakeRunner()))
+    destination = tmp_path / "output"
+    generated = generator.generate(campaign, destination, base_dir=tmp_path)
+    run_dir = destination / generated.entries[0].run_path
+    path = run_dir / filename
+    path.write_text(path.read_text(encoding="utf-8") + "\n! tampered\n", encoding="utf-8")
+
+    with pytest.raises(CampaignCollisionError, match="INPUT_MODIFIED"):
+        generator.generate(campaign, destination, base_dir=tmp_path)
+
+
+def test_reuse_rejects_missing_materialized_input(tmp_path: Path) -> None:
+    _source(tmp_path, "bccFe", "bcc")
+    _source(tmp_path, "FeN", "fen")
+    campaign = _campaign(tmp_path)
+    generator = CampaignGenerator(setup_service=SetupService(runner=_FakeRunner()))
+    destination = tmp_path / "output"
+    generated = generator.generate(campaign, destination, base_dir=tmp_path)
+    run_dir = destination / generated.entries[0].run_path
+    (run_dir / "input_new.nml").unlink()
+
+    with pytest.raises(CampaignCollisionError, match="OWNED_FILE_MISSING"):
+        generator.generate(campaign, destination, base_dir=tmp_path)
+
+
+def test_runtime_outputs_do_not_change_materialized_input_identity(tmp_path: Path) -> None:
+    _source(tmp_path, "bccFe", "bcc")
+    _source(tmp_path, "FeN", "fen")
+    campaign = _campaign(tmp_path)
+    generator = CampaignGenerator(setup_service=SetupService(runner=_FakeRunner()))
+    destination = tmp_path / "output"
+    generated = generator.generate(campaign, destination, base_dir=tmp_path)
+    run_dir = destination / generated.entries[0].run_path
+    (run_dir / "report.out").write_text("runtime output\n", encoding="utf-8")
+
+    reused = generator.generate(campaign, destination, base_dir=tmp_path)
+
+    assert reused.entries[0].entry_id == generated.entries[0].entry_id
+
+
+def test_reuse_rejects_tampered_campaign_manifest_metadata(tmp_path: Path) -> None:
+    _source(tmp_path, "bccFe", "bcc")
+    _source(tmp_path, "FeN", "fen")
+    campaign = _campaign(tmp_path)
+    generator = CampaignGenerator(setup_service=SetupService(runner=_FakeRunner()))
+    destination = tmp_path / "output"
+    generated = generator.generate(campaign, destination, base_dir=tmp_path)
+    manifest_path = destination / generated.entries[0].manifest_path
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    payload["campaign"]["calculation"]["mode"] = "tampered"
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(CampaignCollisionError, match="MANIFEST_MISMATCH"):
+        generator.generate(campaign, destination, base_dir=tmp_path)

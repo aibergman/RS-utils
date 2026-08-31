@@ -6,6 +6,7 @@ not execute RS-LMTO jobs or provide workflow/scheduler functionality.
 
 from .generation import (
     CAMPAIGN_INDEX_FILENAME,
+    CAMPAIGN_RUN_MANIFEST_SCHEMA,
     RUN_MANIFEST_FILENAME,
     CampaignCollisionError,
     CampaignError,
@@ -66,6 +67,7 @@ from .ht17 import (
 
 __all__ = [
     "CAMPAIGN_INDEX_FILENAME",
+    "CAMPAIGN_RUN_MANIFEST_SCHEMA",
     "CAMPAIGN_SCHEMA_VERSION",
     "RUN_MANIFEST_FILENAME",
     "Campaign",

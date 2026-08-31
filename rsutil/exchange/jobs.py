@@ -20,7 +20,8 @@ from .pairs import map_cluster_neighbor
 
 
 EXCHANGE_MANIFEST_FILENAME = "rsutil_exchange_manifest.json"
-EXCHANGE_MANIFEST_SCHEMA = "rsutil-exchange-v1"
+EXCHANGE_MANIFEST_SCHEMA = "rsutil-exchange-v2"
+_SUPPORTED_EXCHANGE_MANIFEST_SCHEMAS = frozenset({"rsutil-exchange-v1", EXCHANGE_MANIFEST_SCHEMA})
 _COLLISION_POLICIES = frozenset({"error", "replace_generated", "reuse_if_identical"})
 
 
@@ -302,7 +303,7 @@ def read_exchange_manifest(path: str | Path) -> dict[str, Any]:
         raise ExchangeManifestError(f"could not read exchange manifest {manifest_path}") from exc
     if not isinstance(manifest, dict):
         raise ExchangeManifestError(f"exchange manifest is not an object: {manifest_path}")
-    if manifest.get("schema_version") != EXCHANGE_MANIFEST_SCHEMA:
+    if manifest.get("schema_version") not in _SUPPORTED_EXCHANGE_MANIFEST_SCHEMAS:
         raise ExchangeManifestError(
             f"unsupported exchange manifest schema in {manifest_path}: "
             f"{manifest.get('schema_version')!r}"
@@ -313,7 +314,41 @@ def read_exchange_manifest(path: str | Path) -> dict[str, Any]:
         raise ExchangeManifestError(f"exchange manifest has no valid specification: {manifest_path}")
     if hash_json(manifest["spec"]) != manifest["spec_hash"]:
         raise ExchangeManifestError(f"exchange manifest specification hash is invalid: {manifest_path}")
+    _validate_manifest_pair_identity(manifest, manifest_path)
     return manifest
+
+
+def _validate_manifest_pair_identity(
+    manifest: Mapping[str, Any], source: str | Path = "exchange manifest"
+) -> list[dict[str, Any]]:
+    """Validate pair compatibility views against the hashed specification.
+
+    ``spec.pair_keys`` is the sole scientific identity.  The top-level views
+    are retained for compatibility with older consumers, but are never
+    authoritative.
+    """
+
+    spec = manifest.get("spec")
+    if not isinstance(spec, Mapping) or not isinstance(spec.get("pair_keys"), list):
+        raise ExchangeManifestError(f"{source} has no authoritative spec.pair_keys")
+    authoritative = spec["pair_keys"]
+    for name in ("canonical_pair_list", "pair_keys"):
+        view = manifest.get(name)
+        if view is not None and view != authoritative:
+            raise ExchangeManifestError(
+                f"{source} {name} does not match authoritative spec.pair_keys"
+            )
+    legacy = manifest.get("legacy_ijpair")
+    if legacy is not None and legacy != spec.get("legacy_ijpair"):
+        raise ExchangeManifestError(
+            f"{source} legacy_ijpair does not match the hashed specification"
+        )
+    try:
+        for item in authoritative:
+            PairKey.from_dict(item)
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ExchangeManifestError(f"{source} contains invalid canonical pair keys") from exc
+    return authoritative
 
 
 def _validate_exchange_input(path: Path, job: ExchangeJobSpec) -> None:
@@ -364,7 +399,8 @@ def _validate_staged_job(stage_dir: Path, job: ExchangeJobSpec, manifest: Mappin
     except (OSError, ValueError, TypeError, KeyError) as exc:
         raise ExchangeManifestError(f"staged exchange job contains unreadable namelists") from exc
     expected_pairs = [key.to_dict() for key in job.canonical_pair_list]
-    if manifest.get("canonical_pair_list") != expected_pairs:
+    authoritative_pairs = _validate_manifest_pair_identity(manifest)
+    if authoritative_pairs != expected_pairs:
         raise ExchangeManifestError("exchange manifest canonical pair list is inconsistent")
     if manifest.get("legacy_ijpair") != [
         [job.atom_index] * len(job.matching_indices),

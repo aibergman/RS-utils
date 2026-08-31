@@ -18,6 +18,7 @@ from typing import Any, Mapping, Sequence
 import numpy as np
 
 from rsutil.core import ExchangePair, PairKey, RSStructure
+from rsutil.core.hashing import hash_json
 
 from .errors import (
     InteractionMappingError,
@@ -40,7 +41,7 @@ from .units import MILLI_RYDBERG, Quantity, UNKNOWN_UNIT, Unit, scalar, vector
 _NUMBER = r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[EeDd][+-]?\d+)?"
 _NUMBER_RE = re.compile(rf"^{_NUMBER}$")
 _MANIFEST_NAME = "rsutil_exchange_manifest.json"
-_SCHEMA = "rsutil-exchange-v1"
+_SCHEMAS = frozenset({"rsutil-exchange-v1", "rsutil-exchange-v2"})
 _FABLE_V4_MRY_STEMS = frozenset(
     {
         "jij",
@@ -271,9 +272,32 @@ def _load_manifest(value: str | Path | Mapping[str, Any] | None) -> dict[str, An
             data = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise MalformedResultError(f"could not read exchange manifest {path}: {exc}") from exc
-    if not isinstance(data, dict) or data.get("schema_version") != _SCHEMA:
+    if not isinstance(data, dict) or data.get("schema_version") not in _SCHEMAS:
         raise UnsupportedResultFormatError("unsupported or malformed exchange manifest schema")
-    keys = data.get("canonical_pair_list", data.get("pair_keys"))
+    spec = data.get("spec")
+    if spec is not None:
+        if not isinstance(spec, Mapping) or not isinstance(data.get("spec_hash"), str):
+            raise MalformedResultError("exchange manifest has an incomplete specification")
+        if hash_json(spec) != data["spec_hash"]:
+            raise MalformedResultError("exchange manifest specification hash is invalid")
+        keys = spec.get("pair_keys")
+        if not isinstance(keys, list):
+            raise MalformedResultError("exchange manifest spec has no pair_keys")
+        for name in ("canonical_pair_list", "pair_keys"):
+            view = data.get(name)
+            if view is not None and view != keys:
+                raise MalformedResultError(
+                    f"exchange manifest {name} does not match spec.pair_keys"
+                )
+        if data.get("legacy_ijpair") is not None and data["legacy_ijpair"] != spec.get("legacy_ijpair"):
+            raise MalformedResultError("exchange manifest legacy_ijpair does not match spec")
+    else:
+        # Older hand-authored parser manifests may contain only one pair-list
+        # view.  If compatibility views are duplicated, they must still agree.
+        keys = data.get("canonical_pair_list", data.get("pair_keys"))
+        if data.get("canonical_pair_list") is not None and data.get("pair_keys") is not None:
+            if data["canonical_pair_list"] != data["pair_keys"]:
+                raise MalformedResultError("exchange manifest pair-list views disagree")
     if not isinstance(keys, list):
         raise MalformedResultError("exchange manifest has no canonical_pair_list")
     try:
