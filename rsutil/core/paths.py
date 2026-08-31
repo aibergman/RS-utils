@@ -12,10 +12,10 @@ import shutil
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterable, Iterator
+from typing import Iterable, Iterator, Union
 
 
-PathLike = str | os.PathLike[str]
+PathLike = Union[str, os.PathLike[str]]
 
 
 def as_path(path: PathLike) -> Path:

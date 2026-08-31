@@ -1,10 +1,29 @@
 import os
+import re
 import sys
 import subprocess
 import glob
+from pathlib import Path
 import setuptools
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
+
+
+def _package_version() -> str:
+    """Read the package version without importing the package during setup."""
+
+    version_file = Path(__file__).parent / "rsutil" / "_version.py"
+    match = re.search(
+        r"^__version__\s*=\s*[\"']([^\"']+)[\"']",
+        version_file.read_text(),
+        re.MULTILINE,
+    )
+    if match is None:
+        raise RuntimeError(f"Could not read package version from {version_file}")
+    return match.group(1)
+
+
+PACKAGE_VERSION = _package_version()
 
 
 RUNTIME_REQUIRES = [
@@ -68,7 +87,7 @@ class CMakeBuild(build_ext):
 
 setup(
     name="rsutil",
-    version="0.10.0",  # Bump version for new band/DOS features
+    version=PACKAGE_VERSION,
     author="Anders Bergman",
     author_email="anders.bergman@physics.uu.se",
     description="Utilities for the RS-LMTO code including band structure and DOS analysis",
@@ -88,6 +107,7 @@ setup(
         "test": TEST_REQUIRES,
         "full": [*BANDS_REQUIRES, "ase>=3.22", "pyvista"],
         "dev": [*TEST_REQUIRES, "black", "flake8"],
+        "docs": ["sphinx", "myst-parser", "sphinx-rtd-theme", "sphinx-autodoc-typehints"],
     },
     entry_points={
         "console_scripts": [

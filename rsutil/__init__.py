@@ -51,7 +51,7 @@ import ctypes
 import importlib
 from typing import Optional
 
-__version__ = "0.10.0"
+from ._version import __version__
 
 from .setup_runner import FortranSetupRunner
 from .setup_service import SetupService, run_setup

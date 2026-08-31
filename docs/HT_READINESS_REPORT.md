@@ -3,12 +3,16 @@
 > **READY FOR PILOT HT USE WITHIN THE DOCUMENTED SUPPORT MATRIX — HT-R17
 > COMPLETE.**
 
+**RS-utils 0.11.0rc1 is ready for controlled pilot high-throughput RS-LMTO
+workflows within the explicitly documented support matrix.**
+
 The R15/R16 identity, ownership, and magnetic-context shape-up is complete.
-The installed-wheel closeout passed 177 tests with 16 known spglib deprecation
-warnings. The wheel was `rsutil-0.10.0-cp311-cp311-macosx_26_0_arm64.whl`;
-both the Python package and compiled extension resolved from the external
-environment's site-packages with `PYTHONPATH` removed. The source checkout
-suite passed the same 177 tests and warning count.
+The installed-wheel evidence described in this report predates this release
+candidate. The recorded `0.10.0` wheel and its 177-test closeout are retained
+as historical qualification evidence, not as the current package version.
+The current REL-01 release evidence is recorded in `docs/RELEASE_CHECKLIST.md`:
+the source and installed-wheel suites each passed 179 tests with 16 known
+warnings, and the warnings-as-errors documentation build passed.
 >
 > The earlier R09 conclusion is superseded/reopened by the post-R09
 > self-review. Its historical evidence is retained below, but it must not be
@@ -303,9 +307,10 @@ historical and superseded; they are preserved below for traceability.
 > units, setup validation semantics, campaign state, execution evidence,
 > manifest/reuse integrity, magnetic symmetry scope, source-format evidence,
 > provenance, ASE setup policy, and clean-checkout reproducibility. See
-> [`HT_REMEDIATION_BLUEPRINT.md`](HT_REMEDIATION_BLUEPRINT.md) for the frozen
-> acceptance criteria and remediation ledger. The statuses and test results
-> below must not be interpreted as a current production-readiness claim.
+> The frozen acceptance criteria and remediation ledger remain in the
+> repository’s `HT_REMEDIATION_BLUEPRINT.md` provenance document. The statuses
+> and test results below must not be interpreted as a current
+> production-readiness claim.
 
 ## Scope and provenance
 

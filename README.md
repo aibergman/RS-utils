@@ -2,6 +2,11 @@
 
 RS-utils is a Python + Fortran toolkit for RS-LMTO workflows. It now includes a pure-Python band structure and DOS analysis module alongside the existing Fortran utilities for lattice setup and exchange/export workflows.
 
+> **HT pilot release:** RS-utils `0.11.0rc1` is ready for controlled
+> high-throughput RS-LMTO use within the documented support matrix. Start with
+> the [HT quick start](docs/HT_QUICKSTART.md) and review the [HT readiness
+> report](docs/HT_READINESS_REPORT.md).
+
 ## Components
 
 - **Band/DOS analysis (Python):**
@@ -26,7 +31,13 @@ RS-utils is a Python + Fortran toolkit for RS-LMTO workflows. It now includes a 
 
 ## Build and Installation
 
-### Python package (recommended)
+### Release wheel (recommended for users)
+
+Install the `0.11.0rc1` release wheel in a dedicated virtual environment;
+see the [HT quick start](docs/HT_QUICKSTART.md) for the cluster deployment
+model.
+
+### Developer checkout
 
 ```bash
 pip install -e .
@@ -107,6 +118,11 @@ rsutil --lmto47 --nspin 2 --lmx 3 --out lmto47_out
 # LMTO47 export from staged supercell (non-destructive by default)
 rsutil --lmto47 --supercell 2 2 2 --out lmto47_out
 ```
+
+Existing UppASD export functionality remains available, but automated UppASD
+integration is not currently part of the validated `0.11.0rc1` HT campaign
+workflow. RS-utils does not claim an automatic `SCF -> exchange -> UppASD`
+pipeline.
 
 ### Visualization workflows (`--lattice`, `--clust`)
 

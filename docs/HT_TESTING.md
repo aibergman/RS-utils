@@ -94,5 +94,6 @@ The optional extras are:
 - `test` for the complete checked-in pytest suite;
 - `full` for all optional runtime features.
 
-The package remains at version `0.10.0` for this remediation. No release is
-being cut by R08, so a version bump is deferred to the next release decision.
+The release candidate package version is `0.11.0rc1`. The wheel and installed
+artifact checks in this page are the release evidence path; the editable
+installation above remains the developer/source-test workflow.
