@@ -75,7 +75,7 @@ pre-remediation implementation.
 - [x] **HT-R08** — Make packaging, test environment, and CI reproducible
 - [ ] **HT-R09** — True adversarial HT closeout and pilot evidence *(superseded/reopened by post-R09 self-review; historical evidence preserved below)*
 - [x] **HT-R10** — Interaction scientific contract closeout
-- [ ] **HT-R11** — Authoritative regeneration-based reuse
+- [x] **HT-R11** — Authoritative regeneration-based reuse
 - [ ] **HT-R12** — Magnetic-reference-aware symmetry contract
 - [ ] **HT-R13** — Installed-wheel clean-environment verification
 - [ ] **HT-R14** — Final falsification closeout
@@ -566,7 +566,7 @@ self-review**. Its historical evidence remains above and in
 readiness evidence while the final closeout campaign is open.
 
 - [x] **HT-R10** — Interaction scientific contract closeout
-- [ ] **HT-R11** — Authoritative regeneration-based reuse
+- [x] **HT-R11** — Authoritative regeneration-based reuse
 - [ ] **HT-R12** — Magnetic-reference-aware symmetry contract
 - [ ] **HT-R13** — Installed-wheel clean-environment verification
 - [ ] **HT-R14** — Final falsification closeout
@@ -601,4 +601,32 @@ python -m pytest -q tests/test_ht12_exchange_results.py tests/test_ht07_pair_ide
 28 passed
 python -m pytest -q
 144 passed, 12 warnings
+```
+
+### HT-R11 decision and evidence
+
+HT-R11 is closed for campaign and exchange reuse. Campaign reuse now
+regenerates each setup in an isolated candidate directory from the current
+source and `CampaignEntry` setup specification, then compares the candidate's
+immutable output hashes and stable setup identity with the existing run.
+Exchange reuse already stages a fresh candidate; it now compares destination
+files against that candidate's hashes rather than hashes read from the old
+destination manifest. Both paths reject unseeded stochastic generation and
+allow runtime artifacts outside the immutable generated-file contract. The
+campaign path rejects unseeded stochastic generation conservatively.
+
+The historical manifest integrity hash remains useful as tamper evidence, but
+is not a root of trust: a manifest can self-consistently record a coordinated
+file edit. The fresh-regeneration contract is recorded as
+`fresh_regeneration_v1` in campaign manifests and is documented in
+`HT_CAMPAIGNS.md` and `HT_EXCHANGE_JOBS.md`.
+
+Focused R11 evidence includes negative controls that modify both a generated
+scientific file and its historical hash record; both are rejected against
+freshly generated expectations. Positive controls cover campaign and exchange
+runtime outputs and seeded stochastic campaign reuse:
+
+```text
+python -m pytest -q tests/test_ht10_exchange_jobs.py tests/test_ht16_campaign.py
+21 passed, 1 warning
 ```

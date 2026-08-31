@@ -26,7 +26,7 @@ The Python API accepts these collision policies:
 |---|---|
 | `error` | Refuse any existing destination. |
 | `replace_generated` | Replace only an existing rsutil-owned directory. The old directory is held as a rollback backup until the full commit succeeds. |
-| `reuse_if_identical` | Reuse an owned directory only when its specification hash, compatibility views, expected file set, and current generated-file hashes match exactly. |
+| `reuse_if_identical` | Stage the current job afresh and reuse an owned directory only when its specification hash, expected immutable file set, and fresh candidate hashes match exactly. |
 
 Unmarked legacy or user directories are never deleted by default. The explicit
 `force_legacy_collision=True` API option, or the legacy CLI option
@@ -35,6 +35,11 @@ uses `replace_generated`, so clean `Atom_*` creation remains familiar and
 previously generated rsutil jobs can be regenerated safely.
 
 All job directories are populated and semantically checked in a same-filesystem
-staging area before any destination is changed. A staging or validation error
+staging area before any destination is changed. That fresh staged candidate is
+the authority for `reuse_if_identical`; the old directory manifest is only an
+ownership/specification marker, so changing both an existing scientific file
+and its historical manifest hash cannot make reuse succeed. Runtime outputs
+(`*.out`, `*.log`, and `rsutil_execution.json`) are allowed to accumulate
+without changing generated-job identity. A staging or validation error
 therefore leaves existing job directories untouched; a commit error rolls back
 already-replaced directories where the filesystem permits.

@@ -23,6 +23,31 @@ EXCHANGE_MANIFEST_FILENAME = "rsutil_exchange_manifest.json"
 EXCHANGE_MANIFEST_SCHEMA = "rsutil-exchange-v2"
 _SUPPORTED_EXCHANGE_MANIFEST_SCHEMAS = frozenset({"rsutil-exchange-v1", EXCHANGE_MANIFEST_SCHEMA})
 _COLLISION_POLICIES = frozenset({"error", "replace_generated", "reuse_if_identical"})
+_RUNTIME_OUTPUT_NAMES = frozenset(
+    {
+        "report.out",
+        "out.scf",
+        "out.cold",
+        "rsutil_execution.json",
+        "jij.out",
+        "jijso.out",
+        "jijfo.out",
+        "dij.out",
+        "dijso.out",
+        "dijfo.out",
+        "aij.out",
+        "aijso.out",
+        "aijfo.out",
+        "jtens.out",
+    }
+)
+_RUNTIME_OUTPUT_SUFFIXES = frozenset({".log", ".out"})
+
+
+def _is_runtime_output_name(name: str) -> bool:
+    """Return whether an unowned directory entry is a post-generation artifact."""
+
+    return name in _RUNTIME_OUTPUT_NAMES or Path(name).suffix.lower() in _RUNTIME_OUTPUT_SUFFIXES
 
 
 class ExchangeJobError(RuntimeError):
@@ -562,11 +587,16 @@ def _write_exchange_jobs(
                         EXCHANGE_MANIFEST_FILENAME,
                     }
                     actual_names = {item.name for item in destination.iterdir()}
-                    if actual_names != expected_names or not _existing_files_match_manifest(
-                        destination, owned, expected_names
+                    unexpected = {
+                        name for name in actual_names - expected_names
+                        if not _is_runtime_output_name(name)
+                    }
+                    if unexpected or not _existing_files_match_manifest(
+                        destination, manifest, expected_names
                     ):
                         raise ExchangeCollisionError(
-                            f"existing exchange job contains unexpected/stale files or hash mismatches; "
+                            f"existing exchange job contains unexpected/stale files or hash mismatches against "
+                            f"freshly generated inputs; "
                             f"use collision_policy='replace_generated': {destination}"
                         )
                     reused.append(destination)

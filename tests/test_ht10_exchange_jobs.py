@@ -15,6 +15,7 @@ from rsutil.exchange.jobs import (
     read_exchange_manifest,
 )
 from rsutil.exchange.service import ExchangeService
+from rsutil.core.hashing import hash_file
 
 from .conftest import copy_example_files
 
@@ -57,6 +58,37 @@ def test_manifest_is_canonical_and_identical_reuse_is_non_mutating(tmp_path: Pat
     assert second.write_result is not None
     assert tmp_path / "Atom_1" in second.write_result.reused
     assert manifest_path.read_bytes() == before
+
+
+def test_runtime_outputs_are_ignored_during_identical_reuse(tmp_path: Path) -> None:
+    _copy_exchange_fixture(tmp_path)
+    service = ExchangeService(tmp_path)
+    service.generate(cutoff=1.0)
+    runtime_output = tmp_path / "Atom_1" / "runtime.log"
+    runtime_output.write_text("solver log\n", encoding="utf-8")
+
+    result = service.generate(cutoff=1.0, collision_policy="reuse_if_identical")
+
+    assert result.write_result is not None
+    assert tmp_path / "Atom_1" in result.write_result.reused
+    assert runtime_output.read_text(encoding="utf-8") == "solver log\n"
+
+
+def test_reuse_rejects_coordinated_input_and_historical_manifest_tampering(tmp_path: Path) -> None:
+    _copy_exchange_fixture(tmp_path)
+    service = ExchangeService(tmp_path)
+    service.generate(cutoff=1.0)
+    atom = tmp_path / "Atom_1"
+    manifest_path = atom / EXCHANGE_MANIFEST_FILENAME
+    tampered = atom / "input.nml"
+    tampered.write_text(tampered.read_text(encoding="utf-8") + "\n! tampered\n", encoding="utf-8")
+
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    payload["files"]["input.nml"] = hash_file(tampered)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ExchangeCollisionError, match="freshly generated inputs"):
+        service.generate(cutoff=1.0, collision_policy="reuse_if_identical")
 
 
 def test_changed_pair_set_rejects_stale_reuse_and_does_not_replace_job(tmp_path: Path) -> None:

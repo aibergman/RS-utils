@@ -8,8 +8,10 @@ from pathlib import Path
 
 import pytest
 
-from rsutil.campaign import Campaign, CampaignCollisionError, CampaignGenerator
+from rsutil.campaign import Campaign, CampaignCollisionError, CampaignError, CampaignGenerator
 from rsutil.core import OperationStatus, SetupResult, ValidationResult
+from rsutil.core.hashing import hash_file
+from rsutil.campaign.generation import _campaign_integrity_hash
 from rsutil.setup import SetupService
 
 from .conftest import copy_example_files
@@ -164,6 +166,53 @@ def test_runtime_outputs_do_not_change_materialized_input_identity(tmp_path: Pat
     reused = generator.generate(campaign, destination, base_dir=tmp_path)
 
     assert reused.entries[0].entry_id == generated.entries[0].entry_id
+
+
+def test_reuse_rejects_coordinated_input_and_historical_manifest_tampering(tmp_path: Path) -> None:
+    _source(tmp_path, "bccFe", "bcc")
+    _source(tmp_path, "FeN", "fen")
+    campaign = _campaign(tmp_path)
+    generator = CampaignGenerator(setup_service=SetupService(runner=_FakeRunner()))
+    destination = tmp_path / "output"
+    generated = generator.generate(campaign, destination, base_dir=tmp_path)
+    run_dir = destination / generated.entries[0].run_path
+    manifest_path = destination / generated.entries[0].manifest_path
+    tampered = run_dir / "input_new.nml"
+    tampered.write_text("&atoms\n label(1) = 'Ni'\n/\n", encoding="utf-8")
+
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    record = {"sha256": hash_file(tampered), "size": tampered.stat().st_size}
+    payload["output_hashes"]["input_new.nml"] = record
+    payload["campaign"]["materialized_inputs"]["input_new.nml"] = record
+    payload["campaign"]["integrity_hash"] = _campaign_integrity_hash(payload)
+    manifest_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(CampaignCollisionError, match="INPUT_MODIFIED"):
+        generator.generate(campaign, destination, base_dir=tmp_path)
+
+
+def test_seeded_stochastic_generation_can_be_reused(tmp_path: Path) -> None:
+    _source(tmp_path, "bccFe", "bcc")
+    _source(tmp_path, "FeN", "fen")
+    campaign = _campaign(tmp_path, second_setup={"lattice_dist": 0.01, "seed": 42})
+    generator = CampaignGenerator(setup_service=SetupService(runner=_FakeRunner()))
+    destination = tmp_path / "output"
+
+    generated = generator.generate(campaign, destination, base_dir=tmp_path)
+    reused = generator.generate(campaign, destination, base_dir=tmp_path)
+
+    assert [entry.entry_id for entry in reused.entries] == [entry.entry_id for entry in generated.entries]
+
+
+def test_unseeded_stochastic_campaign_is_rejected(tmp_path: Path) -> None:
+    _source(tmp_path, "bccFe", "bcc")
+    _source(tmp_path, "FeN", "fen")
+    campaign = _campaign(tmp_path, second_setup={"lattice_dist": 0.01})
+
+    with pytest.raises(CampaignError, match="preflight validation failed"):
+        CampaignGenerator(setup_service=SetupService(runner=_FakeRunner())).generate(
+            campaign, tmp_path / "output", base_dir=tmp_path
+        )
 
 
 def test_reuse_rejects_tampered_campaign_manifest_metadata(tmp_path: Path) -> None:

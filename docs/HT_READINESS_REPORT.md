@@ -1,6 +1,6 @@
 # RS-utils HT readiness report — HT-R10…R14 closeout
 
-> **HT FOUNDATION NOT READY FOR PILOT USE — HT-R11, HT-R12, HT-R13, AND HT-R14
+> **HT FOUNDATION NOT READY FOR PILOT USE — HT-R12, HT-R13, AND HT-R14
 > REMAIN OPEN.**
 >
 > The earlier R09 conclusion is superseded/reopened by the post-R09
@@ -107,8 +107,8 @@ and `UNSUPPORTED`.
 | AiiDA/UppASD integration | UNSUPPORTED | Outside the validated R00-R09 foundation boundary. |
 
 The R09 gate was recorded as satisfied for pilot use, but that conclusion is
-superseded/reopened by the post-R09 self-review. R10 is now closed below;
-R11-R14 remain release blockers. The historical HT-18 claims below are
+superseded/reopened by the post-R09 self-review. R10 and R11 are now closed
+below; R12-R14 remain release blockers. The historical HT-18 claims below are
 retained for traceability only.
 
 ## Current HT-R10 closeout
@@ -131,9 +131,28 @@ python -m pytest -q
 144 passed, 12 warnings
 ```
 
-This does not close the overall HT gate: authoritative reuse (R11), magnetic
-reference context (R12), installed-wheel verification (R13), and final
-falsification (R14) remain open.
+This does not close the overall HT gate: magnetic reference context (R12),
+installed-wheel verification (R13), and final falsification (R14) remain open.
+
+## Current HT-R11 closeout
+
+HT-R11 is closed for authoritative reuse. Campaign reuse regenerates the
+current setup in an isolated candidate directory and compares immutable output
+bytes against that fresh candidate. Exchange reuse compares existing immutable
+files against the freshly staged job, while allowing runtime `*.out`, `*.log`,
+and `rsutil_execution.json` artifacts. Historical manifest hashes are not a
+root of trust, because a coordinated edit can make a mutable manifest agree
+with altered bytes; the fresh-regeneration contract is explicit in the
+campaign and exchange documentation.
+
+The focused adversarial campaign/exchange suite passed:
+
+```text
+python -m pytest -q tests/test_ht10_exchange_jobs.py tests/test_ht16_campaign.py
+21 passed, 1 warning
+```
+
+R12, R13, and R14 remain open release blockers.
 
 ## Historical HT-18 evidence (preserved)
 

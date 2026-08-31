@@ -54,17 +54,21 @@ relative/logical paths, so the complete tree can be relocated.
 
 `rsutil campaign create` validates every entry before creating the campaign
 root. Each setup run is then committed atomically by `SetupService`. An
-existing run is reused only when its campaign manifest contains the same
-entry and manifest hashes and its materialized scientific inputs still match
-the recorded SHA-256 hashes. Each generated setup file is listed under
-`campaign.materialized_inputs`; missing or changed files fail reuse with an
-explicit integrity error. Unexpected `.nml` files are also rejected as
-unrecorded scientific inputs. Runtime artifacts such as `report.out`, logs,
-and `rsutil_execution.json` are not part of generation identity and may be
-added after generation. An existing directory without a matching owned
-manifest is an explicit collision; it is never silently overwritten. A
-modified specification under the same human name gets a different entry ID
-and therefore a different default directory.
+existing run is reused only after the current source files and setup
+specification have been regenerated in an isolated candidate directory. The
+candidate's immutable scientific output bytes and hashes are the authority;
+the existing run manifest is historical metadata and its mutable hashes cannot
+authorize a coordinated file-and-manifest edit. Each generated setup file is
+listed under `campaign.materialized_inputs`; missing or changed files fail
+reuse with an explicit integrity error. Unexpected `.nml` files are also
+rejected as unrecorded scientific inputs. Runtime artifacts such as
+`report.out`, logs, and `rsutil_execution.json` are not part of generation
+identity and may be added after generation. Seeded stochastic setups may be
+reused; unseeded stochastic generation is rejected conservatively. An
+existing directory without a matching owned manifest is an explicit collision;
+it is never silently overwritten. A modified specification under the same
+human name gets a different entry ID and therefore a different default
+directory.
 
 ```bash
 rsutil campaign validate examples/campaigns/pilot.json
@@ -76,8 +80,10 @@ The generated top-level `campaign_index.json` is
 `rsutil-run-v1` setup manifest and adds a versioned
 `rsutil-campaign-run-v2` campaign identity, materialized-input hashes, and
 external-run metadata. Its integrity hash covers the campaign identity and
-setup scientific identity fields. Older campaign manifests without this
-explicit input contract are not reused implicitly.
+setup scientific identity fields, but it is only a tamper-evident record of
+history—not the root of trust for reuse. Reuse uses the explicit
+`fresh_regeneration_v1` contract described above. Older campaign manifests
+without this explicit contract are not reused implicitly.
 
 ## Slurm arrays, status, and collection
 
