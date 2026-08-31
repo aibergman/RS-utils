@@ -2000,7 +2000,7 @@ def _run_setup_cli(args):
     print("=" * 70)
     rec_steps = args.rec_steps
     if rec_steps is None:
-        rec_steps = 200 if args.rec_method == "chebyshev" else 20
+        rec_steps = 200 if args.rec_method == "chebyshev" else 21
     try:
         spec = SetupSpec(
             cluster_type=args.cluster,
@@ -2337,7 +2337,7 @@ Examples:
         "--rec-steps",
         type=int,
         default=None,
-        help="Recursion steps for &control lld in setup output (default: 20, or 200 for chebyshev)",
+        help="Recursion steps for &control lld in setup output (default: 21, or 200 for chebyshev)",
     )
     parser.add_argument(
         "--lattice-dist",

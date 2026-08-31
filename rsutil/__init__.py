@@ -46,7 +46,6 @@ Calculate band structure:
     >>> calc.plot_bands(kdist, bands, klabels, 'bands.png')
 """
 import os
-import sys
 import glob
 import ctypes
 import importlib
@@ -121,10 +120,10 @@ if lib_filename is None:
         # Use basename as lib_filename and adjust pkg_dir for loading below
         lib_full = os.path.abspath(candidates[0])
         lib_filename = os.path.basename(lib_full)
-        # Prepend containing directory to sys.path so imports can find Python extensions
+        # Keep the build directory only as the native library location.  The
+        # library is loaded through ctypes below; adding this package directory
+        # to the import path would let files such as ``ase.py`` shadow dependencies.
         lib_dir = os.path.dirname(lib_full)
-        if lib_dir not in sys.path:
-            sys.path.insert(0, lib_dir)
         # Also set pkg_dir so later join() will work if needed
         pkg_dir = lib_dir
 

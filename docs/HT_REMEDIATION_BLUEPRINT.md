@@ -77,7 +77,7 @@ pre-remediation implementation.
 - [x] **HT-R10** — Interaction scientific contract closeout
 - [x] **HT-R11** — Authoritative regeneration-based reuse
 - [x] **HT-R12** — Magnetic-reference-aware symmetry contract
-- [ ] **HT-R13** — Installed-wheel clean-environment verification
+- [x] **HT-R13** — Installed-wheel clean-environment verification
 - [ ] **HT-R14** — Final falsification closeout
 
 No task may be marked complete before its acceptance tests pass. The historical
@@ -567,8 +567,8 @@ readiness evidence while the final closeout campaign is open.
 
 - [x] **HT-R10** — Interaction scientific contract closeout
 - [x] **HT-R11** — Authoritative regeneration-based reuse
-- [ ] **HT-R12** — Magnetic-reference-aware symmetry contract
-- [ ] **HT-R13** — Installed-wheel clean-environment verification
+- [x] **HT-R12** — Magnetic-reference-aware symmetry contract
+- [x] **HT-R13** — Installed-wheel clean-environment verification
 - [ ] **HT-R14** — Final falsification closeout
 
 ### HT-R10 decision and evidence
@@ -668,3 +668,35 @@ Focused R12 evidence:
 python -m pytest -q tests/test_ht12_magnetic_reference.py tests/test_ht08_exchange_service.py tests/test_ht09_exchange_symmetry.py tests/test_ht10_exchange_jobs.py tests/test_legacy_cli.py
 45 passed
 ```
+
+### HT-R13 decision and evidence
+
+HT-R13 is closed for installed-wheel clean-environment verification. CI now
+has separate source/editable and artifact lanes. The artifact lane builds
+exactly one wheel, installs it with the declared `test` extra into an
+external venv, checks dependencies, proves both the Python package and
+compiled extension resolve under that venv's site-packages, and runs the
+complete suite from an external copy of `tests` and `examples` with
+`PYTHONPATH` removed. The workflow runs on both pushes and pull requests.
+
+The artifact run also restored the legacy CLI's documented default recursion
+depth (`lld=21` for the default method); the existing legacy test caught the
+incompatibility when the installed wheel, rather than an unrelated global
+`rsutil` executable, was first placed on `PATH`.
+
+Focused R13 evidence from a clean local wheel build:
+
+```text
+platform: macOS-26.5.2-arm64-arm-64bit (arm64)
+Python: 3.11.16
+gfortran: GNU Fortran (Homebrew GCC 16.2.0)
+cmake: 4.4.3
+wheel: rsutil-0.10.0-cp311-cp311-macosx_26_0_arm64.whl
+rsutil.__file__: .../site-packages/rsutil/__init__.py
+native extension: .../site-packages/rsutil/rsutil.so
+site-packages assertion: PASS
+pip check: No broken requirements found
+pytest: 162 passed, 15 warnings
+```
+
+HT-R14 remains the only unchecked final-closeout item.

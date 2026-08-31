@@ -5,7 +5,7 @@ on:
   pull_request:
 
 jobs:
-  build:
+  source_tests:
     runs-on: ubuntu-latest
 
     steps:
@@ -25,27 +25,94 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install build
 
-      - name: Build package
-        run: |
-          python -m build --wheel
-
-      - name: Install package and HT test dependencies
+      - name: Install editable package and HT test dependencies
         run: |
           python -m pip install -e '.[test]'
           python -m pip check
 
-      - name: Upload built package
-        uses: actions/upload-artifact@v4
-        with:
-          name: rsutil-package
-          path: dist/*
-
-      - name: Verify installed package
-        run: |
-          unzip -l dist/*.whl
-
-      - name: Run tests
+      - name: Run source/editable tests
         run: |
           python -m pytest -q
+
+  wheel_tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install Fortran build toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gfortran
+
+      - name: Install wheel builder
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build
+
+      - name: Build exactly one wheel
+        run: |
+          rm -rf wheelhouse
+          mkdir wheelhouse
+          python -m build --wheel --outdir wheelhouse
+          wheel_count=$(find wheelhouse -maxdepth 1 -type f -name '*.whl' | wc -l | tr -d ' ')
+          test "$wheel_count" -eq 1
+          wheel_path=$(find wheelhouse -maxdepth 1 -type f -name '*.whl' -print -quit)
+          echo "RSUTIL_WHEEL=$PWD/$wheel_path" >> "$GITHUB_ENV"
+
+      - name: Create external wheel environment
+        run: |
+          venv_path="$RUNNER_TEMP/rsutil-wheel-venv"
+          suite_path="$RUNNER_TEMP/rsutil-wheel-suite"
+          python -m venv "$venv_path"
+          "$venv_path/bin/python" -m pip install --upgrade pip
+          "$venv_path/bin/python" -m pip install "$RSUTIL_WHEEL[test]"
+          "$venv_path/bin/python" -m pip check
+          mkdir -p "$suite_path"
+          cp -R tests examples "$suite_path/"
+
+      - name: Assert installed package and native extension paths
+        run: |
+          venv_path="$RUNNER_TEMP/rsutil-wheel-venv"
+          suite_path="$RUNNER_TEMP/rsutil-wheel-suite"
+          cd "$suite_path"
+          env -u PYTHONPATH PATH="$venv_path/bin:$PATH" "$venv_path/bin/python" - <<'PY'
+          import importlib.util
+          import pathlib
+          import site
+          import sys
+          import rsutil
+
+          site_roots = [pathlib.Path(path).resolve() for path in site.getsitepackages()]
+          package_path = pathlib.Path(rsutil.__file__).resolve()
+          native_spec = importlib.util.find_spec("rsutil.rsutil")
+          assert native_spec is not None and native_spec.origin is not None
+          native_path = pathlib.Path(native_spec.origin).resolve()
+          assert any(root == package_path or root in package_path.parents for root in site_roots)
+          assert any(root == native_path or root in native_path.parents for root in site_roots)
+          assert native_path.suffix in {".so", ".dylib", ".pyd"}
+          print(f"Python: {sys.executable}")
+          print(f"rsutil.__file__: {package_path}")
+          print(f"native extension: {native_path}")
+          print("site-packages assertion: PASS")
+          PY
+
+      - name: Run external full wheel suite
+        run: |
+          venv_path="$RUNNER_TEMP/rsutil-wheel-venv"
+          suite_path="$RUNNER_TEMP/rsutil-wheel-suite"
+          cd "$suite_path"
+          env -u PYTHONPATH PATH="$venv_path/bin:$PATH" "$venv_path/bin/python" -m pytest -q "$suite_path/tests"
+
+      - name: Upload built wheel
+        uses: actions/upload-artifact@v4
+        with:
+          name: rsutil-wheel
+          path: wheelhouse/*.whl

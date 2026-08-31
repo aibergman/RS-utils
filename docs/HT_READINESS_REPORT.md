@@ -1,6 +1,6 @@
 # RS-utils HT readiness report — HT-R10…R14 closeout
 
-> **HT FOUNDATION NOT READY FOR PILOT USE — HT-R13 AND HT-R14
+> **HT FOUNDATION NOT READY FOR PILOT USE — HT-R14
 > REMAIN OPEN.**
 >
 > The earlier R09 conclusion is superseded/reopened by the post-R09
@@ -152,7 +152,7 @@ python -m pytest -q tests/test_ht10_exchange_jobs.py tests/test_ht16_campaign.py
 21 passed, 1 warning
 ```
 
-R13 and R14 remain open release blockers.
+R14 remains an open release blocker.
 
 ## Current HT-R12 closeout
 
@@ -171,7 +171,29 @@ python -m pytest -q tests/test_ht12_magnetic_reference.py tests/test_ht08_exchan
 45 passed
 ```
 
-R13 and R14 remain release blockers.
+R14 remains the only final-closeout release blocker.
+
+## Current HT-R13 closeout
+
+HT-R13 is closed for installed-wheel clean-environment verification. CI now
+separates the source/editable test lane from the built-wheel artifact lane.
+The artifact lane builds exactly one wheel, installs it with the declared test
+dependencies into an external venv, removes `PYTHONPATH`, asserts that both
+`rsutil.__file__` and the compiled extension resolve under site-packages, and
+runs the full suite from an external copy of the test fixtures.
+
+The clean local artifact verification passed with Python 3.11.16,
+gfortran 16.2.0, and CMake 4.4.3:
+
+```text
+rsutil.__file__: .../site-packages/rsutil/__init__.py
+native extension: .../site-packages/rsutil/rsutil.so
+site-packages assertion: PASS
+pip check: No broken requirements found
+pytest: 162 passed, 15 warnings
+```
+
+R14 remains the only final-closeout release blocker.
 
 ## Historical HT-18 evidence (preserved)
 
