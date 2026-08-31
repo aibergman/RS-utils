@@ -1,0 +1,43 @@
+{
+  "schema_version": "rsutil-campaign-v1",
+  "name": "rsutil-ht-pilot",
+  "destination": "../../build/rsutil-ht-pilot",
+  "destination_naming": "runs/{name}--{entry_id}",
+  "structures": {
+    "bcc-fe": "../bccFe/Dist",
+    "fen": "../FeN",
+    "fept": "../FePt"
+  },
+  "setup_template": {
+    "cluster_type": "periodic",
+    "rec_method": "block",
+    "rec_steps": 20
+  },
+  "entries": [
+    {
+      "name": "bcc-fe-reference",
+      "structure": "bcc-fe",
+      "setup": {"seed": 101},
+      "calculation": {"executable": "rs-lmto", "mode": "scf", "label": "bcc-fe"}
+    },
+    {
+      "name": "fen-reference",
+      "structure": "fen",
+      "setup": {"seed": 102, "lattice_dist": 0.01},
+      "calculation": {"executable": "rs-lmto", "mode": "scf", "label": "fen"}
+    },
+    {
+      "name": "bcc-fe-seeded-sqs",
+      "structure": "bcc-fe",
+      "setup": {
+        "seed": 103,
+        "supercell": [2, 1, 1],
+        "sqs": "Fe=0.5,Co=0.5",
+        "sqs_steps": 10,
+        "sqs_seed": 104
+      },
+      "calculation": {"executable": "rs-lmto", "mode": "scf", "label": "bcc-fe-sqs"},
+      "exchange": {"enabled": false}
+    }
+  ]
+}

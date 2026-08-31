@@ -57,6 +57,15 @@ __version__ = "0.10.0"
 from .setup_runner import FortranSetupRunner
 from .setup_service import SetupService, run_setup
 from .results import SCFResult, parse_run
+from .campaign import (
+    Campaign,
+    CampaignEntry,
+    CampaignGenerator,
+    CampaignIndex,
+    generate_campaign,
+    load_campaign,
+    validate_campaign,
+)
 
 __all__ = [
     'process_lattice',
@@ -66,6 +75,13 @@ __all__ = [
     'run_setup',
     'SCFResult',
     'parse_run',
+    'Campaign',
+    'CampaignEntry',
+    'CampaignGenerator',
+    'CampaignIndex',
+    'generate_campaign',
+    'load_campaign',
+    'validate_campaign',
 ]
 
 

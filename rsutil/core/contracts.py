@@ -59,6 +59,10 @@ class ErrorCode(str, Enum):
     OUTPUT_NAMELIST_INVALID = "output_namelist_invalid"
     SPHERE_OUTPUT_INVALID = "sphere_output_invalid"
     UNSEEDED_SETUP = "unseeded_setup"
+    CAMPAIGN_SPEC_INVALID = "campaign_spec_invalid"
+    CAMPAIGN_SOURCE_MISSING = "campaign_source_missing"
+    CAMPAIGN_COLLISION = "campaign_collision"
+    CAMPAIGN_MANIFEST_INVALID = "campaign_manifest_invalid"
     UNKNOWN = "unknown"
 
 

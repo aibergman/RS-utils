@@ -63,7 +63,7 @@ filenames remain local to that workspace.
 - [x] **HT-13** — Transport and damping result contracts
 - [x] **HT-14** — Versioned TB model and ML export
 - [x] **HT-15** — ASE structure interoperability
-- [ ] **HT-16** — Deterministic campaign specification and generation
+- [x] **HT-16** — Deterministic campaign specification and generation
 - [ ] **HT-17** — Slurm array rendering, status, and collection
 - [ ] **HT-18** — HT readiness closeout and pilot evidence
 
@@ -349,3 +349,22 @@ No scientific or functional code was changed for HT-00.
   existing `lattice.nml`/`input.nml` source contract and delegates execution to
   `SetupService`.  Element potential files are not guessed and must be passed
   as explicit runner resources.  No ASE calculator was added.
+
+### HT-16 decisions
+
+- Added the versioned JSON `rsutil-campaign-v1` specification and typed
+  `Campaign`, `CampaignEntry`, and `CampaignIndex` contracts.  Entry IDs are
+  SHA-256 hashes of source file contents plus normalized setup, calculation,
+  exchange, and entry metadata; entry order and human names do not determine
+  scientific identity.
+- Campaign preflight validates every source, setup specification, namelist,
+  and required stochastic seed before creating the destination.  Generation
+  composes `SetupService` once per entry and writes relative-path
+  `run_manifest.json` files and a relocatable `rsutil-campaign-index-v1`
+  index.  Existing identical runs are reused by manifest hash; incompatible
+  or unmarked directories are explicit collisions.
+- The primary CLI surface is `rsutil campaign validate SPEC` and `rsutil
+  campaign create SPEC [--destination PATH]`.  YAML is accepted only as a
+  convenience when PyYAML is already installed; no scheduler or job
+  execution is introduced.  Invalid preflight entries leave the campaign
+  destination untouched; runtime failures retain per-entry setup atomicity.

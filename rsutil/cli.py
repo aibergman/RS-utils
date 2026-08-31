@@ -1026,6 +1026,80 @@ def create_dos_parser(subparsers):
     return parser
 
 
+def _print_campaign_diagnostics(diagnostics) -> None:
+    for diagnostic in diagnostics:
+        stream = sys.stderr if diagnostic.severity is DiagnosticSeverity.ERROR else sys.stdout
+        location = f" [{diagnostic.path}]" if diagnostic.path else ""
+        print(f"{diagnostic.severity.value.upper()}: {diagnostic.message}{location}", file=stream)
+
+
+def run_campaign_validate(args):
+    """Validate every campaign entry without touching its destination."""
+
+    from .campaign import load_campaign, validate_campaign
+
+    try:
+        spec_path = Path(args.spec).resolve()
+        campaign = load_campaign(spec_path)
+        validation = validate_campaign(campaign, base_dir=spec_path.parent)
+    except Exception as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    _print_campaign_diagnostics(validation.diagnostics)
+    if validation.valid:
+        print(f"Campaign '{campaign.name}' is valid ({len(campaign.entries)} entries).")
+        return 0
+    print(f"Campaign '{campaign.name}' is invalid.", file=sys.stderr)
+    return 1
+
+
+def run_campaign_create(args):
+    """Generate deterministic setup-owned run directories, without job execution."""
+
+    from .campaign import CampaignGenerator, load_campaign
+
+    try:
+        spec_path = Path(args.spec).resolve()
+        campaign = load_campaign(spec_path)
+        destination = None if args.destination is None else Path(args.destination).resolve()
+        index = CampaignGenerator().generate(
+            campaign,
+            destination,
+            base_dir=spec_path.parent,
+            collision_policy=args.collision_policy,
+        )
+    except Exception as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    target_root = (destination or (spec_path.parent / (campaign.destination or f"{campaign.name}-campaign"))).resolve()
+    print(f"Campaign '{campaign.name}' generated: {target_root / 'campaign_index.json'}")
+    print(f"Entries: {len(index.entries)}")
+    return 0
+
+
+def create_campaign_parser(subparsers):
+    """Create the lightweight campaign create/validate command surface."""
+
+    parser = subparsers.add_parser("campaign", help="Validate or generate deterministic HT campaigns")
+    commands = parser.add_subparsers(dest="campaign_command", required=True)
+
+    validate = commands.add_parser("validate", help="Validate a campaign specification")
+    validate.add_argument("spec", help="Campaign JSON (YAML when PyYAML is installed)")
+    validate.set_defaults(func=run_campaign_validate)
+
+    create = commands.add_parser("create", help="Generate setup run directories and a campaign index")
+    create.add_argument("spec", help="Campaign JSON (jobs are not executed)")
+    create.add_argument("--destination", help="Campaign output directory (default: spec destination or <name>-campaign)")
+    create.add_argument(
+        "--collision-policy",
+        choices=["reuse_if_identical", "error"],
+        default="reuse_if_identical",
+        help="Existing identical runs are reused; incompatible runs always fail",
+    )
+    create.set_defaults(func=run_campaign_create)
+    return parser
+
+
 def validate_setup_inputs():
     """
     Validate that required input files exist for --setup workflow.
@@ -2024,6 +2098,7 @@ Examples:
     # Add band/DOS subcommands
     create_bands_parser(subparsers)
     create_dos_parser(subparsers)
+    create_campaign_parser(subparsers)
 
     # Existing flags for backward compatibility
     parser.add_argument(
