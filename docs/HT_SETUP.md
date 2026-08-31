@@ -41,3 +41,23 @@ console output. Its top-level schemas are `rsutil-setup-report-v1` and
 separate from human messages. Deterministic structure/setup hashes exclude
 timestamps, while the manifest records timestamps and the worker/build
 environment separately.
+
+## Lattice count validation
+
+Setup validation follows the RS-LMTO `fable_v4` meanings of the lattice
+counts; they are not interchangeable:
+
+- `ntot` sizes the primitive-cell `crd`, `izp`, `no`, `iu`, and `ib` tables.
+- `nrec` sizes `irec` and identifies recursion representatives.
+- `nbas` is the charge-distribution/shell count and may differ from `ntot`.
+- `nbulk_bulk` is a mode input used to derive bulk/reference counts; it is
+  not treated as a universal array size.
+
+For surface inputs (`calctype='S'`), the validator checks the source-derived
+relationships `nrec = nlay` and `ntype = nbulk_bulk + nlay` when those fields
+are available. For layered/interface inputs (`calctype='L'`), it checks
+`nrec = nlay` and `ntype = 2*nbulk_bulk + nlay`. Atom labels are checked
+against `ntype`, not `nrec`, because impurity and surface workflows can have
+frozen/reference labels in addition to recursion entries. Cluster-dependent
+index bounds remain delegated to the protected RS-LMTO kernel because the
+cluster does not exist at preflight time.

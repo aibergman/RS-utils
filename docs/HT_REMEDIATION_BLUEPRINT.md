@@ -66,7 +66,7 @@ pre-remediation implementation.
 
 - [x] **HT-R00** — Reopen readiness and freeze adversarial acceptance criteria
 - [x] **HT-R01** — Correct exchange/DMI/tensor units and unit evidence
-- [ ] **HT-R02** — Restore complete RS-LMTO setup/lattice validation semantics
+- [x] **HT-R02** — Restore complete RS-LMTO setup/lattice validation semantics
 - [ ] **HT-R03** — Implement scientific campaign state and execution evidence
 - [ ] **HT-R04** — Harden manifests, pair identity, and reuse integrity
 - [ ] **HT-R05** — Bound and harden exchange symmetry/magnetic-reference semantics
@@ -172,3 +172,68 @@ valid workflows must remain available. Determinism, source units, identity,
 execution/parse/convergence separation, tamper detection, conservative
 symmetry, reproducible tests, CI coverage, and adversarial closeout evidence
 are all required.
+
+## HT-R02 source-derived validation contract
+
+The current public [`fable_v4` lattice namelist declarations](https://github.com/rslmtoasa/rslmtoasa/blob/fable_v4/source/include_codes/namelists/lattice.f90),
+[`lattice` implementation](https://github.com/rslmtoasa/rslmtoasa/blob/fable_v4/source/lattice_lifecycle.f90),
+and [`charge` implementation](https://github.com/rslmtoasa/rslmtoasa/blob/fable_v4/source/charge.f90)
+define these fields independently:
+
+| Field | Source meaning used by validation |
+| --- | --- |
+| `nbulk_bulk` | Number of primitive-cell/reference bulk sites used by the mode-specific lattice setup. It participates in surface/interface derived counts; it is not a universal array length. |
+| `ntot` | Number of sites in the primitive cell. `crd`, `izp`, `no`, `iu`, and `ib` are the primitive-cell tables and are sized by this count. |
+| `nbas` | Number of shells/sites used by charge distribution. It can differ from `ntot`; the `charge` source explicitly allows `nbas` to differ from `ntot` for reduced cells and uses it for surface charge storage. |
+| `nrec` | Number of sites/classes included in self-consistent recursion. `irec` is sized by this count. Bulk presets set it to the bulk count, while surface/interface construction derives it from the active layer count. |
+
+The source also documents `ntype = nbulk + nrec`. For surface mode
+(`calctype='S'`), `build_clusup` derives `ntype = nbulk_bulk + nlay` and
+`nrec = nlay`. For layered/interface mode (`calctype='L'`), it derives
+`ntype = 2*nbulk_bulk + nlay` and `nrec = nlay`. These relationships are
+validated only when the corresponding mode fields are present. The validator
+does not infer a missing mode, invent an upper bound for cluster indices, or
+require `nbas`, `ntot`, `nbulk_bulk`, and `nrec` to be equal.
+
+The public `fable_v4` surface and impurity inputs are source-realistic
+examples of why labels cannot be tied to `nrec`: the surface input has seven
+labels with six active layers, while the hcp impurity input has three labels
+with two primitive/reference sites. No checked-in public unequal-count
+`lattice.nml` was found, so regression coverage uses a minimal fixture built
+from those source-declared surface semantics and records the provenance here.
+The protected Fortran kernel remains responsible for cluster construction,
+mode-specific geometry, and any bounds that depend on the generated cluster.
+
+## HT-R02 decision and evidence
+
+The validator no longer applies a universal `count == nrec` rule. It now
+uses `ntot` for the primitive-cell `crd`, `izp`, `no`, `iu`, and `ib` tables,
+`nrec` for `irec`, and leaves `nbas` and `nbulk_bulk` independent except for
+the source-backed surface/interface derivations. Input labels are checked
+against `ntype` and are no longer incorrectly required to equal `nrec`.
+Surface (`S`) and layered/interface (`L`) diagnostics explicitly check their
+source-derived `nlay` relationships when the mode is declared. Cluster index
+upper bounds remain delegated to the protected kernel because the cluster is
+constructed after preflight.
+
+The supercell transform now scales `ntot` and only scales the other count
+fields when the source explicitly used them as the primitive-site count;
+independent mode-specific counts are retained. This preserves the ordinary
+bulk workflow while avoiding a new count aliasing invariant.
+
+Regression coverage includes the bcc baseline, a source-derived surface
+fixture with `nbulk_bulk=1`, `ntot=1`, `nbas=51`, `nrec=6`, and seven labels, a
+public fable_v4-style impurity label/count case, malformed recursion-table
+and surface-layer cases, plus the existing supercell/setup-service and CLI
+coverage. The required focused suites pass:
+
+```text
+tests/test_setup_validation.py       13 passed
+tests/test_setup_service.py          11 passed
+tests/test_legacy_cli.py              8 passed
+tests/test_fortran_setup_runner.py   4 passed
+full feasible suite                  104 passed, 10 warnings
+```
+
+The authoritative evidence is the public `fable_v4` source links recorded in
+the contract above; the protected numerical Fortran kernel was not modified.

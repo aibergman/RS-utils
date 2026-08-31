@@ -188,8 +188,21 @@ def _labels(value: Any) -> list[str]:
 
 
 def _validate_lattice_group(
-    group: Mapping[str, Any], path: Path, diagnostics: list[Diagnostic]
+    group: Mapping[str, Any],
+    path: Path,
+    diagnostics: list[Diagnostic],
+    *,
+    calculation_type: str | None = None,
+    nlay: int | None = None,
+    input_ntype: int | None = None,
 ) -> dict[str, Any]:
+    """Validate lattice fields using their independent RS-LMTO meanings.
+
+    The four count fields are deliberately not interchangeable.  ``ntot``
+    sizes primitive-cell tables, ``nrec`` sizes recursion representatives,
+    ``nbas`` is a charge-distribution/shell count, and ``nbulk_bulk`` is a
+    mode input used by surface/interface construction.
+    """
     normalized: dict[str, Any] = {}
     for name in _LATTICE_REQUIRED:
         value = _value(group, name)
@@ -222,21 +235,29 @@ def _validate_lattice_group(
         else:
             counts[name] = converted
             normalized[name] = converted
-    if counts:
-        reference = counts.get("nrec")
-        if reference is not None:
-            for name, value in counts.items():
-                if value != reference:
-                    diagnostics.append(
-                        _error(
-                            ErrorCode.COUNT_MISMATCH,
-                            f"lattice count '{name}'={value} does not match nrec={reference}",
-                            path=str(path),
-                            field=name,
-                            expected=reference,
-                            actual=value,
-                        )
-                    )
+    optional_nbulk = _value(group, "nbulk")
+    nbulk = _as_int(optional_nbulk) if optional_nbulk is not None else None
+    if optional_nbulk is not None:
+        if nbulk is None or nbulk < 0:
+            diagnostics.append(
+                _error(
+                    ErrorCode.COUNT_MISMATCH,
+                    "lattice field 'nbulk' must be a non-negative integer",
+                    path=str(path),
+                    field="nbulk",
+                    value=optional_nbulk,
+                )
+            )
+        else:
+            normalized["nbulk"] = nbulk
+
+    # In the source, these arrays have distinct owners.  ``crd`` is the
+    # primitive-cell basis, ``iu``/``ib`` identify the primitive-cell sites
+    # used for bulk/reference calculations, and ``irec`` identifies the
+    # recursion representatives.  Cluster indices cannot be upper-bounded
+    # here because the cluster is built only after preflight validation.
+    primitive_count = counts.get("ntot")
+    recursion_count = counts.get("nrec")
 
     vectors = _array(_value(group, "a"))
     if len(vectors) != 3 or any(not isinstance(vector, Sequence) or len(vector) != 3 for vector in vectors):
@@ -267,15 +288,14 @@ def _validate_lattice_group(
         normalized["a"] = [list(vector) for vector in vectors]
 
     coordinates = _array(_value(group, "crd"))
-    site_count = counts.get("nrec")
-    if site_count is not None and len(coordinates) != site_count:
+    if primitive_count is not None and len(coordinates) != primitive_count:
         diagnostics.append(
             _error(
                 ErrorCode.COUNT_MISMATCH,
-                f"coordinate count {len(coordinates)} does not match nrec={site_count}",
+                f"coordinate count {len(coordinates)} does not match ntot={primitive_count}",
                 path=str(path),
                 field="crd",
-                expected=site_count,
+                expected=primitive_count,
                 actual=len(coordinates),
             )
         )
@@ -286,7 +306,13 @@ def _validate_lattice_group(
     else:
         normalized["crd"] = [list(vector) for vector in coordinates]
 
-    for name, expected in (("izp", site_count), ("no", site_count), ("irec", site_count)):
+    for name, expected in (
+        ("izp", primitive_count),
+        ("no", primitive_count),
+        ("iu", primitive_count),
+        ("ib", primitive_count),
+        ("irec", recursion_count),
+    ):
         values = _array(_value(group, name))
         if expected is not None and len(values) != expected:
             diagnostics.append(
@@ -296,20 +322,6 @@ def _validate_lattice_group(
                     path=str(path),
                     field=name,
                     expected=expected,
-                    actual=len(values),
-                )
-            )
-    ntot = counts.get("ntot")
-    for name in ("iu", "ib"):
-        values = _array(_value(group, name))
-        if ntot is not None and len(values) != ntot:
-            diagnostics.append(
-                _error(
-                    ErrorCode.COUNT_MISMATCH,
-                    f"array '{name}' has {len(values)} entries; expected {ntot}",
-                    path=str(path),
-                    field=name,
-                    expected=ntot,
                     actual=len(values),
                 )
             )
@@ -331,6 +343,67 @@ def _validate_lattice_group(
             diagnostics.append(_error(ErrorCode.COUNT_MISMATCH, "lattice ntype must be positive", path=str(path)))
         else:
             normalized["ntype"] = ntype
+
+    # ``ntype = nbulk + nrec`` is a source relationship when nbulk is part of
+    # the materialized lattice state.  File-mode inputs often omit nbulk, so
+    # do not manufacture it merely to make this check possible.
+    if nbulk is not None and input_ntype is not None and recursion_count is not None:
+        expected_ntype = nbulk + recursion_count
+        if input_ntype != expected_ntype:
+            diagnostics.append(
+                _error(
+                    ErrorCode.COUNT_MISMATCH,
+                    f"input ntype={input_ntype} does not match source nbulk+nrec={expected_ntype}",
+                    path=str(path),
+                    field="ntype",
+                    expected=expected_ntype,
+                    actual=input_ntype,
+                    mode=calculation_type,
+                )
+            )
+
+    # Surface/interface construction derives the active recursion count from
+    # nlay.  Apply these checks only when the mode is explicit and nbulk_bulk
+    # is available; bulk and impurity modes have different semantics.
+    if calculation_type in {"S", "L"}:
+        if nlay is None or nlay <= 0:
+            diagnostics.append(
+                _error(
+                    ErrorCode.COUNT_MISMATCH,
+                    f"{calculation_type} mode requires a positive lattice nlay",
+                    path=str(path),
+                    field="nlay",
+                    mode=calculation_type,
+                    value=nlay,
+                )
+            )
+        elif recursion_count is not None and recursion_count != nlay:
+            diagnostics.append(
+                _error(
+                    ErrorCode.COUNT_MISMATCH,
+                    f"{calculation_type} mode requires nrec=nlay={nlay}",
+                    path=str(path),
+                    field="nrec",
+                    expected=nlay,
+                    actual=recursion_count,
+                    mode=calculation_type,
+                )
+            )
+        if counts.get("nbulk_bulk") is not None and nlay is not None and input_ntype is not None:
+            multiplier = 2 if calculation_type == "L" else 1
+            expected_ntype = multiplier * counts["nbulk_bulk"] + nlay
+            if input_ntype != expected_ntype:
+                diagnostics.append(
+                    _error(
+                        ErrorCode.COUNT_MISMATCH,
+                        f"{calculation_type} mode requires ntype={expected_ntype} from lattice counts",
+                        path=str(path),
+                        field="ntype",
+                        expected=expected_ntype,
+                        actual=input_ntype,
+                        mode=calculation_type,
+                    )
+                )
     return normalized
 
 
@@ -379,18 +452,6 @@ def _validate_input_groups(
                 actual=len(labels),
             )
         )
-    nrec = _as_int(_value(lattice_data, "nrec"))
-    if nrec is not None and len(labels) != nrec:
-        diagnostics.append(
-            _error(
-                ErrorCode.LABEL_COUNT_MISMATCH,
-                f"{len(labels)} atom labels do not match lattice nrec={nrec}",
-                path=str(input_path),
-                expected=nrec,
-                actual=len(labels),
-            )
-        )
-
     for index, label in enumerate(labels, start=1):
         symbol, atomic_number = _label_element(label)
         if symbol is None:
@@ -438,7 +499,35 @@ def validate_setup_namelists(
     if lattice_group is None or input_lattice_group is None or atoms_group is None:
         return ValidationResult(valid=not _has_errors(diagnostics), diagnostics=tuple(diagnostics))
 
-    normalized_lattice = _validate_lattice_group(lattice_group, lattice_file, diagnostics)
+    control_group = next(
+        (
+            value
+            for key, value in input_document.items()
+            if str(key).lower() == "control" and isinstance(value, Mapping)
+        ),
+        None,
+    )
+    calculation_type = None
+    if control_group is not None:
+        raw_calculation_type = _value(control_group, "calctype")
+        if raw_calculation_type is not None:
+            calculation_type = str(raw_calculation_type).strip().upper()
+
+    raw_nlay = _value(input_lattice_group, "nlay")
+    if raw_nlay is None:
+        raw_nlay = _value(lattice_group, "nlay")
+    nlay = _as_int(raw_nlay) if raw_nlay is not None else None
+    raw_ntype = _value(input_lattice_group, "ntype")
+    input_ntype = _as_int(raw_ntype) if raw_ntype is not None else len(_labels(_value(atoms_group, "label")))
+
+    normalized_lattice = _validate_lattice_group(
+        lattice_group,
+        lattice_file,
+        diagnostics,
+        calculation_type=calculation_type,
+        nlay=nlay,
+        input_ntype=input_ntype,
+    )
     normalized_input = _validate_input_groups(
         input_lattice_group,
         atoms_group,
@@ -470,9 +559,6 @@ def validate_setup_namelists(
             )
         if setup_spec.supercell != (1, 1, 1):
             expected_factor = math.prod(setup_spec.supercell)
-            base_count = _as_int(normalized_lattice.get("nrec"))
-            if base_count is not None and _as_int(normalized_lattice.get("nbulk_bulk")) != base_count:
-                diagnostics.append(_error(ErrorCode.SUPERCELL_INVALID, "supercell source counts are inconsistent"))
             if expected_factor < 1:
                 diagnostics.append(_error(ErrorCode.SUPERCELL_INVALID, "supercell dimensions must be positive"))
             normalized_input["supercell"] = list(setup_spec.supercell)
@@ -565,17 +651,37 @@ def _validate_supercell_expansion(
         generated_lattice_group = f90nml.read(generated_lattice)["lattice"]
         source_input_document = f90nml.read(source_input)
         generated_input_document = f90nml.read(generated_input)
-        source_count = _as_int(_value(source_lattice_group, "nrec"))
-        generated_count = _as_int(_value(generated_lattice_group, "nrec"))
+        source_counts = {
+            name: _as_int(_value(source_lattice_group, name))
+            for name in ("nbulk_bulk", "ntot", "nbas", "nrec")
+        }
+        generated_counts = {
+            name: _as_int(_value(generated_lattice_group, name))
+            for name in ("nbulk_bulk", "ntot", "nbas", "nrec")
+        }
         source_labels = _labels(_value(source_input_document["atoms"], "label"))
         generated_labels = _labels(_value(generated_input_document["atoms"], "label"))
     except Exception as exc:
         diagnostics.append(_error(ErrorCode.SUPERCELL_INVALID, f"could not validate supercell expansion: {exc}"))
         return
-    expected = None if source_count is None else source_count * math.prod(spec.supercell)
-    if expected is not None and generated_count != expected:
-        diagnostics.append(_error(ErrorCode.SUPERCELL_INVALID, "generated site count does not match supercell factor", expected=expected, actual=generated_count))
-    if source_count is not None and len(generated_labels) != len(source_labels) * math.prod(spec.supercell):
+    source_ntot = source_counts.get("ntot")
+    factor = math.prod(spec.supercell)
+    for name, source_value in source_counts.items():
+        generated_value = generated_counts.get(name)
+        if source_value is None or generated_value is None:
+            continue
+        expected = source_value * factor if name == "ntot" or source_value == source_ntot else source_value
+        if generated_value != expected:
+            diagnostics.append(
+                _error(
+                    ErrorCode.SUPERCELL_INVALID,
+                    f"generated {name} does not preserve its source-defined scaling",
+                    field=name,
+                    expected=expected,
+                    actual=generated_value,
+                )
+            )
+    if source_ntot is not None and len(generated_labels) != len(source_labels) * factor:
         diagnostics.append(_error(ErrorCode.SUPERCELL_INVALID, "generated label count does not match supercell factor", expected=len(source_labels) * math.prod(spec.supercell), actual=len(generated_labels)))
 
 

@@ -21,6 +21,59 @@ def _codes(result):
     return {diagnostic.code for diagnostic in result.diagnostics}
 
 
+def _surface_like_fixture(destination: Path) -> None:
+    """Build the source-derived fable_v4 surface count fixture.
+
+    fable_v4 ``build_clusup`` derives ntype=nbulk_bulk+nlay, nrec=nlay,
+    and keeps nbas as an independent charge-distribution count.  The public
+    surface example does not materialize a lattice.nml, so this is the
+    smallest local fixture expressing those source semantics.
+    """
+
+    _fixture(destination)
+    lattice = destination / "lattice.nml"
+    lattice_text = lattice.read_text(encoding="utf-8")
+    lattice_text = lattice_text.replace("nbas = 1", "nbas = 51").replace("nrec = 1", "nrec = 6")
+    lattice_text = lattice_text.replace(
+        "irec(1) = 1\n!\nct(1) = 3.3",
+        "irec(1) = 1\nirec(2) = 2\nirec(3) = 3\nirec(4) = 4\nirec(5) = 5\nirec(6) = 6\n!\nct(1) = 3.3",
+    )
+    lattice.write_text(lattice_text, encoding="utf-8")
+
+    input_path = destination / "input.nml"
+    input_text = input_path.read_text(encoding="utf-8")
+    input_text = input_text.replace("crystal_sym = 'file'", "crystal_sym = 'file'\nntype = 7\nnlay = 6")
+    input_text = input_text.replace(
+        "label(1) = 'Fe'",
+        "\n".join(
+            [
+                "label(1) = 'Cu'",
+                "label(2) = 'ES'",
+                "label(3) = 'Cu-S'",
+                "label(4) = 'Cu-S-1'",
+                "label(5) = 'Cu-S-2'",
+                "label(6) = 'Cu-S-3'",
+                "label(7) = 'Cu-S-4'",
+            ]
+        ),
+    ).replace("calctype = 'B'", "calctype = 'S'")
+    input_path.write_text(input_text, encoding="utf-8")
+
+
+def _impurity_like_fixture(destination: Path) -> None:
+    """Build the public fable_v4 impurity label/count relationship."""
+
+    _fixture(destination, "FeN")
+    input_path = destination / "input.nml"
+    input_text = input_path.read_text(encoding="utf-8")
+    input_text = input_text.replace("ntype       = 2\n", "")
+    input_text = input_text.replace(
+        "label(1) = 'Fe1'\nlabel(2) = 'N1'",
+        "label(1) = 'Co1-bulk'\nlabel(2) = 'Co2-bulk'\nlabel(3) = 'Fe-imp'",
+    ).replace("calctype = 'B'", "calctype = 'I'")
+    input_path.write_text(input_text, encoding="utf-8")
+
+
 def test_baseline_fixtures_are_semantically_valid(tmp_path: Path) -> None:
     for example in ("bccFe", "FeN", "FePt"):
         directory = tmp_path / example
@@ -28,6 +81,68 @@ def test_baseline_fixtures_are_semantically_valid(tmp_path: Path) -> None:
         _fixture(directory, example)
         validation = validate_setup(directory / "lattice.nml", directory / "input.nml")
         assert validation.valid, (example, validation.to_dict())
+
+
+def test_source_derived_surface_counts_can_differ(tmp_path: Path) -> None:
+    _surface_like_fixture(tmp_path)
+
+    validation = validate_setup(tmp_path / "lattice.nml", tmp_path / "input.nml")
+
+    assert validation.valid, validation.to_dict()
+    assert not any(
+        "does not match nrec" in diagnostic.message
+        for diagnostic in validation.diagnostics
+    )
+
+
+def test_source_derived_interface_counts_are_mode_aware(tmp_path: Path) -> None:
+    _surface_like_fixture(tmp_path)
+    path = tmp_path / "input.nml"
+    input_text = path.read_text(encoding="utf-8")
+    input_text = input_text.replace("ntype = 7", "ntype = 8")
+    input_text = input_text.replace("label(7) = 'Cu-S-4'", "label(7) = 'Cu-S-4'\nlabel(8) = 'Cu-S-5'")
+    input_text = input_text.replace("calctype = 'S'", "calctype = 'L'")
+    path.write_text(input_text, encoding="utf-8")
+
+    validation = validate_setup(tmp_path / "lattice.nml", path)
+
+    assert validation.valid, validation.to_dict()
+
+
+def test_impurity_labels_are_not_limited_by_recursion_count(tmp_path: Path) -> None:
+    _impurity_like_fixture(tmp_path)
+
+    validation = validate_setup(tmp_path / "lattice.nml", tmp_path / "input.nml")
+
+    assert validation.valid, validation.to_dict()
+
+
+def test_recursion_array_count_is_still_rejected(tmp_path: Path) -> None:
+    _surface_like_fixture(tmp_path)
+    path = tmp_path / "lattice.nml"
+    path.write_text(
+        path.read_text(encoding="utf-8").replace("irec(6) = 6\n", ""),
+        encoding="utf-8",
+    )
+
+    validation = validate_setup(path, tmp_path / "input.nml")
+
+    assert not validation.valid
+    assert ErrorCode.COUNT_MISMATCH.value in _codes(validation)
+
+
+def test_surface_recursion_count_must_match_active_layers(tmp_path: Path) -> None:
+    _surface_like_fixture(tmp_path)
+    path = tmp_path / "lattice.nml"
+    path.write_text(
+        path.read_text(encoding="utf-8").replace("nrec = 6", "nrec = 5"),
+        encoding="utf-8",
+    )
+
+    validation = validate_setup(path, tmp_path / "input.nml")
+
+    assert not validation.valid
+    assert ErrorCode.COUNT_MISMATCH.value in _codes(validation)
 
 
 def test_inconsistent_ntype_is_coded_as_a_semantic_error(tmp_path: Path) -> None:

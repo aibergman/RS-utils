@@ -271,8 +271,22 @@ def create_supercell(
         ]
         n_atoms = len(expanded)
         print(f"  Supercell: {n_atoms} atoms ({nx}×{ny}×{nz} = {nx * ny * nz} unit cells)")
+        source_counts: dict[str, int] = {}
         for key in ("nbulk_bulk", "ntot", "nbas", "nrec"):
-            content = re.sub(rf"({key}\s*=\s*)\d+", rf"\g<1>{n_atoms}", content, flags=re.IGNORECASE)
+            match = re.search(rf"{key}\s*=\s*(\d+)", content, flags=re.IGNORECASE)
+            if match:
+                source_counts[key] = int(match.group(1))
+        source_ntot = source_counts.get("ntot")
+        for key in ("nbulk_bulk", "ntot", "nbas", "nrec"):
+            # ntot always expands with the primitive-cell site table.  The
+            # other counts are expanded only when they were serving that same
+            # site count in the source input; mode-specific counts are kept
+            # independent rather than being rewritten by coincidence.
+            should_expand = key == "ntot" or (
+                source_ntot is not None and source_counts.get(key) == source_ntot
+            )
+            if should_expand:
+                content = re.sub(rf"({key}\s*=\s*)\d+", rf"\g<1>{n_atoms}", content, flags=re.IGNORECASE)
         for index, scale in enumerate((nx, ny, nz), start=1):
             content = re.sub(
                 rf"(a\s*\(\s*:\s*,\s*{index}\s*\)\s*=\s*)([-\d.eE+]+)\s*,\s*([-\d.eE+]+)\s*,\s*([-\d.eE+]+)",
