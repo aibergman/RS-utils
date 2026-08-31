@@ -75,11 +75,17 @@ defaults are not changed merely for code style or HT performance.
 - Setup source inputs remain unchanged on failed operations.
 - Future HT setup execution isolates fixed Fortran filenames and fatal-stop
   behavior in a worker workspace.
-- Deterministic setup and campaign operations record their seed and relevant
-  provenance.
+- Deterministic setup and campaign operations record active stochastic
+  operations, applicable seeds, and relevant provenance; deterministic
+  operations do not require a meaningless seed.
 - Exchange scientific identity is the periodic `(i, j, R)` key, where `R` is
   an integer lattice translation; `Atom_<index>` remains serialization only.
 - Symmetry reduction is conservative for SOC/magnetic states and does not
   mutate third-party private symmetry state.
 - Explicitly requested output failures propagate as operation failures.
 - Raw calculation evidence is retained when results are parsed.
+
+ASE `Atoms <-> RSStructure` is the supported structure boundary. Automatic
+ASE-to-LMTO setup-source generation is experimental and requires explicit
+opt-in because its generated LMTO policy is not an HT-ready scientific
+contract.

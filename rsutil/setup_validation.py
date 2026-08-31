@@ -83,6 +83,44 @@ def _has_errors(diagnostics: Sequence[Diagnostic]) -> bool:
     return any(item.severity is DiagnosticSeverity.ERROR for item in diagnostics)
 
 
+def _stochastic_provenance(spec: SetupSpec) -> dict[str, Any]:
+    """Describe only stochastic operations active in ``spec``.
+
+    A seed is not required for deterministic setup work.  The legacy seed
+    applies to lattice/basis distortions, while SQS has its own seed.
+    """
+
+    operations: list[str] = []
+    seeds: dict[str, int | None] = {}
+    if spec.lattice_dist > 0:
+        operations.append("lattice_distortion")
+        seeds["lattice_distortion"] = spec.seed
+    if spec.basis_dist > 0:
+        operations.append("basis_distortion")
+        seeds["basis_distortion"] = spec.seed
+    if spec.sqs is not None:
+        operations.append("sqs")
+        seeds["sqs"] = spec.sqs_seed
+
+    unseeded = [name for name in operations if seeds[name] is None]
+    reproducible = not unseeded
+    if not operations:
+        reason = "no stochastic operations requested"
+    elif reproducible:
+        reason = "all active stochastic operations are seeded"
+    else:
+        reason = "unseeded stochastic operations: " + ", ".join(unseeded)
+    return {
+        "active": bool(operations),
+        "operations": operations,
+        "seeds": seeds,
+        "seed": spec.seed,
+        "sqs_seed": spec.sqs_seed,
+        "reproducible": reproducible,
+        "reason": reason,
+    }
+
+
 def _read_namelist(path: Path, diagnostics: list[Diagnostic]) -> Mapping[str, Any] | None:
     if not path.is_file():
         diagnostics.append(_error(ErrorCode.MISSING_INPUT, "required namelist is missing", path=str(path)))
@@ -550,11 +588,12 @@ def validate_setup_namelists(
             diagnostics.append(_error(ErrorCode.SETUP_SPEC_INVALID, f"invalid setup specification: {exc}"))
 
     if setup_spec is not None:
-        if setup_spec.seed is None or (setup_spec.sqs is not None and setup_spec.sqs_seed is None):
+        stochastic = _stochastic_provenance(setup_spec)
+        if not stochastic["reproducible"]:
             diagnostics.append(
                 _warning(
                     ErrorCode.UNSEEDED_SETUP,
-                    "setup contains an unseeded stochastic operation; reproducibility is not guaranteed",
+                    f"setup contains {stochastic['reason']}; reproducibility is not guaranteed",
                 )
             )
         if setup_spec.supercell != (1, 1, 1):
@@ -840,7 +879,6 @@ def build_run_manifest(
         path = Path(path_value)
         if path.is_file():
             output_hashes[name] = {"sha256": hash_file(path), "size": path.stat().st_size}
-    reproducible = setup_spec.seed is not None and (setup_spec.sqs is None or setup_spec.sqs_seed is not None)
     diagnostics = () if validation is None else validation.diagnostics
     validation_data = {
         "valid": validation.valid if validation is not None else status == OperationStatus.SUCCESS,
@@ -848,12 +886,7 @@ def build_run_manifest(
         "warning_count": sum(item.severity is DiagnosticSeverity.WARNING for item in diagnostics),
         "diagnostics": [item.to_dict() for item in diagnostics],
     }
-    stochastic = {
-        "seed": setup_spec.seed,
-        "sqs_seed": setup_spec.sqs_seed,
-        "reproducible": reproducible,
-        "reason": "all stochastic operations are seeded" if reproducible else "one or more stochastic operations are unseeded",
-    }
+    stochastic = _stochastic_provenance(setup_spec)
     timestamps = {"started_at": started_at or _now(), "finished_at": finished_at or _now()}
     provenance = dict(base_provenance or {})
     provenance.pop("timestamps", None)

@@ -76,5 +76,7 @@ large-scale storage backend can use the same explicit identity arrays.
 Legacy `rs2txt.dat` remains readable by the existing bands reader. Its
 conversion method, `HamiltonianReader.to_tight_binding_model(lattice)`, is
 fail-closed unless its Cartesian displacement maps to exactly one periodic
-site/translation identity; legacy band/DOS analysis does not require this
+site/translation identity. The converter solves the legacy displacement
+equation directly in the supplied lattice basis; it does not impose a
+bounded translation search. Legacy band/DOS analysis does not require this
 conversion.

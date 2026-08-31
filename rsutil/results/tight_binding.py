@@ -533,23 +533,34 @@ def read_fable_v4_tb(
 
 
 def _match_legacy_translation(structure: RSStructure, site_i: int, displacement: Sequence[float], tolerance: float = 1e-6) -> tuple[int, int, int, int] | None:
-    """Return the unique target site and R matching a legacy Cartesian vector."""
+    """Return the unique target site and integer ``R`` for a legacy vector.
+
+    The legacy file stores ``origin - (target + R @ lattice)``.  Solve that
+    equation directly in the lattice basis; a bounded translation search
+    would silently make a valid long-range legacy block look unsupported.
+    """
 
     if structure.coordinate_convention.value != "cartesian":
         raise MalformedResultError("legacy TB conversion requires Cartesian site positions")
     vectors = np.asarray(structure.lattice_vectors, dtype=float)
+    if vectors.shape != (3, 3) or not np.all(np.isfinite(vectors)):
+        raise MalformedResultError("legacy TB conversion requires a finite 3x3 lattice")
+    try:
+        inverse = np.linalg.inv(vectors)
+    except np.linalg.LinAlgError as exc:
+        raise MalformedResultError("legacy TB conversion requires a non-singular lattice") from exc
     origin = np.asarray(structure.sites[site_i].position, dtype=float)
     displacement = np.asarray(displacement, dtype=float)
+    if displacement.shape != (3,) or not np.all(np.isfinite(displacement)):
+        raise MalformedResultError("legacy TB displacement must be a finite 3-vector")
     matches = []
     for site_j, site in enumerate(structure.sites):
         position = np.asarray(site.position, dtype=float)
-        for r1 in range(-5, 6):
-            for r2 in range(-5, 6):
-                for r3 in range(-5, 6):
-                    R = np.array((r1, r2, r3), dtype=float)
-                    expected = origin - (position + R @ vectors)
-                    if np.linalg.norm(expected - displacement) <= tolerance:
-                        matches.append((site_j, (r1, r2, r3)))
+        fractional = (origin - displacement - position) @ inverse
+        rounded = np.rint(fractional).astype(int)
+        expected = origin - (position + rounded @ vectors)
+        if np.linalg.norm(expected - displacement) <= tolerance:
+            matches.append((site_j, tuple(int(value) for value in rounded)))
     if len(matches) != 1:
         return None
     return (*matches[0][1], matches[0][0])

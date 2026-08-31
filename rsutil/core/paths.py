@@ -84,14 +84,16 @@ class Workspace:
         self._cleaned = True
 
     def child(self, name: str) -> Path:
-        """Return a safe child path and reject traversal outside the workspace."""
+        """Return a resolved child path and reject lexical/symlink escapes."""
 
         candidate = self.path / name
+        root = self.path.resolve()
+        resolved = candidate.resolve(strict=False)
         try:
-            candidate.relative_to(self.path)
+            resolved.relative_to(root)
         except ValueError as exc:
             raise ValueError(f"workspace child escapes workspace: {name!r}") from exc
-        return candidate
+        return resolved
 
 
 @contextmanager

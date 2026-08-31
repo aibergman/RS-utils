@@ -39,8 +39,10 @@ The report is optional and does not change the ordinary human-readable
 console output. Its top-level schemas are `rsutil-setup-report-v1` and
 `rsutil-run-v1`; diagnostic `code` values are stable machine-facing values,
 separate from human messages. Deterministic structure/setup hashes exclude
-timestamps, while the manifest records timestamps and the worker/build
-environment separately.
+  timestamps, while the manifest records actual operation start/finish times
+  and the worker/build environment separately. Stochastic provenance lists
+  active operations and their seeds; a missing seed is only a warning when a
+  stochastic distortion or SQS operation is actually requested.
 
 ## Lattice count validation
 

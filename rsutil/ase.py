@@ -247,7 +247,7 @@ class ASESetupSource:
 
 
 def _setup_source_text(structure: RSStructure) -> tuple[str, str]:
-    """Serialize only the geometry portion of the existing RS input contract."""
+    """Serialize geometry plus explicitly experimental placeholder policy."""
 
     if structure.coordinate_convention.value != "cartesian":
         raise ValueError("ASE setup source serialization requires Cartesian RSStructure positions")
@@ -262,7 +262,7 @@ def _setup_source_text(structure: RSStructure) -> tuple[str, str]:
     pbc = tuple(bool(value) for value in structure.pbc)
     nsites = len(symbols)
     volume_per_site = abs(determinant) / max(nsites, 1)
-    wav = volume_per_site ** (1.0 / 3.0)
+    wav = (3.0 * volume_per_site / (4.0 * math.pi)) ** (1.0 / 3.0)
     ndim = nsites * 1000 if any(pbc) else nsites
 
     lattice_lines = [
@@ -331,13 +331,22 @@ def write_setup_source(
     source_dir: str | Path,
     *,
     overwrite: bool = False,
+    experimental: bool = False,
 ) -> ASESetupSource:
     """Write an ASE-derived ``lattice.nml``/``input.nml`` source bundle.
 
-    The helper does not invent RS-LMTO element potential files.  Callers that
-    invoke the real Fortran setup service must provide those files as explicit
-    runner resources, just as they would for a hand-authored source directory.
+    This is an explicitly experimental convenience path, not an HT-ready
+    automatic LMTO setup policy.  It writes placeholder ``rc``, ``ct``,
+    recursion, and related values; callers must opt in and provide reviewed
+    element-potential resources before invoking the legacy kernel.  The
+    supported HT ASE contract is :func:`from_ase` / :func:`to_ase`.
     """
+
+    if not experimental:
+        raise ValueError(
+            "ASE-to-setup-source generation is experimental; pass experimental=True "
+            "after reviewing the generated LMTO policy"
+        )
 
     structure = from_ase(atoms)
     destination = Path(source_dir).expanduser().resolve()
@@ -365,18 +374,20 @@ def run_setup_from_ase(
     source_dir: str | Path | None = None,
     resources: Iterable[str | Path] = (),
     setup_service: SetupService | None = None,
+    experimental: bool = False,
     **kwargs: Any,
 ) -> Any:
-    """Generate a source bundle and delegate setup to the existing service.
+    """Generate an experimental source bundle and delegate setup to the service.
 
     ``resources`` is passed explicitly to the service/runner; no setup logic
     is duplicated here.  A temporary source bundle is used when ``source_dir``
-    is omitted and is removed after the service returns.
+    is omitted and is removed after the service returns.  Pass
+    ``experimental=True`` only after reviewing the generated LMTO policy.
     """
 
     service = setup_service or SetupService()
     if source_dir is not None:
-        bundle = write_setup_source(atoms, source_dir)
+        bundle = write_setup_source(atoms, source_dir, experimental=experimental)
         return service.run(
             bundle.source_dir,
             destination_dir,
@@ -385,7 +396,7 @@ def run_setup_from_ase(
             **kwargs,
         )
     with tempfile.TemporaryDirectory(prefix="rsutil-ase-source-") as temporary:
-        bundle = write_setup_source(atoms, temporary)
+        bundle = write_setup_source(atoms, temporary, experimental=experimental)
         return service.run(
             bundle.source_dir,
             destination_dir,

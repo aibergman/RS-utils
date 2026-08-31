@@ -15,6 +15,8 @@ from rsutil.results import (
     tight_binding_from_legacy_reader,
     tight_binding_from_ml_dataset,
 )
+from rsutil.results.tight_binding import _match_legacy_translation
+from rsutil.core import RSStructure, StructureSite
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -63,6 +65,17 @@ def test_legacy_reader_remains_available_and_conversion_requires_lattice_identit
     assert model.energy_unit.value == "unknown"
     assert model.dimension == 36
     assert model.hoppings
+
+
+def test_legacy_translation_solver_accepts_long_range_periodic_blocks() -> None:
+    structure = RSStructure(
+        lattice_vectors=((1, 0, 0), (0, 1, 0), (0, 0, 1)),
+        length_unit="angstrom",
+        coordinate_convention="cartesian",
+        sites=(StructureSite(0, (0, 0, 0), "X", None),),
+    )
+
+    assert _match_legacy_translation(structure, 0, (-6.0, 0.0, 0.0)) == (6, 0, 0, 0)
 
 
 def test_control_nsp_records_soc_and_magnetic_representation() -> None:

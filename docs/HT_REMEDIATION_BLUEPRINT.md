@@ -71,7 +71,7 @@ pre-remediation implementation.
 - [x] **HT-R04** — Harden manifests, pair identity, and reuse integrity
 - [x] **HT-R05** — Bound and harden exchange symmetry/magnetic-reference semantics
 - [x] **HT-R06** — Complete transport/damping source audit against `fable_v4`
-- [ ] **HT-R07** — Provenance, ASE, path, indexing, and dead-code cleanup
+- [x] **HT-R07** — Provenance, ASE, path, indexing, and dead-code cleanup
 - [ ] **HT-R08** — Make packaging, test environment, and CI reproducible
 - [ ] **HT-R09** — True adversarial HT closeout and pilot evidence
 
@@ -377,4 +377,41 @@ Required verification:
 tests/test_ht13_transport_results.py  17 passed
 tests/test_ht11_results.py              6 passed
 full feasible suite                    132 passed, 12 warnings
+```
+
+## HT-R07 decision and evidence
+
+HT-R07 was completed without changing the protected Fortran kernel or
+redesigning the TB/ASE workflows. Setup provenance now derives reproducibility
+from active stochastic operations: deterministic unseeded setup is
+reproducible, while lattice/basis distortion and SQS operations identify their
+seeds and warn when an active operation is unseeded. Setup manifests receive
+operation start/finish timestamps from the service lifecycle, and those
+timestamps remain outside deterministic scientific identity hashes.
+
+The supported ASE boundary remains `Atoms <-> RSStructure`. The full
+ASE-to-setup-source helper is now explicitly experimental and requires
+`experimental=True`; its generated LMTO policy is documented as placeholder
+and reviewed rather than silently advertised as HT-ready. Its derived
+Wigner-Seitz radius uses `(3 V_atom / (4 pi))^(1/3)`.
+
+`Workspace.child()` now resolves the owned root and candidate path before
+containment checking, rejecting `..`, absolute, and symlink escapes. Exchange
+neighbor reduction accepts an explicit `index_base` and normalizes once to
+canonical zero-based site indices; no integer-domain heuristic remains. The
+unreachable post-service setup implementation was removed from `cli.py` after
+the existing service-path CLI regressions passed.
+
+Legacy `rs2txt.dat` conversion now solves its Cartesian displacement equation
+directly in the supplied lattice basis, preserving exact long-range periodic
+identities instead of limiting the search to translations in `[-5, 5]`.
+The legacy path remains fail-closed for singular, malformed, or ambiguous
+geometry. Relevant setup, ASE, path, indexing, CLI, and TB documentation was
+updated.
+
+Required verification:
+
+```text
+HT-R07 focused suites                 55 passed
+full feasible suite                  136 passed, 12 warnings
 ```

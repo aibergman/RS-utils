@@ -12,6 +12,7 @@ import re
 import shutil
 import sys
 from dataclasses import replace
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -32,6 +33,10 @@ from .setup_validation import build_run_manifest, validate_setup_namelists, vali
 
 
 _COLLISION_POLICIES = frozenset({"error", "replace"})
+
+
+def _timestamp() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def _diagnostic(code: ErrorCode, message: str, **details: Any) -> Diagnostic:
@@ -408,6 +413,7 @@ class SetupService:
         collision_policy: str = "error",
         resources: Iterable[str | Path] = (),
     ) -> SetupResult:
+        started_at = _timestamp()
         source = Path(source_dir).resolve()
         destination = Path(destination_dir).resolve()
         try:
@@ -441,7 +447,7 @@ class SetupService:
                 ),
                 semantic_validation=preflight_validation,
             )
-            return self._with_manifest(failed, source, input_nml, setup_spec)
+            return self._with_manifest(failed, source, input_nml, setup_spec, started_at=started_at)
 
         transform_workspace: Workspace | None = None
         runner_workspace: Workspace | None = None
@@ -467,7 +473,7 @@ class SetupService:
                 runner_kwargs["resources"] = resource_paths
             result = self.runner.run(run_lattice, run_input, setup_spec, **runner_kwargs)
             if not result.success:
-                return self._with_manifest(result, source, input_nml, setup_spec)
+                return self._with_manifest(result, source, input_nml, setup_spec, started_at=started_at)
 
             if result.semantic_validation is not None:
                 semantic_validation = ValidationResult(
@@ -489,6 +495,7 @@ class SetupService:
                         source,
                         input_nml,
                         setup_spec,
+                        started_at=started_at,
                     )
 
             if isinstance(self.runner, FortranSetupRunner) and setup_spec.supercell != (1, 1, 1):
@@ -511,6 +518,7 @@ class SetupService:
                         source,
                         input_nml,
                         setup_spec,
+                        started_at=started_at,
                     )
 
             committed_files = _commit_setup_outputs(
@@ -522,9 +530,6 @@ class SetupService:
                 collision_policy=collision_policy,
             )
             provenance = dict(result.provenance)
-            reproducible = setup_spec.seed is not None and (
-                setup_spec.sqs is None or setup_spec.sqs_seed is not None
-            )
             output_paths = {
                 name: (
                     destination / "lattice.nml"
@@ -543,7 +548,10 @@ class SetupService:
                 validation=result.semantic_validation,
                 output_paths=output_paths,
                 base_provenance=result.provenance,
+                started_at=started_at,
+                finished_at=_timestamp(),
             )
+            reproducible = bool(manifest.stochastic.get("reproducible"))
             provenance.update(
                 {
                     "source_dir": str(source),
@@ -554,28 +562,45 @@ class SetupService:
                     "backup": backup or in_place,
                     "committed_files": list(committed_files),
                     "reproducible": reproducible,
-                    "randomness": {
-                        "seed": setup_spec.seed,
-                        "sqs_seed": setup_spec.sqs_seed,
-                        "reproducible": reproducible,
-                    },
+                    "randomness": dict(manifest.stochastic),
                     "manifest": manifest.to_dict(),
                 }
             )
             result = replace(result, provenance=provenance)
             return result
         except _OutputCollisionError as exc:
-            return SetupResult(
-                status=OperationStatus.FAILED,
-                diagnostics=(_diagnostic(ErrorCode.OUTPUT_COLLISION, str(exc)),),
+            return self._with_manifest(
+                SetupResult(
+                    status=OperationStatus.FAILED,
+                    diagnostics=(_diagnostic(ErrorCode.OUTPUT_COLLISION, str(exc)),),
+                ),
+                source,
+                input_nml,
+                setup_spec,
+                started_at=started_at,
             )
         except _CommitError as exc:
-            return SetupResult(
-                status=OperationStatus.FAILED,
-                diagnostics=(_diagnostic(ErrorCode.COMMIT_FAILED, str(exc)),),
+            return self._with_manifest(
+                SetupResult(
+                    status=OperationStatus.FAILED,
+                    diagnostics=(_diagnostic(ErrorCode.COMMIT_FAILED, str(exc)),),
+                ),
+                source,
+                input_nml,
+                setup_spec,
+                started_at=started_at,
             )
         except Exception as exc:
-            return SetupResult(status=OperationStatus.FAILED, diagnostics=(_diagnostic(ErrorCode.WORKSPACE_ERROR, f"setup service failed: {exc}"),))
+            return self._with_manifest(
+                SetupResult(
+                    status=OperationStatus.FAILED,
+                    diagnostics=(_diagnostic(ErrorCode.WORKSPACE_ERROR, f"setup service failed: {exc}"),),
+                ),
+                source,
+                input_nml,
+                setup_spec,
+                started_at=started_at,
+            )
         finally:
             if transform_workspace is not None:
                 transform_workspace.cleanup()
@@ -588,6 +613,8 @@ class SetupService:
         source: Path,
         input_path: Path,
         spec: SetupSpec,
+        *,
+        started_at: str | None = None,
     ) -> SetupResult:
         """Attach the same machine-readable provenance to success and failure."""
 
@@ -599,6 +626,8 @@ class SetupService:
                 status=result.status,
                 validation=result.semantic_validation,
                 base_provenance=result.provenance,
+                started_at=started_at,
+                finished_at=_timestamp(),
             )
             provenance = dict(result.provenance)
             provenance["manifest"] = manifest.to_dict()

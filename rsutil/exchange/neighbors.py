@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 
 import numpy as np
@@ -100,20 +101,23 @@ def _canonical_from_pymatgen(structure: Structure) -> RSStructure:
     )
 
 
-def _normalize_reference_sites(
-    recursion_sites: Sequence[int], site_count: int
+def _reference_indices(
+    recursion_sites: Sequence[int], site_count: int, *, index_base: int
 ) -> tuple[int, ...]:
-    """Normalize the legacy one-based boundary to canonical zero-based sites."""
+    """Normalize an explicitly declared index base to zero-based sites."""
+
+    if index_base not in (0, 1):
+        raise ValueError("index_base must be 0 or 1")
 
     result: list[int] = []
     for value in recursion_sites:
         integer = int(value)
-        if 1 <= integer <= site_count:
-            result.append(integer - 1)
-        else:
+        canonical = integer - index_base
+        if not 0 <= canonical < site_count:
             raise ValueError(
-                f"legacy recursion site {integer} is outside the reference cell"
+                f"recursion site {integer} is outside the reference cell for index_base={index_base}"
             )
+        result.append(canonical)
     return tuple(result)
 
 
@@ -130,21 +134,28 @@ def discover_exact_unique_neighbors(
     magnetic_context: MagneticSymmetryContext | None = None,
     magnetic_reference: str | None = None,
     tolerance: float = 1e-8,
+    index_base: int = 1,
     verbose: bool = False,
 ) -> dict[int, list[Any]]:
     """Reduce neighbors using canonical zero-based sites internally.
 
-    ``recursion_sites`` is the legacy one-based RS-LMTO boundary.  It is
-    normalized once before any pair mapping; the pair-key symmetry machinery
-    never performs index-base inference.
+    ``recursion_sites`` uses the explicit ``index_base`` boundary declaration
+    (the RS-LMTO file boundary defaults to one-based). It is normalized once
+    before any pair mapping; the pair-key symmetry machinery never performs
+    index-base inference.
     """
+
+    if index_base not in (0, 1):
+        raise ValueError("index_base must be 0 or 1")
 
     if analyzer is None:
         # No crystallographic operation source means no scientifically valid
         # reduction.  Returning all pairs is the conservative behavior.
         return discover_default_neighbors(cluster, recursion_sites, cutoff=cutoff, verbose=verbose)
     canonical = canonical_structure or _canonical_from_pymatgen(structure)
-    center_sites = _normalize_reference_sites(recursion_sites, len(canonical.sites))
+    center_sites = _reference_indices(
+        recursion_sites, len(canonical.sites), index_base=index_base
+    )
     all_neighbors = discover_default_neighbors(cluster, recursion_sites, cutoff=cutoff, verbose=False)
     operations = periodic_symmetry_operations(
         structure,
@@ -208,6 +219,7 @@ def discover_legacy_unique_neighbors(
     magnetic_axis: tuple[float, float, float] | None = None,
     magnetic_context: MagneticSymmetryContext | None = None,
     magnetic_reference: str | None = None,
+    index_base: int = 1,
     verbose: bool = False,
 ) -> dict[int, list[Any]]:
     """Compatibility wrapper for exact periodic symmetry reduction.
@@ -231,6 +243,7 @@ def discover_legacy_unique_neighbors(
         magnetic_axis=magnetic_axis,
         magnetic_context=magnetic_context,
         magnetic_reference=magnetic_reference,
+        index_base=index_base,
         verbose=verbose,
     )
 
@@ -250,6 +263,7 @@ def discover_neighbors(
     magnetic_context: MagneticSymmetryContext | None = None,
     magnetic_reference: str | None = None,
     full_pairs: bool = False,
+    index_base: int = 1,
     verbose: bool = False,
 ) -> dict[int, list[Any]]:
     """Dispatch through the isolated legacy reduction interface."""
@@ -267,6 +281,7 @@ def discover_neighbors(
             magnetic_axis=magnetic_axis,
             magnetic_context=magnetic_context,
             magnetic_reference=magnetic_reference,
+            index_base=index_base,
             verbose=verbose,
         )
     return discover_default_neighbors(

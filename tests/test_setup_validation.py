@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from pathlib import Path
 
 from rsutil.core import ErrorCode, SetupReport, SetupSpec
@@ -200,6 +201,36 @@ def test_bad_supercell_and_2d_options_fail_as_spec_diagnostics(tmp_path: Path) -
         )
         assert not validation.valid
         assert ErrorCode.SETUP_SPEC_INVALID.value in _codes(validation)
+
+
+def test_deterministic_setup_without_seed_is_reproducible(tmp_path: Path) -> None:
+    _fixture(tmp_path)
+    validation = validate_setup(
+        tmp_path / "lattice.nml", tmp_path / "input.nml", spec=SetupSpec()
+    )
+    assert validation.valid
+    assert ErrorCode.UNSEEDED_SETUP.value not in _codes(validation)
+
+    manifest = setup_report(SetupService().run(tmp_path, tmp_path, SetupSpec())).manifest
+    assert manifest.stochastic["active"] is False
+    assert manifest.stochastic["operations"] == []
+    assert manifest.stochastic["reproducible"] is True
+    assert manifest.stochastic["reason"] == "no stochastic operations requested"
+    timestamps = manifest.timestamps
+    assert datetime.fromisoformat(timestamps["started_at"].replace("Z", "+00:00")) <= datetime.fromisoformat(
+        timestamps["finished_at"].replace("Z", "+00:00")
+    )
+
+    stochastic = SetupSpec(lattice_dist=0.1)
+    stochastic_manifest = setup_report(SetupService().run(tmp_path, tmp_path, stochastic)).manifest
+    assert stochastic_manifest.stochastic["active"] is True
+    assert stochastic_manifest.stochastic["operations"] == ["lattice_distortion"]
+    assert stochastic_manifest.stochastic["reproducible"] is False
+    assert ErrorCode.UNSEEDED_SETUP.value in {
+        item.code for item in validate_setup(
+            tmp_path / "lattice.nml", tmp_path / "input.nml", spec=stochastic
+        ).diagnostics
+    }
 
 
 def test_generated_recursion_and_sphere_records_are_checked(tmp_path: Path) -> None:

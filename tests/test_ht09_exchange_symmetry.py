@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 from pymatgen.core import Lattice, Molecule, Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
@@ -219,3 +220,15 @@ def test_missing_symmetry_analyzer_keeps_all_neighbors() -> None:
     )
 
     assert len(actual[0]) == len(expected[0])
+
+
+def test_reference_indices_require_an_explicit_index_base() -> None:
+    from rsutil.exchange.neighbors import _reference_indices
+
+    assert _reference_indices([0, 1], 2, index_base=0) == (0, 1)
+    assert _reference_indices([1, 2], 2, index_base=1) == (0, 1)
+    for values, base in (([0], 1), ([2], 0)):
+        with pytest.raises(ValueError, match="index_base"):
+            _reference_indices(values, 2, index_base=base)
+    with pytest.raises(ValueError, match="index_base must be 0 or 1"):
+        _reference_indices([1], 2, index_base=2)

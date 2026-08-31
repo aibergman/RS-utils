@@ -99,7 +99,9 @@ def test_missing_ase_has_a_clear_optional_dependency_error(monkeypatch: pytest.M
 
 def test_setup_source_uses_existing_namelist_contract_and_preserves_species_order(tmp_path: Path) -> None:
     atoms = _atoms(np.diag([3.0, 4.0, 5.0]), (True, True, False))
-    bundle = write_setup_source(atoms, tmp_path / "source")
+    with pytest.raises(ValueError, match="experimental"):
+        write_setup_source(atoms, tmp_path / "not-approved")
+    bundle = write_setup_source(atoms, tmp_path / "source", experimental=True)
 
     lattice = f90nml.read(bundle.lattice_path)["lattice"]
     input_nml = f90nml.read(bundle.input_path)
@@ -108,6 +110,8 @@ def test_setup_source_uses_existing_namelist_contract_and_preserves_species_orde
     assert np.asarray(lattice["crd"]).shape == (3, 3)
     assert input_nml["lattice"]["b3"] is False
     assert input_nml["atoms"]["label"] == ["Fe", "Pt", "N"]
+    expected_wav = (3.0 * (3.0 * 4.0 * 5.0 / 3.0) / (4.0 * np.pi)) ** (1.0 / 3.0)
+    np.testing.assert_allclose(input_nml["lattice"]["wav"], expected_wav)
 
 
 class _ResourceAwareRunner:
@@ -133,6 +137,7 @@ def test_run_setup_from_ase_delegates_to_setup_service_with_explicit_resources(t
         tmp_path / "destination",
         SetupSpec(),
         resources=[resource],
+        experimental=True,
         setup_service=SetupService(runner=_ResourceAwareRunner()),
     )
     assert result.success

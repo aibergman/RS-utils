@@ -21,10 +21,13 @@ structure = from_ase(atoms)
 round_tripped = to_ase(structure)
 ```
 
-The setup helper serializes the same `lattice.nml`/`input.nml` source contract
-used by `SetupService`, then delegates to that service.  It does not invent
-RS-LMTO element potential files; provide those as explicit runner resources
-when using a real legacy setup kernel:
+The `Atoms <-> RSStructure` conversion above is the supported HT ASE
+boundary. Full ASE-to-setup-source generation is retained only as an
+explicitly opt-in experimental convenience; it emits placeholder LMTO policy
+(`rc`, `ct`, recursion dimensions, and related values) and does not establish
+scientifically reviewed setup defaults. It also does not invent RS-LMTO
+element potential files. If this experimental path is deliberately reviewed,
+pass `experimental=True` and provide the required resources explicitly:
 
 ```python
 from ase.io import read
@@ -38,6 +41,7 @@ result = run_setup_from_ase(
     "runs/structure-setup",
     SetupSpec(seed=42),
     resources=["potentials/Fe.nml", "potentials/Pt.nml"],
+    experimental=True,
     collision_policy="error",
 )
 if not result.success:
@@ -47,3 +51,7 @@ if not result.success:
 The adapter accepts fractional `RSStructure` coordinates when converting to
 ASE, and supports `angstrom`, `bohr`, `nm`, and `pm` length units.  Unknown
 units fail explicitly instead of being silently interpreted as Å.
+
+The experimental source helper derives the initial Wigner-Seitz radius as
+`(3 V_atom / (4 pi))^(1/3)`, but this value and the other generated policy
+fields remain subject to review by the legacy setup workflow.

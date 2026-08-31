@@ -79,6 +79,21 @@ def test_workspace_cleans_up_after_exception(tmp_path: Path) -> None:
     assert not holder["path"].exists()
 
 
+def test_workspace_child_rejects_absolute_dotdot_and_symlink_escape(tmp_path: Path) -> None:
+    workspace = Workspace.create(tmp_path)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    link = workspace.path / "link"
+    link.symlink_to(outside, target_is_directory=True)
+    try:
+        for name in ("../escape", str(tmp_path / "absolute"), "link/escape"):
+            with pytest.raises(ValueError, match="escapes workspace"):
+                workspace.child(name)
+        assert workspace.child("nested/file").is_relative_to(workspace.path.resolve())
+    finally:
+        workspace.cleanup()
+
+
 def test_workspaces_are_independent_and_same_filesystem_staging_is_atomic(tmp_path: Path) -> None:
     first = Workspace.create(tmp_path)
     second = Workspace.create(tmp_path)
