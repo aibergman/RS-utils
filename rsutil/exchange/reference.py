@@ -15,6 +15,7 @@ from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from rsutil.core import RSStructure, StructureSite
 
 from .fermi import parse_fermi_energy
+from .symmetry import NspSemantics, nsp_semantics
 
 
 def _as_list(value: Any) -> list[Any]:
@@ -129,6 +130,21 @@ def _recursion_sites(lattice_nml: dict) -> tuple[int, ...]:
     return tuple(int(value) for value in values)
 
 
+def _nsp(input_nml: dict) -> int | None:
+    """Read ``control.nsp`` without inventing a default for old inputs."""
+
+    try:
+        value = input_nml["control"].get("nsp")
+    except (AttributeError, KeyError, TypeError):
+        return None
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"reference control.nsp must be an integer, got {value!r}") from exc
+
+
 @dataclass(frozen=True)
 class ReferenceCalculation:
     """All source data required to plan exchange jobs."""
@@ -146,6 +162,31 @@ class ReferenceCalculation:
     cluster: Molecule
     recursion_sites: tuple[int, ...]
     fermi_energy: float
+    nsp: int | None = None
+
+    @property
+    def nsp_semantics(self) -> NspSemantics:
+        """Return the centralized source-derived ``nsp`` interpretation."""
+
+        return nsp_semantics(self.nsp)
+
+    @property
+    def is_collinear(self) -> bool | None:
+        """Whether the source calculation uses a collinear representation."""
+
+        return self.nsp_semantics.is_collinear
+
+    @property
+    def is_noncollinear(self) -> bool | None:
+        """Whether the source calculation uses a noncollinear representation."""
+
+        return self.nsp_semantics.is_noncollinear
+
+    @property
+    def has_soc(self) -> bool | None:
+        """Whether the source calculation includes spin-orbit coupling."""
+
+        return self.nsp_semantics.has_soc
 
 
 def read_reference_calculation(
@@ -185,6 +226,7 @@ def read_reference_calculation(
         cluster=read_rs_clust(cluster_file, input_file),
         recursion_sites=_recursion_sites(lattice_nml),
         fermi_energy=parse_fermi_energy(report_file),
+        nsp=_nsp(input_nml),
     )
 
 

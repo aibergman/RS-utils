@@ -1,6 +1,6 @@
 # RS-utils HT readiness report — HT-R10…R14 closeout
 
-> **HT FOUNDATION NOT READY FOR PILOT USE — HT-R12, HT-R13, AND HT-R14
+> **HT FOUNDATION NOT READY FOR PILOT USE — HT-R13 AND HT-R14
 > REMAIN OPEN.**
 >
 > The earlier R09 conclusion is superseded/reopened by the post-R09
@@ -90,7 +90,7 @@ and `UNSUPPORTED`.
 | Scalar exchange | READY | Canonical pair generation, manifests, and real MnSi result parsing pass. |
 | DMI | READY | MnSi `jijso.out` fixture parses with explicit mRy provenance. |
 | Full tensor exchange | EXPERIMENTAL | Explicit tensor parsing exists; unverified sources retain unknown units and require review. |
-| SOC symmetry | RESTRICTED | Proven only for the documented axial-`+z` collinear domain; axis-flipping operations are excluded. |
+| SOC symmetry | RESTRICTED | Source `nsp` controls SOC; reduction is proven only for explicit collinear-FM references with an explicit axial magnetization axis. |
 | AFM/ferrimagnetic symmetry | RESTRICTED | Conservative identity/full-pair behavior is covered; no general magnetic reduction is claimed. |
 | Generic noncollinear symmetry | UNSUPPORTED | No general equivalence theorem is asserted; retain full inventory and require domain-specific review. |
 | SCF parsing/convergence | READY | Converged, non-converged, malformed, unknown, and execution-failure states are distinct and tested. |
@@ -152,7 +152,26 @@ python -m pytest -q tests/test_ht10_exchange_jobs.py tests/test_ht16_campaign.py
 21 passed, 1 warning
 ```
 
-R12, R13, and R14 remain open release blockers.
+R13 and R14 remain open release blockers.
+
+## Current HT-R12 closeout
+
+HT-R12 is closed for the magnetic-reference-aware symmetry contract. The
+public `fable_v4` `control` source establishes `nsp=1/2` as collinear and
+`nsp=3/4` as noncollinear, with SOC in `nsp=2/4`. RS-utils now retains and
+propagates that source value; it does not infer FM from collinearity. Unknown,
+AFM, ferrimagnetic, and noncollinear references use identity-only reduction.
+An explicit collinear-FM assertion is required for reduction, and SOC
+reduction additionally requires an explicit global magnetization axis.
+
+The focused R12 suite passed:
+
+```text
+python -m pytest -q tests/test_ht12_magnetic_reference.py tests/test_ht08_exchange_service.py tests/test_ht09_exchange_symmetry.py tests/test_ht10_exchange_jobs.py tests/test_legacy_cli.py
+45 passed
+```
+
+R13 and R14 remain release blockers.
 
 ## Historical HT-18 evidence (preserved)
 

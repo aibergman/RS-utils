@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
+import warnings
 
 from rsutil.core import ExchangePair, PairKey
 from rsutil.core.hashing import hash_file, hash_json
@@ -19,7 +20,11 @@ from .jobs import (
 from .neighbors import discover_neighbors
 from .pairs import legacy_displacement_mapping
 from .reference import ReferenceCalculation, read_reference_calculation
-from .symmetry import MagneticSymmetryContext
+from .symmetry import (
+    MAGNETIC_REFERENCE_COLLINEAR_FM,
+    MAGNETIC_REFERENCE_UNKNOWN,
+    MagneticSymmetryContext,
+)
 from .writer import write_Rij_mappings
 
 
@@ -107,6 +112,84 @@ def _logical_source_path(path: Path, root: Path) -> str:
         return path.resolve().as_posix()
 
 
+def _resolve_magnetic_context(
+    reference: ReferenceCalculation,
+    *,
+    soc: bool | None,
+    magnetic_axis: tuple[float, float, float] | None,
+    magnetic_context: MagneticSymmetryContext | None,
+    magnetic_reference: str | None,
+) -> MagneticSymmetryContext:
+    """Combine source-derived spin mode with explicit magnetic assertions."""
+
+    if magnetic_context is not None and magnetic_reference is not None:
+        raise ValueError("provide magnetic_context or magnetic_reference, not both")
+    if magnetic_context is not None and magnetic_axis is not None:
+        raise ValueError("provide magnetic_axis through magnetic_context, not both")
+
+    source_soc = reference.has_soc
+    if magnetic_context is not None:
+        if soc is not None and bool(soc) != magnetic_context.soc:
+            raise ValueError(
+                "explicit soc conflicts with magnetic_context.soc; refusing to override context"
+            )
+        if source_soc is not None and magnetic_context.soc != source_soc:
+            raise ValueError(
+                f"explicit magnetic context SOC={magnetic_context.soc} conflicts with "
+                f"reference nsp={reference.nsp} SOC={source_soc}"
+            )
+        if (
+            magnetic_context.nsp is not None
+            and reference.nsp is not None
+            and magnetic_context.nsp != reference.nsp
+        ):
+            raise ValueError(
+                "magnetic context nsp conflicts with the reference input; refusing to override source"
+            )
+        return replace(
+            magnetic_context,
+            nsp=reference.nsp,
+            nsp_source=_logical_source_path(reference.input_path, reference.source_dir),
+        )
+
+    if soc is not None and source_soc is not None and bool(soc) != source_soc:
+        raise ValueError(
+            f"explicit soc={bool(soc)} conflicts with reference nsp={reference.nsp} "
+            f"(soc={source_soc})"
+        )
+    effective_soc = source_soc if soc is None and source_soc is not None else bool(soc or False)
+    selected_reference = magnetic_reference or MAGNETIC_REFERENCE_UNKNOWN
+    if (
+        selected_reference == MAGNETIC_REFERENCE_COLLINEAR_FM
+        and reference.is_noncollinear is True
+    ):
+        raise ValueError(
+            f"magnetic reference {selected_reference!r} conflicts with noncollinear nsp={reference.nsp}"
+        )
+    return MagneticSymmetryContext(
+        reference_class=selected_reference,
+        soc=effective_soc,
+        magnetic_axis=magnetic_axis,
+        nsp=reference.nsp,
+        nsp_source=_logical_source_path(reference.input_path, reference.source_dir),
+    )
+
+
+def _reduction_metadata(
+    *,
+    unique: bool,
+    full_pairs: bool,
+    context: MagneticSymmetryContext,
+) -> tuple[bool, str]:
+    if full_pairs:
+        return False, "full_pairs requested"
+    if not unique:
+        return False, "symmetry reduction not requested"
+    if context.reduction_supported:
+        return True, context.reduction_reason
+    return False, context.reduction_reason
+
+
 class ExchangeService:
     """Plan and serialize exchange jobs without changing process CWD."""
 
@@ -119,7 +202,7 @@ class ExchangeService:
         cutoff: float = 1.0,
         unique: bool = False,
         shell_width: float = 0.1,
-        soc: bool = False,
+        soc: bool | None = None,
         full_pairs: bool = False,
         magnetic_axis: tuple[float, float, float] | None = None,
         magnetic_context: MagneticSymmetryContext | None = None,
@@ -132,13 +215,6 @@ class ExchangeService:
     ) -> ExchangePlan:
         """Read inputs, discover neighbors, and construct canonical jobs."""
 
-        effective_soc = magnetic_context.soc if magnetic_context is not None else soc
-        effective_axis = (
-            magnetic_context.magnetic_axis
-            if magnetic_context is not None and magnetic_axis is None
-            else magnetic_axis
-        )
-
         reference = read_reference_calculation(
             self.source_dir,
             input_path=input_path,
@@ -147,6 +223,27 @@ class ExchangeService:
             report_path=report_path,
             verbose=verbose,
         )
+        resolved_context = _resolve_magnetic_context(
+            reference,
+            soc=soc,
+            magnetic_axis=magnetic_axis,
+            magnetic_context=magnetic_context,
+            magnetic_reference=magnetic_reference,
+        )
+        effective_soc = resolved_context.soc
+        effective_axis = resolved_context.magnetic_axis
+        reduction_applied, reduction_reason = _reduction_metadata(
+            unique=unique,
+            full_pairs=full_pairs,
+            context=resolved_context,
+        )
+        if unique and not full_pairs and not reduction_applied:
+            warnings.warn(
+                "exchange symmetry reduction is identity-only: "
+                f"{reduction_reason}; retaining the complete candidate pair set",
+                UserWarning,
+                stacklevel=2,
+            )
         required_files = required_atom_files_from_input(reference.input_nml)
         source_identity = _source_run_identity(reference, required_files)
         neighbors = discover_neighbors(
@@ -159,9 +256,8 @@ class ExchangeService:
             structure=reference.structure,
             canonical_structure=reference.canonical_structure,
             soc=effective_soc,
-            magnetic_axis=effective_axis,
-            magnetic_context=magnetic_context,
-            magnetic_reference=magnetic_reference,
+            magnetic_axis=None,
+            magnetic_context=resolved_context,
             full_pairs=full_pairs,
             verbose=verbose,
         )
@@ -177,19 +273,22 @@ class ExchangeService:
             reduction="unique" if unique and not full_pairs else "full",
             soc=effective_soc,
             magnetic_axis=effective_axis,
-            magnetic_reference=(
-                magnetic_reference
-                if magnetic_reference is not None
-                else (
-                    magnetic_context.reference_class
-                    if magnetic_context is not None
-                    else "collinear_fm"
-                )
-            ),
+            magnetic_reference=resolved_context.reference_class,
             fermi_energy_source=_logical_source_path(reference.report_path, self.source_dir),
             required_atom_files=required_files,
             source_run_identity=source_identity,
             source_run_hash=source_identity,
+            nsp=reference.nsp,
+            nsp_source=_logical_source_path(reference.input_path, reference.source_dir),
+            is_collinear=reference.is_collinear,
+            is_noncollinear=reference.is_noncollinear,
+            soc_source=(
+                "reference:control.nsp"
+                if reference.has_soc is not None
+                else ("caller" if soc is not None else "unknown")
+            ),
+            symmetry_reduction_applied=reduction_applied,
+            symmetry_reduction_reason=reduction_reason,
         )
         return ExchangePlan(
             reference=reference,
@@ -204,7 +303,7 @@ class ExchangeService:
         cutoff: float = 1.0,
         unique: bool = False,
         shell_width: float = 0.1,
-        soc: bool = False,
+        soc: bool | None = None,
         full_pairs: bool = False,
         magnetic_axis: tuple[float, float, float] | None = None,
         magnetic_context: MagneticSymmetryContext | None = None,

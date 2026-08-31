@@ -171,7 +171,7 @@ def exchange_map(
     verbose: bool = False,
     unique: bool = False,
     shell_width: float = 0.1,
-    soc: bool = False,
+    soc: bool | None = None,
     full_pairs: bool = False,
     magnetic_axis: tuple[float, float, float] | None = None,
     magnetic_reference: str | None = None,

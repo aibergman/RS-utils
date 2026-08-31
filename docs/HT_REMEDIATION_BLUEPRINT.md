@@ -76,7 +76,7 @@ pre-remediation implementation.
 - [ ] **HT-R09** — True adversarial HT closeout and pilot evidence *(superseded/reopened by post-R09 self-review; historical evidence preserved below)*
 - [x] **HT-R10** — Interaction scientific contract closeout
 - [x] **HT-R11** — Authoritative regeneration-based reuse
-- [ ] **HT-R12** — Magnetic-reference-aware symmetry contract
+- [x] **HT-R12** — Magnetic-reference-aware symmetry contract
 - [ ] **HT-R13** — Installed-wheel clean-environment verification
 - [ ] **HT-R14** — Final falsification closeout
 
@@ -629,4 +629,42 @@ runtime outputs and seeded stochastic campaign reuse:
 ```text
 python -m pytest -q tests/test_ht10_exchange_jobs.py tests/test_ht16_campaign.py
 21 passed, 1 warning
+```
+
+### HT-R12 decision and evidence
+
+HT-R12 is closed for source-derived magnetic context. The current public
+`fable_v4` `control` source documents `nsp=1` as collinear scalar-relativistic,
+`nsp=2` as collinear fully-relativistic, `nsp=3` as noncollinear
+scalar-relativistic, and `nsp=4` as noncollinear fully-relativistic. Its
+`is_collinear`, `is_noncollinear`, and `has_soc` helpers implement exactly
+that mapping. These values describe the spin representation and SOC mode;
+they do not establish FM, AFM, or ferrimagnetic order.
+
+`ReferenceCalculation` now retains `control.nsp` and exposes the centralized
+source-derived `nsp`, collinearity, noncollinearity, and SOC properties.
+Missing and unsupported values remain explicit unknowns. Exchange planning
+derives SOC from the reference when present and rejects an explicit conflicting
+SOC argument rather than silently overriding the source.
+
+Symmetry planning defaults to the `unknown` magnetic-reference class. Unknown
+order, AFM, ferrimagnetic, and noncollinear references retain the complete
+candidate pair set. Only an explicit `collinear_fm` assertion can enable the
+proven reduction domain; SOC additionally requires an explicit global
+magnetization axis. The CLI remains compatible with `rsutil -J`, and now
+offers `--magnetic-reference collinear_fm --magnetic-axis X Y Z` for that
+restricted opt-in. Job manifests record source `nsp`, derived spin/SOC state,
+magnetic class, axis, reduction status, and the conservative-reduction reason.
+
+Negative controls cover all four `nsp` modes, missing `nsp`, conflicting SOC,
+noncollinear references, absent SOC axes, and accidental FM inference.
+Positive controls cover explicit collinear-FM reduction with and without SOC,
+including the restricted axial-axis case. Same-element RS labels remain part
+of site identity and the exact periodic pair-key tests remain unchanged.
+
+Focused R12 evidence:
+
+```text
+python -m pytest -q tests/test_ht12_magnetic_reference.py tests/test_ht08_exchange_service.py tests/test_ht09_exchange_symmetry.py tests/test_ht10_exchange_jobs.py tests/test_legacy_cli.py
+45 passed
 ```

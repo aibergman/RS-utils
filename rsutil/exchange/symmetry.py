@@ -47,6 +47,43 @@ _MAGNETIC_REFERENCE_CLASSES = frozenset(
 
 
 @dataclass(frozen=True)
+class NspSemantics:
+    """Source-derived meaning of the RS-LMTO ``control.nsp`` value.
+
+    The public ``fable_v4`` control contract uses ``nsp`` for the global spin
+    representation and relativistic mode.  It does not encode magnetic order
+    (FM, AFM, or ferrimagnetic order), so this type intentionally contains no
+    magnetic-order inference.
+    """
+
+    nsp: int | None
+    is_collinear: bool | None
+    is_noncollinear: bool | None
+    has_soc: bool | None
+
+    @property
+    def known(self) -> bool:
+        return self.is_collinear is not None and self.has_soc is not None
+
+
+_NSP_SEMANTICS: dict[int, NspSemantics] = {
+    1: NspSemantics(1, True, False, False),
+    2: NspSemantics(2, True, False, True),
+    3: NspSemantics(3, False, True, False),
+    4: NspSemantics(4, False, True, True),
+}
+
+
+def nsp_semantics(nsp: int | None) -> NspSemantics:
+    """Return the centralized source contract for an ``nsp`` value."""
+
+    if nsp is None:
+        return NspSemantics(None, None, None, None)
+    value = int(nsp)
+    return _NSP_SEMANTICS.get(value, NspSemantics(value, None, None, None))
+
+
+@dataclass(frozen=True)
 class MagneticSymmetryContext:
     """The deliberately small magnetic contract used by pair reduction.
 
@@ -57,9 +94,11 @@ class MagneticSymmetryContext:
     magnetic-space-group contract is implemented.
     """
 
-    reference_class: str = MAGNETIC_REFERENCE_COLLINEAR_FM
+    reference_class: str = MAGNETIC_REFERENCE_UNKNOWN
     soc: bool = False
     magnetic_axis: tuple[float, float, float] | None = None
+    nsp: int | None = None
+    nsp_source: str | None = None
 
     def __post_init__(self) -> None:
         reference_class = str(self.reference_class).strip().lower()
@@ -69,6 +108,10 @@ class MagneticSymmetryContext:
             )
         object.__setattr__(self, "reference_class", reference_class)
         object.__setattr__(self, "soc", bool(self.soc))
+        if self.nsp is not None:
+            object.__setattr__(self, "nsp", int(self.nsp))
+        if self.nsp_source is not None:
+            object.__setattr__(self, "nsp_source", str(self.nsp_source))
         if self.magnetic_axis is not None:
             axis = tuple(float(value) for value in self.magnetic_axis)
             if len(axis) != 3 or not np.all(np.isfinite(axis)):
@@ -81,7 +124,48 @@ class MagneticSymmetryContext:
     def reduction_supported(self) -> bool:
         """Whether the supplied context is within the proven domain."""
 
-        return self.reference_class == MAGNETIC_REFERENCE_COLLINEAR_FM
+        semantics = nsp_semantics(self.nsp)
+        if self.reference_class != MAGNETIC_REFERENCE_COLLINEAR_FM:
+            return False
+        if semantics.is_collinear is False:
+            return False
+        if self.soc and self.magnetic_axis is None:
+            return False
+        return True
+
+    @property
+    def reduction_reason(self) -> str:
+        """Explain why reduction is supported or conservatively disabled."""
+
+        semantics = nsp_semantics(self.nsp)
+        if semantics.is_noncollinear is True:
+            return f"nsp={self.nsp} is noncollinear"
+        if semantics.known is False and self.nsp is not None:
+            return f"unsupported nsp={self.nsp} has no proven symmetry semantics"
+        if self.reference_class != MAGNETIC_REFERENCE_COLLINEAR_FM:
+            return "magnetic order is not explicitly established as collinear_fm"
+        if self.soc and self.magnetic_axis is None:
+            return "SOC reduction requires an explicit global magnetization axis"
+        return "explicit collinear ferromagnetic reference"
+
+    @property
+    def provenance(self) -> dict[str, object]:
+        """Return serializable source/context evidence for job manifests."""
+
+        semantics = nsp_semantics(self.nsp)
+        return {
+            "nsp": self.nsp,
+            "nsp_source": self.nsp_source,
+            "is_collinear": semantics.is_collinear,
+            "is_noncollinear": semantics.is_noncollinear,
+            "has_soc": semantics.has_soc,
+            "magnetic_reference": self.reference_class,
+            "magnetic_axis": (
+                None if self.magnetic_axis is None else list(self.normalized_axis or ())
+            ),
+            "symmetry_reduction_supported": self.reduction_supported,
+            "symmetry_reduction_reason": self.reduction_reason,
+        }
 
     @property
     def reference(self) -> str:
@@ -272,7 +356,7 @@ def periodic_symmetry_operations(
         raise ValueError("provide magnetic_axis through magnetic_context, not both")
     if magnetic_context is None:
         magnetic_context = MagneticSymmetryContext(
-            reference_class=magnetic_reference or MAGNETIC_REFERENCE_COLLINEAR_FM,
+            reference_class=magnetic_reference or MAGNETIC_REFERENCE_UNKNOWN,
             soc=soc,
             magnetic_axis=magnetic_axis,
         )
@@ -283,7 +367,9 @@ def periodic_symmetry_operations(
         raise ValueError("symmetry tolerance must be positive")
     axis: np.ndarray | None = None
     if magnetic_context.soc:
-        raw_axis = (0.0, 0.0, 1.0) if magnetic_context.magnetic_axis is None else magnetic_context.magnetic_axis
+        if magnetic_context.magnetic_axis is None:
+            return (_identity_operation(len(structure.sites)),)
+        raw_axis = magnetic_context.magnetic_axis
         axis = np.asarray(tuple(raw_axis), dtype=float)
         if axis.shape != (3,) or not np.all(np.isfinite(axis)):
             raise ValueError("magnetic_axis must contain three finite values")
@@ -463,6 +549,7 @@ __all__ = [
     "MAGNETIC_REFERENCE_MAGNETIC_SPACE_GROUP",
     "MAGNETIC_REFERENCE_NONCOLLINEAR",
     "MAGNETIC_REFERENCE_UNKNOWN",
+    "NspSemantics",
     "MagneticSymmetryContext",
     "PairSymmetryReduction",
     "PeriodicSymmetryOperation",
@@ -470,6 +557,7 @@ __all__ = [
     "allowed_public_symmetry_operations",
     "pair_key_orbit",
     "pair_key_transform",
+    "nsp_semantics",
     "periodic_symmetry_operations",
     "reduce_pair_keys",
     "reduce_pair_keys_with_orbits",

@@ -48,7 +48,9 @@ def _fe_pt() -> Structure:
 def test_bcc_translation_bearing_pair_reduces_by_exact_periodic_orbit() -> None:
     structure = _bcc_fe()
     analyzer = SpacegroupAnalyzer(structure)
-    operations = periodic_symmetry_operations(structure, analyzer)
+    operations = periodic_symmetry_operations(
+        structure, analyzer, magnetic_reference="collinear_fm"
+    )
     key = PairKey(0, 0, (1, 0, 0))
     orbit = pair_key_orbit(key, operations)
 
@@ -63,7 +65,9 @@ def test_bcc_translation_bearing_pair_reduces_by_exact_periodic_orbit() -> None:
 def test_multisublattice_symmetry_preserves_species_and_never_merges_cross_species() -> None:
     structure = _b2_fe_co()
     analyzer = SpacegroupAnalyzer(structure)
-    operations = periodic_symmetry_operations(structure, analyzer)
+    operations = periodic_symmetry_operations(
+        structure, analyzer, magnetic_reference="collinear_fm"
+    )
     keys = set(pair_key_orbit(PairKey(0, 1, (1, 0, 0)), operations))
     keys.update(pair_key_orbit(PairKey(1, 0, (0, 0, 0)), operations))
     reduction = reduce_pair_keys_with_orbits(keys, operations)
@@ -78,8 +82,16 @@ def test_multisublattice_symmetry_preserves_species_and_never_merges_cross_speci
 def test_soc_uses_axial_z_reference_and_excludes_axis_flipping_operations() -> None:
     structure = _fe_pt()
     analyzer = SpacegroupAnalyzer(structure)
-    non_soc = periodic_symmetry_operations(structure, analyzer)
-    soc = periodic_symmetry_operations(structure, analyzer, soc=True)
+    non_soc = periodic_symmetry_operations(
+        structure, analyzer, magnetic_reference="collinear_fm"
+    )
+    soc = periodic_symmetry_operations(
+        structure,
+        analyzer,
+        soc=True,
+        magnetic_reference="collinear_fm",
+        magnetic_axis=(0.0, 0.0, 1.0),
+    )
 
     assert len(soc) < len(non_soc)
     assert all(
@@ -123,7 +135,9 @@ def test_soc_uses_axial_z_reference_and_excludes_axis_flipping_operations() -> N
 def test_pair_reduction_does_not_change_derived_distance_or_species() -> None:
     structure = _b2_fe_co()
     analyzer = SpacegroupAnalyzer(structure)
-    operations = periodic_symmetry_operations(structure, analyzer)
+    operations = periodic_symmetry_operations(
+        structure, analyzer, magnetic_reference="collinear_fm"
+    )
     keys = {
         PairKey(0, 1, (0, 0, 0)),
         PairKey(0, 1, (1, 0, 0)),

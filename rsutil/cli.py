@@ -2236,7 +2236,28 @@ Examples:
         "--soc",
         action="store_true",
         default=False,
-        help="Use conservative SOC symmetry with the legacy collinear z-axis reference",
+        help="Request SOC; must agree with the reference input's control.nsp",
+    )
+    parser.add_argument(
+        "--magnetic-reference",
+        choices=[
+            "unknown",
+            "collinear_fm",
+            "afm",
+            "ferrimagnetic",
+            "noncollinear",
+            "magnetic_space_group",
+        ],
+        default=None,
+        help="Explicit magnetic order assertion required for symmetry reduction",
+    )
+    parser.add_argument(
+        "--magnetic-axis",
+        nargs=3,
+        type=float,
+        metavar=("X", "Y", "Z"),
+        default=None,
+        help="Global magnetization axis for explicit collinear-FM SOC reduction",
     )
     parser.add_argument(
         "--full-pairs",
@@ -2466,7 +2487,11 @@ Examples:
                 cutoff=args.cutoff,
                 unique=args.unique,
                 shell_width=args.shell_width,
-                soc=args.soc,
+                soc=True if args.soc else None,
+                magnetic_reference=args.magnetic_reference,
+                magnetic_axis=(
+                    None if args.magnetic_axis is None else tuple(args.magnetic_axis)
+                ),
                 full_pairs=args.full_pairs,
                 rij_out=args.rij_out,
                 rij_fmt=args.rij_format,

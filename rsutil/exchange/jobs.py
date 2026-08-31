@@ -147,11 +147,18 @@ class ExchangeJobSpec:
     reduction: str = "full"
     soc: bool = False
     magnetic_axis: tuple[float, float, float] | None = None
-    magnetic_reference: str = "collinear_fm"
+    magnetic_reference: str = "unknown"
     fermi_energy_source: str = "report.out"
     required_atom_files: tuple[str, ...] = ()
     source_run_identity: str = ""
     source_run_hash: str = ""
+    nsp: int | None = None
+    nsp_source: str = "unknown"
+    is_collinear: bool | None = None
+    is_noncollinear: bool | None = None
+    soc_source: str = "unknown"
+    symmetry_reduction_applied: bool = False
+    symmetry_reduction_reason: str = ""
 
     @property
     def pair_keys(self) -> tuple[PairKey, ...]:
@@ -189,11 +196,18 @@ def construct_exchange_jobs(
     reduction: str = "full",
     soc: bool = False,
     magnetic_axis: tuple[float, float, float] | None = None,
-    magnetic_reference: str = "collinear_fm",
+    magnetic_reference: str = "unknown",
     fermi_energy_source: str = "report.out",
     required_atom_files: Sequence[str] | None = None,
     source_run_identity: str = "",
     source_run_hash: str = "",
+    nsp: int | None = None,
+    nsp_source: str = "unknown",
+    is_collinear: bool | None = None,
+    is_noncollinear: bool | None = None,
+    soc_source: str = "unknown",
+    symmetry_reduction_applied: bool = False,
+    symmetry_reduction_reason: str = "",
 ) -> tuple[ExchangeJobSpec, ...]:
     """Construct canonical pair-backed jobs while preserving legacy indices."""
 
@@ -241,6 +255,13 @@ def construct_exchange_jobs(
                 required_atom_files=output_files,
                 source_run_identity=str(source_run_identity),
                 source_run_hash=str(source_run_hash),
+                nsp=None if nsp is None else int(nsp),
+                nsp_source=str(nsp_source),
+                is_collinear=is_collinear,
+                is_noncollinear=is_noncollinear,
+                soc_source=str(soc_source),
+                symmetry_reduction_applied=bool(symmetry_reduction_applied),
+                symmetry_reduction_reason=str(symmetry_reduction_reason),
             )
         )
     return tuple(jobs)
@@ -281,6 +302,13 @@ def _spec_payload(job: ExchangeJobSpec) -> dict[str, Any]:
         "required_atom_files": list(job.required_atom_files),
         "source_run_identity": job.source_run_identity,
         "source_run_hash": job.source_run_hash,
+        "nsp": job.nsp,
+        "nsp_source": job.nsp_source,
+        "is_collinear": job.is_collinear,
+        "is_noncollinear": job.is_noncollinear,
+        "soc_source": job.soc_source,
+        "symmetry_reduction_applied": job.symmetry_reduction_applied,
+        "symmetry_reduction_reason": job.symmetry_reduction_reason,
         "pair_keys": pair_keys,
         "legacy_ijpair": [
             [job.atom_index] * len(job.matching_indices),

@@ -109,7 +109,12 @@ def test_explicit_rij_output_failure_fails_operation(tmp_path: Path) -> None:
 def test_full_pairs_opt_out_reproduces_unreduced_inventory(tmp_path: Path) -> None:
     _copy_exchange_fixture(tmp_path)
 
-    reduced = ExchangeService(tmp_path).plan(cutoff=1.0, unique=True)
+    reduced = ExchangeService(tmp_path).plan(
+        cutoff=1.0,
+        unique=True,
+        magnetic_reference="collinear_fm",
+        magnetic_axis=(0.0, 0.0, 1.0),
+    )
     full = ExchangeService(tmp_path).plan(
         cutoff=1.0, unique=True, full_pairs=True
     )
