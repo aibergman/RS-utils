@@ -33,6 +33,13 @@ class MalformedResultError(ResultParserError):
     error_code = code
 
 
+class SourceUnitMismatchError(MalformedResultError):
+    """A known source format contradicts its writer-defined unit contract."""
+
+    code = "SOURCE_UNIT_MISMATCH"
+    error_code = code
+
+
 class InteractionMappingError(MalformedResultError):
     """An interaction row cannot be mapped to exactly one canonical pair."""
 
@@ -45,5 +52,6 @@ __all__ = [
     "InteractionMappingError",
     "MissingResultFileError",
     "ResultParserError",
+    "SourceUnitMismatchError",
     "UnsupportedResultFormatError",
 ]

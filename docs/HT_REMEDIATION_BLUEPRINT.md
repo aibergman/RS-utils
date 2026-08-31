@@ -73,11 +73,16 @@ pre-remediation implementation.
 - [x] **HT-R06** — Complete transport/damping source audit against `fable_v4`
 - [x] **HT-R07** — Provenance, ASE, path, indexing, and dead-code cleanup
 - [x] **HT-R08** — Make packaging, test environment, and CI reproducible
-- [x] **HT-R09** — True adversarial HT closeout and pilot evidence
+- [ ] **HT-R09** — True adversarial HT closeout and pilot evidence *(superseded/reopened by post-R09 self-review; historical evidence preserved below)*
+- [x] **HT-R10** — Interaction scientific contract closeout
+- [ ] **HT-R11** — Authoritative regeneration-based reuse
+- [ ] **HT-R12** — Magnetic-reference-aware symmetry contract
+- [ ] **HT-R13** — Installed-wheel clean-environment verification
+- [ ] **HT-R14** — Final falsification closeout
 
-No task may be marked complete before its acceptance tests pass. R09 is checked
-only because the closeout evidence below records its acceptance tests and
-pilot gate.
+No task may be marked complete before its acceptance tests pass. The historical
+R09 checkbox is reopened because the post-R09 self-review found additional
+release blockers; its evidence below is retained for traceability only.
 
 ## Frozen adversarial blockers
 
@@ -552,3 +557,48 @@ closeout. The full suite, focused negative controls, legacy compatibility
 subset, and independent deterministic pilot hash comparison passed. Therefore
 the foundation is **ready for pilot use** within the support matrix in
 `HT_READINESS_REPORT.md`; it is not a blanket production-readiness claim.
+
+## Final closeout HT-R10…HT-R14
+
+The earlier R09 conclusion is **superseded/reopened by the post-R09
+self-review**. Its historical evidence remains above and in
+[`HT_READINESS_REPORT.md`](HT_READINESS_REPORT.md); it is not current
+readiness evidence while the final closeout campaign is open.
+
+- [x] **HT-R10** — Interaction scientific contract closeout
+- [ ] **HT-R11** — Authoritative regeneration-based reuse
+- [ ] **HT-R12** — Magnetic-reference-aware symmetry contract
+- [ ] **HT-R13** — Installed-wheel clean-environment verification
+- [ ] **HT-R14** — Final falsification closeout
+
+### HT-R10 decision and evidence
+
+The current public `fable_v4` `source/exchange.f90` writer contract was
+audited directly. `jij`, `dij`, and `aij` outputs are scaled by
+`1.0d3/(4.0d0*pi)`, so their source unit is mRy. The writer emits `aij` as
+the anisotropic component; the complete tensor is constructed separately as
+`J*I + [[0,Dz,-Dy],[-Dz,0,Dx],[Dy,-Dx,0]] + A`. Whole-array Fortran output is
+column-major, and the parser now reconstructs that order explicitly.
+
+Known `fable_v4` filenames now reject contradictory explicit unit headers with
+`SOURCE_UNIT_MISMATCH`; absent headers retain the source-defined mRy unit.
+Generic formats remain explicit-header/unknown-unit paths. `ExchangePair`
+geometry carries a length unit through result and `R_ij` JSON/text
+serialization, with legacy unresolved data labeled `unknown` rather than
+assumed to be Angstrom.
+
+The raw tensor model is `anisotropic_exchange_tensor`; the former
+`exchange_tensor`/`tensor` attributes remain deprecated read aliases. The
+derived `full_exchange_tensor()` operation requires J, D, and A with known,
+compatible energy units and otherwise reports unavailable.
+
+Focused evidence:
+
+```text
+python -m pytest -q tests/test_ht12_exchange_results.py tests/test_ht07_pair_identity.py
+23 passed
+python -m pytest -q tests/test_ht12_exchange_results.py tests/test_ht07_pair_identity.py tests/test_ht14_tight_binding.py
+28 passed
+python -m pytest -q
+144 passed, 12 warnings
+```

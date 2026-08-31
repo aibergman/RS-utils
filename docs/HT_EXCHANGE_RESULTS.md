@@ -17,8 +17,8 @@ the checked-in format note `docs/notes/RSLMTO_format.md`.
 | --- | --- | --- | --- |
 | `jijso.out`, `jijfo.out`, `jij.out` | `itype jtype r_ij[3] j_ij |r_ij|` | isotropic exchange `J` | mRy |
 | `dijso.out`, `dijfo.out`, `dij.out` | `itype jtype r_ij[3] d_ij[3] |r_ij|` | DMI vector `D` | mRy |
-| `aijso.out`, `aijfo.out`, `aij.out` | `itype jtype r_ij[3] A_ij[3x3] |r_ij|` | full exchange tensor | mRy |
-| generic explicitly identified tensor file | `itype jtype r_ij[3] J_ij[3x3] [|r_ij|]` | full exchange tensor | unknown unless an explicit unit header is present |
+| `aijso.out`, `aijfo.out`, `aij.out` | `itype jtype r_ij[3] A_ij[3x3] |r_ij|` | anisotropic component `A` | mRy |
+| generic explicitly identified tensor file | `itype jtype r_ij[3] A_ij[3x3] [|r_ij|]` | anisotropic tensor only when the file contract says so | unknown unless an explicit unit header is present |
 
 The first five fields after the two indices are Cartesian displacement
 coordinates in the same scale as the supplied `RSStructure`; `|r_ij|` is a
@@ -28,7 +28,38 @@ the corresponding files, establishing the source output unit as mRy. See
 [`exchange.f90` in `fable_v4`](https://raw.githubusercontent.com/rslmtoasa/rslmtoasa/fable_v4/source/exchange.f90#L941-L1005)
 for the scaling and [`jijso`/`dijso`/`aijso` writers](https://raw.githubusercontent.com/rslmtoasa/rslmtoasa/fable_v4/source/exchange.f90#L1038-L1071)
 for the file mapping. Parsed values retain the numeric source value and
-source unit; no conversion is performed during parsing.
+source unit; no conversion is performed during parsing. For a known
+`fable_v4` filename, a contradictory `# unit:` header is rejected with
+`SOURCE_UNIT_MISMATCH`; the source writer contract remains authoritative.
+
+The three source observables are kept separate:
+
+```text
+J_iso          scalar isotropic exchange from jij*.out
+D_vector       DMI vector from dij*.out
+A_anisotropic  raw anisotropic tensor from aij*.out
+J_full         derived complete tensor, only when J_iso, D_vector, and
+               A_anisotropic all have compatible known energy units
+```
+
+For `fable_v4`, the derived tensor follows the source convention:
+
+\[
+\mathsf{J}^{full}_{ij} = J_{ij}\mathsf{I} +
+\begin{pmatrix}
+0 & D_z & -D_y\\
+-D_z & 0 & D_x\\
+D_y & -D_x & 0
+\end{pmatrix} + \mathsf{A}_{ij}.
+\]
+
+The Python operation is `InteractionRecord.full_exchange_tensor()` (or its
+raising counterpart `require_full_exchange_tensor()`). A raw `aij*.out` row
+is not a full exchange tensor and missing components are not zero-filled.
+
+The nine `aij` values are serialized by Fortran in column-major array order.
+Thus a row containing `1 2 3 4 5 6 7 8 9` reconstructs as
+`((1,4,7),(2,5,8),(3,6,9))`.
 
 Tensor-shaped rows are accepted only when the filename or header explicitly
 identifies a tensor, so a widened scalar table cannot be silently
@@ -38,6 +69,13 @@ filename similarity.
 
 The suffix/channel (`so` or `fo`) is retained as metadata.  SOC is retained
 only when a header explicitly states it; it is not inferred from a filename.
+
+## Geometry units
+
+`ExchangePair` carries `length_unit` alongside its Cartesian displacement and
+distance. Exchange JSON and legacy `R_ij` mapping artifacts preserve this
+field; legacy data with no recoverable physical scale is labeled `unknown` or
+`lattice`, never assumed to be Angstrom.
 
 ## Pair mapping and validation
 
@@ -64,6 +102,10 @@ proof.
 `rsutil-exchange-result-v1`.  Every populated magnetic quantity contains its
 value and unit, and the export retains source hashes, source rows, format
 metadata, the canonical pair key, and optional derived geometry.
+
+The raw tensor is serialized under `anisotropic_exchange_tensor`; the old
+`exchange_tensor` input key remains readable as a deprecated compatibility
+alias.
 
 ## Evidence boundary
 

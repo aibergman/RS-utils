@@ -270,6 +270,7 @@ def map_cluster_neighbor(
         distance=float(np.linalg.norm(reconstructed)),
         species_i=structure.sites[key.i].element,
         species_j=structure.sites[key.j].element,
+        length_unit=structure.length_unit,
         label_i=structure.sites[key.i].rs_label,
         label_j=structure.sites[key.j].rs_label,
         cluster_index=(int(entry_index) if entry_index is not None else None),
@@ -343,6 +344,7 @@ def legacy_displacement_mapping(pair: ExchangePair, *, one_based: bool = True) -
         "R_ij_kind": "cartesian_displacement",
         "pair_key": {"i": pair.key.i, "j": pair.key.j, "R": list(R)},
         "distance": pair.distance,
+        "length_unit": pair.length_unit,
         "species_i": pair.species_i,
         "species_j": pair.species_j,
     }

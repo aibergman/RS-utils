@@ -24,6 +24,7 @@ from .errors import (
     InteractionMappingError,
     MalformedResultError,
     MissingResultFileError,
+    SourceUnitMismatchError,
     UnsupportedResultFormatError,
 )
 from .models import (
@@ -334,12 +335,17 @@ def _classify(path: Path) -> tuple[str, dict[str, Any], tuple[str, ...]]:
     normalized_declared_units = {"mry" if unit == "mry" else "ry" for unit in declared_unit_names}
     if len(normalized_declared_units) > 1:
         raise UnsupportedResultFormatError(f"interaction file declares conflicting energy units: {path}")
-    if normalized_declared_units:
-        energy_unit = MILLI_RYDBERG if "mry" in normalized_declared_units else Unit.RY
-        energy_unit_evidence = "explicit_file_header"
-    elif stem in _FABLE_V4_MRY_STEMS:
+    if stem in _FABLE_V4_MRY_STEMS:
+        if normalized_declared_units and normalized_declared_units != {"mry"}:
+            raise SourceUnitMismatchError(
+                f"SOURCE_UNIT_MISMATCH: {path.name} is a known fable_v4 interaction format "
+                f"written in mRy, but declares {', '.join(sorted(normalized_declared_units))}"
+            )
         energy_unit = MILLI_RYDBERG
         energy_unit_evidence = "fable_v4_exchange_writer_scaling"
+    elif normalized_declared_units:
+        energy_unit = MILLI_RYDBERG if "mry" in normalized_declared_units else Unit.RY
+        energy_unit_evidence = "explicit_file_header"
     else:
         energy_unit = UNKNOWN_UNIT
         energy_unit_evidence = "unverified_source_unit"
@@ -451,6 +457,7 @@ def _record_from_row(
             distance=float(np.linalg.norm(displacement)),
             species_i=structure.sites[key.i].element,
             species_j=structure.sites[key.j].element,
+            length_unit=structure.length_unit,
             label_i=structure.sites[key.i].rs_label,
             label_j=structure.sites[key.j].rs_label,
             provenance={"geometry_source": "reference_structure"},
@@ -458,7 +465,7 @@ def _record_from_row(
     quantities: dict[str, Quantity | None] = {
         "isotropic_exchange": None,
         "dmi_vector": None,
-        "exchange_tensor": None,
+        "anisotropic_exchange_tensor": None,
     }
     if kind == "exchange":
         if len(values) != 7:
@@ -468,8 +475,13 @@ def _record_from_row(
         quantities["dmi_vector"] = vector(values[5:8], metadata["energy_unit"])
     else:
         tensor_values = values[5:14]
-        quantities["exchange_tensor"] = Quantity(
-            tuple(tuple(float(value) for value in tensor_values[offset : offset + 3]) for offset in (0, 3, 6)),
+        # A whole Fortran array is emitted in column-major storage order.
+        # Thus flat values 1..9 mean (1,1),(2,1),(3,1),(1,2),... .
+        quantities["anisotropic_exchange_tensor"] = Quantity(
+            tuple(
+                tuple(float(tensor_values[row + 3 * column]) for column in range(3))
+                for row in range(3)
+            ),
             metadata["energy_unit"],
         )
     return InteractionRecord(
@@ -495,7 +507,7 @@ def _merge_record(first: InteractionRecord, second: InteractionRecord) -> Intera
         raise MalformedResultError(
             f"multiple interaction channels/methods map to the same PairKey {first.key}; parse them as separate datasets"
         )
-    fields = ("isotropic_exchange", "dmi_vector", "exchange_tensor")
+    fields = ("isotropic_exchange", "dmi_vector", "anisotropic_exchange_tensor")
     for field_name in fields:
         if getattr(first, field_name) is not None and getattr(second, field_name) is not None:
             raise MalformedResultError(f"duplicate {field_name} for canonical pair {first.key}")
@@ -503,7 +515,9 @@ def _merge_record(first: InteractionRecord, second: InteractionRecord) -> Intera
         first,
         isotropic_exchange=first.isotropic_exchange or second.isotropic_exchange,
         dmi_vector=first.dmi_vector or second.dmi_vector,
-        exchange_tensor=first.exchange_tensor or second.exchange_tensor,
+        anisotropic_exchange_tensor=(
+            first.anisotropic_exchange_tensor or second.anisotropic_exchange_tensor
+        ),
         provenance={"sources": [first.provenance, second.provenance]},
     )
 

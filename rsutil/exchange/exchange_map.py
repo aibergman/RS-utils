@@ -105,6 +105,7 @@ def get_Rij_mappings(cluster: Molecule, neighbors: dict, one_based: bool = True)
                     "R_ij": [float(value) for value in displacement],
                     "R_ij_kind": "cartesian_displacement",
                     "distance": float(neighbor.nn_distance),
+                    "length_unit": "angstrom",
                     "species_i": str(center.species_string),
                     "species_j": str(neighbor.species_string),
                 }

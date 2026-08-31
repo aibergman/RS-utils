@@ -134,8 +134,10 @@ def test_legacy_serialization_is_explicitly_cartesian() -> None:
         distance=np.sqrt(2.75),
         species_i="Fe",
         species_j="Pt",
+        length_unit="angstrom",
     )
     mapping = legacy_displacement_mapping(pair)
     assert mapping["R_ij_kind"] == "cartesian_displacement"
     assert mapping["R_ij"] == [-1.5, 0.5, 0.5]
+    assert mapping["length_unit"] == "angstrom"
     assert mapping["pair_key"] == {"i": 0, "j": 1, "R": [-1, 0, 0]}

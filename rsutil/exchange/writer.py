@@ -26,12 +26,16 @@ def write_Rij_mappings(
                         "R_ij_kind": entry.get("R_ij_kind", "cartesian_displacement"),
                         "pair_key": entry.get("pair_key"),
                         "distance": float(entry.get("distance", 0.0)),
+                        "length_unit": str(entry.get("length_unit", "unknown")),
                         "species_i": str(entry.get("species_i", "")),
                         "species_j": str(entry.get("species_j", entry.get("species", ""))),
                     }
                 )
     else:
-        records = [dict(record) for record in mappings]
+        records = [
+            {**dict(record), "length_unit": str(record.get("length_unit", "unknown"))}
+            for record in mappings
+        ]
 
     path = Path(filename).expanduser()
     format_name = fmt.lower()
@@ -42,8 +46,8 @@ def write_Rij_mappings(
     if format_name == "txt":
         with path.open("w", encoding="utf-8") as handle:
             handle.write("# R_ij is Cartesian displacement; canonical identity is a PairKey\n")
-            handle.write("# i j R_x R_y R_z distance species_i species_j\n")
-            line_format = "{:4d} {:4d} {:12.8f} {:12.8f} {:12.8f} {:12.8f} {:10s} {:10s}\n"
+            handle.write("# i j R_x R_y R_z distance length_unit species_i species_j\n")
+            line_format = "{:4d} {:4d} {:12.8f} {:12.8f} {:12.8f} {:12.8f} {:12s} {:10s} {:10s}\n"
             for record in records:
                 rx, ry, rz = record.get("R_ij", (0.0, 0.0, 0.0))
                 handle.write(
@@ -54,6 +58,7 @@ def write_Rij_mappings(
                         float(ry),
                         float(rz),
                         float(record.get("distance", 0.0)),
+                        str(record.get("length_unit", "unknown")),
                         str(record.get("species_i", ""))[:10],
                         str(record.get("species_j", ""))[:10],
                     )

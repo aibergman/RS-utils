@@ -1,14 +1,14 @@
-# RS-utils HT readiness report — current adversarial HT-R09 closeout
+# RS-utils HT readiness report — HT-R10…R14 closeout
 
-> **HT FOUNDATION READY FOR PILOT USE — RESTRICTED BY THE SUPPORT MATRIX
-> BELOW; NOT A BLANKET SCIENTIFIC-PRODUCTION CLAIM.**
+> **HT FOUNDATION NOT READY FOR PILOT USE — HT-R11, HT-R12, HT-R13, AND HT-R14
+> REMAIN OPEN.**
 >
-> HT-R09 re-ran the closeout as a falsification attempt after R00-R08. The
-> historical HT-18 record is retained below and is explicitly superseded for
-> current readiness decisions by this section. The protected Fortran numerical
+> The earlier R09 conclusion is superseded/reopened by the post-R09
+> self-review. Its historical evidence is retained below, but it must not be
+> read as an unconditional readiness claim. The protected Fortran numerical
 > kernel was not modified.
 
-## Current R09 closeout
+## Historical R09 closeout (superseded)
 
 ### Reproducible environment and test result
 
@@ -106,10 +106,34 @@ and `UNSUPPORTED`.
 | Status/collection | READY | Filesystem-only status, parse failures, sidecars, hashes, and continuation behavior pass. |
 | AiiDA/UppASD integration | UNSUPPORTED | Outside the validated R00-R09 foundation boundary. |
 
-The R09 gate is satisfied for pilot use because R00-R08 are checked and the
-full suite, adversarial controls, compatibility subset, and independent pilot
-hash comparison all passed. This matrix is the operative current boundary;
-the historical HT-18 claims below are retained for traceability only.
+The R09 gate was recorded as satisfied for pilot use, but that conclusion is
+superseded/reopened by the post-R09 self-review. R10 is now closed below;
+R11-R14 remain release blockers. The historical HT-18 claims below are
+retained for traceability only.
+
+## Current HT-R10 closeout
+
+HT-R10 is closed for the interaction scientific contract. The parser now
+uses the audited `fable_v4` mRy writer contract for known `jij*`, `dij*`, and
+`aij*` files and rejects contradictory explicit unit headers with
+`SOURCE_UNIT_MISMATCH`. Raw `aij` data is represented as an anisotropic
+tensor in Fortran column-major order; `full_exchange_tensor()` derives the
+complete `J*I + skew(D) + A` tensor only when all three known, compatible
+quantities are present. Pair displacement and distance exports carry an
+explicit length unit.
+
+The focused R10/parser compatibility suites pass:
+
+```text
+python -m pytest -q tests/test_ht12_exchange_results.py tests/test_ht07_pair_identity.py tests/test_ht14_tight_binding.py
+28 passed
+python -m pytest -q
+144 passed, 12 warnings
+```
+
+This does not close the overall HT gate: authoritative reuse (R11), magnetic
+reference context (R12), installed-wheel verification (R13), and final
+falsification (R14) remain open.
 
 ## Historical HT-18 evidence (preserved)
 

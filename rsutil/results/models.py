@@ -332,7 +332,7 @@ class InteractionRecord:
     key: PairKey
     isotropic_exchange: Quantity | None = None
     dmi_vector: Quantity | None = None
-    exchange_tensor: Quantity | None = None
+    anisotropic_exchange_tensor: Quantity | None = None
     pair: ExchangePair | None = None
     method: str | None = None
     channel: str | None = None
@@ -346,7 +346,7 @@ class InteractionRecord:
             raise ValueError("interaction pair geometry has a different PairKey")
         for name, expected in (
             ("dmi_vector", 3),
-            ("exchange_tensor", 3),
+            ("anisotropic_exchange_tensor", 3),
         ):
             quantity = getattr(self, name)
             if quantity is None:
@@ -356,8 +356,8 @@ class InteractionRecord:
             shape = _shape(quantity.value)
             if name == "dmi_vector" and shape != (3,):
                 raise ValueError("dmi_vector must contain exactly three components")
-            if name == "exchange_tensor" and shape != (3, 3):
-                raise ValueError("exchange_tensor must be a 3x3 matrix")
+            if name == "anisotropic_exchange_tensor" and shape != (3, 3):
+                raise ValueError("anisotropic_exchange_tensor must be a 3x3 matrix")
         if self.isotropic_exchange is not None and not isinstance(self.isotropic_exchange, Quantity):
             raise ValueError("isotropic_exchange must be a Quantity")
         if self.method is not None:
@@ -380,16 +380,68 @@ class InteractionRecord:
 
     @property
     def tensor(self) -> Quantity | None:
-        """Short alias for the full exchange tensor quantity."""
+        """Deprecated alias for the source-faithful anisotropic A tensor."""
 
-        return self.exchange_tensor
+        return self.anisotropic_exchange_tensor
+
+    @property
+    def exchange_tensor(self) -> Quantity | None:
+        """Deprecated alias for :attr:`anisotropic_exchange_tensor`."""
+
+        return self.anisotropic_exchange_tensor
+
+    def full_exchange_tensor(self) -> Quantity | None:
+        """Return the complete tensor derived from J, D, and anisotropic A.
+
+        The fable_v4 convention is ``J*I + skew(D) + A`` where the skew
+        matrix is ``[[0,Dz,-Dy],[-Dz,0,Dx],[Dy,-Dx,0]]``.  ``None`` is
+        returned when a required observable is absent or its energy unit is
+        unknown/incompatible; raw ``aij*.out`` data is never sufficient alone.
+        """
+
+        if self.J is None or self.D is None or self.anisotropic_exchange_tensor is None:
+            return None
+        if any(
+            quantity.unit is Unit.UNKNOWN
+            for quantity in (self.J, self.D, self.anisotropic_exchange_tensor)
+        ):
+            return None
+        try:
+            d = self.D.convert(self.J.unit)
+            a = self.anisotropic_exchange_tensor.convert(self.J.unit)
+        except ValueError:
+            return None
+        j = float(self.J.value)
+        dx, dy, dz = (float(value) for value in d.value)
+        skew = ((0.0, dz, -dy), (-dz, 0.0, dx), (dy, -dx, 0.0))
+        tensor = tuple(
+            tuple(
+                (j if row == column else 0.0)
+                + skew[row][column]
+                + float(a.value[row][column])
+                for column in range(3)
+            )
+            for row in range(3)
+        )
+        return Quantity(tensor, self.J.unit)
+
+    def require_full_exchange_tensor(self) -> Quantity:
+        """Return the complete tensor or raise a clear contract error."""
+
+        result = self.full_exchange_tensor()
+        if result is None:
+            raise ValueError(
+                "full exchange tensor is unavailable: J, D, and anisotropic A "
+                "with compatible known units are required"
+            )
+        return result
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "key": self.key.to_dict(),
             "isotropic_exchange": _quantity_dict(self.isotropic_exchange),
             "dmi_vector": _quantity_dict(self.dmi_vector),
-            "exchange_tensor": _quantity_dict(self.exchange_tensor),
+            "anisotropic_exchange_tensor": _quantity_dict(self.anisotropic_exchange_tensor),
             "pair": None if self.pair is None else self.pair.to_dict(),
             "method": self.method,
             "channel": self.channel,
@@ -403,7 +455,9 @@ class InteractionRecord:
             key=PairKey.from_dict(data["key"]),
             isotropic_exchange=_quantity_from(data.get("isotropic_exchange")),
             dmi_vector=_quantity_from(data.get("dmi_vector")),
-            exchange_tensor=_quantity_from(data.get("exchange_tensor")),
+            anisotropic_exchange_tensor=_quantity_from(
+                data.get("anisotropic_exchange_tensor", data.get("exchange_tensor"))
+            ),
             pair=None if data.get("pair") is None else ExchangePair.from_dict(data["pair"]),
             method=data.get("method"),
             channel=data.get("channel"),

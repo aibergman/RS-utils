@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from rsutil.core import PairKey, RSStructure, StructureSite
@@ -15,6 +16,7 @@ from rsutil.results import (
     MalformedResultError,
     Quantity,
     RYDBERG,
+    SourceUnitMismatchError,
     UNKNOWN_UNIT,
     UnsupportedResultFormatError,
     parse_exchange_results,
@@ -76,6 +78,110 @@ def test_explicit_ry_mry_conversion_is_factor_of_1000() -> None:
     assert in_ry.convert(MILLI_RYDBERG).value == pytest.approx(source_value.value)
 
 
+@pytest.mark.parametrize("filename", ["jijso.out", "dijso.out", "aijso.out"])
+def test_known_fable_v4_units_cannot_be_overridden_by_a_contradictory_header(
+    tmp_path: Path, filename: str
+) -> None:
+    row = {
+        "jijso.out": "1 1 0 0 0 1 0\n",
+        "dijso.out": "1 1 0 0 0 1 2 3 0\n",
+        "aijso.out": "1 1 0 0 0 1 2 3 4 5 6 7 8 9 0\n",
+    }[filename]
+    path = tmp_path / filename
+    path.write_text("# unit: Ry\n" + row, encoding="utf-8")
+    with pytest.raises(SourceUnitMismatchError) as error:
+        parse_exchange_results(
+            path,
+            manifest={
+                "schema_version": "rsutil-exchange-v1",
+                "canonical_pair_list": [{"i": 0, "j": 0, "R": [0, 0, 0]}],
+            },
+        )
+    assert error.value.error_code == "SOURCE_UNIT_MISMATCH"
+
+
+def test_known_fable_v4_unit_header_mry_is_accepted_and_missing_header_is_mry(tmp_path: Path) -> None:
+    manifest = {
+        "schema_version": "rsutil-exchange-v1",
+        "canonical_pair_list": [{"i": 0, "j": 0, "R": [0, 0, 0]}],
+    }
+    for name, header in (("jijso.out", "# unit: mRy\n"), ("jijfo.out", "")):
+        path = tmp_path / name
+        path.write_text(header + "1 1 0 0 0 1.25 0\n", encoding="utf-8")
+        result = parse_exchange_results(path, manifest=manifest)
+        assert result.interactions[0].J is not None
+        assert result.interactions[0].J.unit is MILLI_RYDBERG
+
+
+def test_aij_fortran_column_major_order_is_preserved_and_json_round_trips(tmp_path: Path) -> None:
+    path = tmp_path / "aijso.out"
+    path.write_text(
+        "1 1 0 0 0 1 2 3 4 5 6 7 8 9 0\n",
+        encoding="utf-8",
+    )
+    structure = RSStructure(
+        lattice_vectors=((1, 0, 0), (0, 1, 0), (0, 0, 1)),
+        length_unit="bohr",
+        coordinate_convention="cartesian",
+        sites=(StructureSite(0, (0, 0, 0), "Fe"),),
+    )
+    result = parse_exchange_results(path, structure=structure)
+    record = result.interactions[0]
+    assert record.anisotropic_exchange_tensor is not None
+    assert record.anisotropic_exchange_tensor.value == (
+        (1.0, 4.0, 7.0),
+        (2.0, 5.0, 8.0),
+        (3.0, 6.0, 9.0),
+    )
+    assert record.pair is not None and record.pair.length_unit == "bohr"
+    payload = result.to_dict()["records"][0]
+    assert "anisotropic_exchange_tensor" in payload
+    assert "exchange_tensor" not in payload
+    assert payload["pair"]["length_unit"] == "bohr"
+    restored = type(result).from_json(result.to_json())
+    assert restored.interactions[0].anisotropic_exchange_tensor is not None
+    assert restored.interactions[0].pair is not None
+    assert restored.interactions[0].pair.length_unit == "bohr"
+    assert np.allclose(
+        restored.interactions[0].anisotropic_exchange_tensor.value,
+        record.anisotropic_exchange_tensor.value,
+    )
+
+
+def test_full_exchange_tensor_uses_fable_v4_j_d_a_convention(tmp_path: Path) -> None:
+    files = {
+        "jijso.out": "1 1 0 0 0 2 0\n",
+        "dijso.out": "1 1 0 0 0 0.1 0.2 0.3 0\n",
+        "aijso.out": "1 1 0 0 0 1 2 3 4 5 6 7 8 9 0\n",
+    }
+    paths = []
+    structure = RSStructure(
+        lattice_vectors=((1, 0, 0), (0, 1, 0), (0, 0, 1)),
+        length_unit="angstrom",
+        sites=(StructureSite(0, (0, 0, 0), "Fe"),),
+    )
+    for name, contents in files.items():
+        path = tmp_path / name
+        path.write_text(contents, encoding="utf-8")
+        paths.append(path)
+    record = parse_exchange_results(paths, structure=structure).interactions[0]
+    full = record.require_full_exchange_tensor()
+    assert full.unit is MILLI_RYDBERG
+    assert np.allclose(full.value, ((3.0, 4.3, 6.8), (1.7, 7.0, 8.1), (3.2, 5.9, 11.0)))
+
+
+def test_full_exchange_tensor_is_unavailable_without_all_known_j_d_a_parts() -> None:
+    from rsutil.results import InteractionRecord
+
+    record = InteractionRecord(
+        PairKey(0, 0, (0, 0, 0)),
+        isotropic_exchange=Quantity(1.0, MILLI_RYDBERG),
+    )
+    assert record.full_exchange_tensor() is None
+    with pytest.raises(ValueError, match="full exchange tensor is unavailable"):
+        record.require_full_exchange_tensor()
+
+
 def test_mismatched_manifest_fails_instead_of_guessing(tmp_path: Path) -> None:
     source = ROOT / "examples" / "export" / "MnSi" / "jijso.out"
     table = tmp_path / "jijso.out"
@@ -135,8 +241,9 @@ def test_tensor_rows_require_explicit_tensor_format_and_keep_field_distinct(tmp_
     assert record is not None
     assert record.J is None and record.D is None
     assert record.tensor is not None
+    assert record.full_exchange_tensor() is None
     assert record.tensor.unit is MILLI_RYDBERG
-    assert record.tensor.value == ((1.0, 2.0, 3.0), (4.0, 5.0, 6.0), (7.0, 8.0, 9.0))
+    assert record.tensor.value == ((1.0, 4.0, 7.0), (2.0, 5.0, 8.0), (3.0, 6.0, 9.0))
 
 
 def test_unverified_tensor_source_keeps_unit_unknown(tmp_path: Path) -> None:

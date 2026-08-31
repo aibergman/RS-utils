@@ -650,6 +650,7 @@ class ExchangePair:
     distance: float
     species_i: str
     species_j: str
+    length_unit: str = "unknown"
     label_i: str | None = None
     label_j: str | None = None
     cluster_index: int | None = None
@@ -669,6 +670,9 @@ class ExchangePair:
         if not math.isfinite(distance) or distance < 0:
             raise ValidationError("pair distance must be a finite non-negative number")
         object.__setattr__(self, "distance", distance)
+        if not isinstance(self.length_unit, str) or not self.length_unit.strip():
+            raise ValidationError("pair length_unit must be a non-empty string")
+        object.__setattr__(self, "length_unit", self.length_unit.strip())
         for name in ("species_i", "species_j"):
             value = getattr(self, name)
             if not isinstance(value, str) or not value.strip():
@@ -700,6 +704,7 @@ class ExchangePair:
             "key": self.key.to_dict(),
             "cartesian_displacement": list(self.cartesian_displacement),
             "distance": self.distance,
+            "length_unit": self.length_unit,
             "species_i": self.species_i,
             "species_j": self.species_j,
             "label_i": self.label_i,
@@ -718,6 +723,7 @@ class ExchangePair:
             distance=float(data["distance"]),
             species_i=str(data["species_i"]),
             species_j=str(data["species_j"]),
+            length_unit=str(data.get("length_unit", "unknown")),
             label_i=data.get("label_i"),
             label_j=data.get("label_j"),
             cluster_index=data.get("cluster_index"),

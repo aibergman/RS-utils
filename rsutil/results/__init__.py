@@ -5,6 +5,7 @@ from .errors import (
     MalformedResultError,
     MissingResultFileError,
     ResultParserError,
+    SourceUnitMismatchError,
     UnsupportedResultFormatError,
 )
 from .models import (
@@ -108,6 +109,7 @@ __all__ = [
     "RY",
     "RYDBERG",
     "ResultParserError",
+    "SourceUnitMismatchError",
     "SCFResult",
     "SIEMENS_PER_CENTIMETER",
     "SIEMENS_PER_METER",
