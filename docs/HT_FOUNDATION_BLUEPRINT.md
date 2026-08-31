@@ -64,7 +64,7 @@ filenames remain local to that workspace.
 - [x] **HT-14** — Versioned TB model and ML export
 - [x] **HT-15** — ASE structure interoperability
 - [x] **HT-16** — Deterministic campaign specification and generation
-- [ ] **HT-17** — Slurm array rendering, status, and collection
+- [x] **HT-17** — Slurm array rendering, status, and collection
 - [ ] **HT-18** — HT readiness closeout and pilot evidence
 
 ## Dependency summary
@@ -368,3 +368,20 @@ No scientific or functional code was changed for HT-00.
   convenience when PyYAML is already installed; no scheduler or job
   execution is introduced.  Invalid preflight entries leave the campaign
   destination untouched; runtime failures retain per-entry setup atomicity.
+
+### HT-17 decisions
+
+- Added `rsutil.campaign.render_slurm_array`, which consumes the relocatable
+  HT-16 index and writes a stable zero-based TSV array map plus a readable,
+  shell-quoted `sbatch` script. Executable, launcher, environment preamble,
+  partition/account/time, and resource directives are all render parameters;
+  no site-specific scheduler or module behavior is selected.
+- Added filesystem-only `status_campaign` classification. Explicit failure
+  and lock markers are recognized, parser/validation evidence classifies
+  completed runs, and missing/invalid evidence remains conservative. Slurm is
+  not queried, so the report explicitly states `scheduler_state=not_queried`.
+- Added failure-tolerant `collect_campaign` aggregation with versioned JSON,
+  optional CSV/JSONL scalar summaries, structured result sidecars, raw-file
+  hashes, manifest identity/content hashes, and exchange-subjob canonical pair
+  references. No retry, restart, dependency, daemon, or workflow-engine
+  behavior was added; those remain a future AiiDA boundary.

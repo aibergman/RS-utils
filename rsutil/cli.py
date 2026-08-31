@@ -1077,8 +1077,99 @@ def run_campaign_create(args):
     return 0
 
 
+def _campaign_resources(values):
+    resources = {}
+    for value in values or ():
+        if "=" not in value:
+            raise ValueError(f"resource must use KEY=VALUE syntax: {value!r}")
+        key, resource = value.split("=", 1)
+        if not key.strip() or not resource.strip():
+            raise ValueError(f"resource must use KEY=VALUE syntax: {value!r}")
+        resources[key.strip()] = resource.strip()
+    return resources
+
+
+def run_campaign_render_slurm(args):
+    """Render transparent Slurm array artifacts; do not submit them."""
+
+    from .campaign import render_slurm_array
+
+    try:
+        resources = _campaign_resources(args.resource)
+        for key in ("cpus_per_task", "mem", "gpus", "nodes", "ntasks"):
+            value = getattr(args, key, None)
+            if value is not None:
+                resources[key] = value
+        result = render_slurm_array(
+            Path(args.index).resolve(),
+            executable=args.executable,
+            launcher=args.launcher,
+            arguments=args.arguments or (),
+            output_dir=None if args.output_dir is None else Path(args.output_dir).resolve(),
+            job_name=args.job_name,
+            partition=args.partition,
+            account=args.account,
+            time_limit=args.time_limit,
+            resources=resources,
+            environment_preamble=args.env_preamble or (),
+        )
+    except Exception as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    print(f"Run list: {result.run_list_path}")
+    print(f"Slurm script: {result.script_path}")
+    print(f"Array size: {result.array_size}")
+    return 0
+
+
+def run_campaign_status(args):
+    """Inspect campaign filesystem evidence without querying a scheduler."""
+
+    from .campaign import status_campaign
+
+    try:
+        report = status_campaign(Path(args.index).resolve())
+    except Exception as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    import json
+
+    if args.output is not None:
+        Path(args.output).resolve().write_text(json.dumps(report.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    if args.json:
+        print(json.dumps(report.to_dict(), indent=2, sort_keys=True))
+    elif args.output is None:
+        print(f"Campaign '{report.campaign_name}' ({report.scheduler_state}; scheduler not queried)")
+        print("INDEX\tENTRY_ID\tSTATUS\tRUN_PATH\tEVIDENCE")
+        for entry in report.entries:
+            print(f"{entry.array_index}\t{entry.entry_id}\t{entry.status}\t{entry.run_path}\t{entry.evidence}")
+    return 0
+
+
+def run_campaign_collect(args):
+    """Collect parsed results, retaining failures per campaign entry."""
+
+    from .campaign import collect_campaign
+
+    try:
+        result = collect_campaign(
+            Path(args.index).resolve(),
+            output=None if args.output is None else Path(args.output).resolve(),
+            csv_output=None if args.csv is None else Path(args.csv).resolve(),
+            jsonl_output=None if args.jsonl is None else Path(args.jsonl).resolve(),
+            sidecar_dir=None if args.sidecar_dir is None else Path(args.sidecar_dir).resolve(),
+        )
+    except Exception as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    print(f"Aggregate: {result.aggregate_path}")
+    print(f"Entries: {len(result.entries)}")
+    print(f"Entry failures: {len(result.failures)}")
+    return 0
+
+
 def create_campaign_parser(subparsers):
-    """Create the lightweight campaign create/validate command surface."""
+    """Create the lightweight campaign command surface."""
 
     parser = subparsers.add_parser("campaign", help="Validate or generate deterministic HT campaigns")
     commands = parser.add_subparsers(dest="campaign_command", required=True)
@@ -1097,6 +1188,39 @@ def create_campaign_parser(subparsers):
         help="Existing identical runs are reused; incompatible runs always fail",
     )
     create.set_defaults(func=run_campaign_create)
+
+    render = commands.add_parser("render-slurm", aliases=["render"], help="Render a Slurm array script and stable run list")
+    render.add_argument("index", help="Campaign directory or campaign_index.json")
+    render.add_argument("--executable", required=True, help="Calculation executable or shell-word command")
+    render.add_argument("--launcher", help="Optional launcher command, for example 'srun --exclusive'")
+    render.add_argument("--argument", dest="arguments", action="append", default=[], help="Static argument passed to the executable (repeatable)")
+    render.add_argument("--output-dir", help="Directory for the rendered artifacts (default: campaign root)")
+    render.add_argument("--job-name", help="Slurm job name (default: campaign name)")
+    render.add_argument("--partition")
+    render.add_argument("--account")
+    render.add_argument("--time", dest="time_limit")
+    render.add_argument("--resource", action="append", default=[], metavar="KEY=VALUE", help="Additional #SBATCH resource (repeatable)")
+    render.add_argument("--cpus-per-task", dest="cpus_per_task", type=int, help="SBATCH CPU count")
+    render.add_argument("--mem", help="SBATCH memory request")
+    render.add_argument("--gpus", help="SBATCH GPU request")
+    render.add_argument("--nodes", type=int, help="SBATCH node count")
+    render.add_argument("--ntasks", type=int, help="SBATCH task count")
+    render.add_argument("--env-preamble", "--environment-preamble", dest="env_preamble", action="append", default=[], help="User-supplied shell environment line (repeatable)")
+    render.set_defaults(func=run_campaign_render_slurm)
+
+    status = commands.add_parser("status", help="Classify campaign entries from local filesystem evidence")
+    status.add_argument("index", help="Campaign directory or campaign_index.json")
+    status.add_argument("--json", action="store_true", help="Print the machine-readable status report")
+    status.add_argument("--output", help="Also write the machine-readable status report to this path")
+    status.set_defaults(func=run_campaign_status)
+
+    collect = commands.add_parser("collect", help="Parse and aggregate campaign results")
+    collect.add_argument("index", help="Campaign directory or campaign_index.json")
+    collect.add_argument("--output", help="Aggregate JSON path (default: campaign_results.json in campaign root)")
+    collect.add_argument("--sidecar-dir", help="Structured result sidecar directory (default: collected)")
+    collect.add_argument("--csv", help="Optional scalar summary CSV path")
+    collect.add_argument("--jsonl", help="Optional per-entry JSONL summary path")
+    collect.set_defaults(func=run_campaign_collect)
     return parser
 
 

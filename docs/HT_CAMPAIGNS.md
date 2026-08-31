@@ -69,3 +69,51 @@ The generated top-level `campaign_index.json` is
 `rsutil-campaign-index-v1`; each `run_manifest.json` retains the existing
 `rsutil-run-v1` setup manifest and adds campaign identity and external-run
 metadata.
+
+## Slurm arrays, status, and collection
+
+HT-17 consumes the generated index and writes two transparent artifacts. The
+run list is a stable tab-separated table with zero-based array index, entry
+ID, run path, and manifest path. The script uses that table, quotes paths, and
+executes one user-selected command in the selected run directory. It does not
+submit the job or select a site-specific module/MPI stack:
+
+```bash
+rsutil campaign render-slurm pilot-runs/campaign_index.json \
+  --executable /opt/rs-lmto/bin/rs-lmto \
+  --launcher 'srun --exclusive' \
+  --partition compute --account project --time 02:00:00 \
+  --resource cpus_per_task=8 --env-preamble 'module load gcc'
+```
+
+This writes `slurm_run_list.tsv` and `submit_array.sbatch` in the campaign
+root by default. Run the rendered script through Slurm, for example with
+`sbatch submit_array.sbatch`, when the site configuration is ready.
+
+Filesystem status is intentionally conservative and does not query Slurm:
+
+```bash
+rsutil campaign status pilot-runs
+```
+
+It recognizes explicit failure markers, explicit lock markers, valid or
+malformed `report.out` parser evidence, and otherwise reports a generated or
+unknown state. A scheduler live state is never inferred from directory age or
+the presence of a setup manifest.
+
+Collection parses each entry independently and writes the versioned
+`campaign_results.json` aggregate. Full SCF and exchange models remain in
+structured JSON sidecars under `collected/`; optional scalar summaries can be
+exported as CSV or JSONL:
+
+```bash
+rsutil campaign collect pilot-runs --csv pilot-runs/results.csv --jsonl pilot-runs/results.jsonl
+```
+
+Parser and validation errors are recorded on their entry and do not prevent
+other entries from being collected. Raw file references and SHA-256 hashes,
+campaign entry IDs, and both index and manifest-content hashes are retained.
+Exchange sub-job manifests, when present, are collected by their canonical
+pair lists and parent campaign entry ID. Retries, restarts, dependency graphs,
+and scheduler daemons remain outside this layer and belong at a future
+AiiDA/workflow-engine boundary.
