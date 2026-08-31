@@ -110,6 +110,12 @@ class MagneticSymmetryContext:
         object.__setattr__(self, "soc", bool(self.soc))
         if self.nsp is not None:
             object.__setattr__(self, "nsp", int(self.nsp))
+            semantics = nsp_semantics(self.nsp)
+            if semantics.known and self.soc != semantics.has_soc:
+                raise ValueError(
+                    f"soc={self.soc} conflicts with known nsp={self.nsp} "
+                    f"(expected soc={semantics.has_soc})"
+                )
         if self.nsp_source is not None:
             object.__setattr__(self, "nsp_source", str(self.nsp_source))
         if self.magnetic_axis is not None:
@@ -260,11 +266,13 @@ def _site_identity(site: Any) -> tuple[str, str | None, str | None]:
     specie = getattr(site, "specie", None)
     element = str(specie.symbol) if specie is not None and hasattr(specie, "symbol") else str(getattr(site, "species_string", ""))
     label = properties.get("rs_label")
+    rs_type_index = properties.get("rs_type_index")
     rs_type = properties.get("rs_type")
+    type_identity = rs_type_index if rs_type_index is not None else rs_type
     return (
         element,
         None if label is None else str(label),
-        None if rs_type is None else str(rs_type),
+        None if type_identity is None else str(type_identity),
     )
 
 
@@ -342,12 +350,12 @@ def periodic_symmetry_operations(
     """Return exact structure-preserving operations from public pymatgen APIs.
 
     With ``soc=False`` all operations that map the supplied chemical
-    structure to itself are retained.  With ``soc=True`` the legacy
-    convention is a collinear magnetic reference with a Cartesian axis of
-    ``(0, 0, 1)`` unless ``magnetic_axis`` is supplied.  The magnetization is
-    an axial vector, so an operation is retained only when
-    ``det(Q) * Q @ axis == axis``.  Time reversal is not assumed.  This is
-    intentionally not a generic magnetic-space-group implementation.
+    structure to itself are retained. With SOC active and no explicit
+    magnetic axis, only the identity operation is returned. When an axis is
+    supplied, the magnetization is treated as an axial vector and an
+    operation is retained only when ``det(Q) * Q @ axis == axis``. Time
+    reversal is not assumed. This is intentionally not a generic
+    magnetic-space-group implementation.
     """
 
     if magnetic_context is not None and magnetic_reference is not None:

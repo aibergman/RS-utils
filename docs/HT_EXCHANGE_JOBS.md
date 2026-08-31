@@ -10,10 +10,12 @@ Each generated directory contains:
 - the explicitly required `<label>_out.nml` files from the selected source run;
 - `rsutil_exchange_manifest.json`.
 
-The manifest uses schema `rsutil-exchange-v2` and records the deterministic job
+The manifest uses schema `rsutil-exchange-v3` and records the deterministic job
 specification hash, source-run hash, cutoff/reduction/SOC policy, Fermi-energy
 source, one-based legacy `ijpair` values, and the canonical `(i, j, R)` pair
-list. `R` is an integer reference-lattice translation, not a Cartesian vector.
+list. Each v3 pair record also carries endpoint `rs_type_i`/`rs_type_j` and
+Cartesian displacement evidence. `R` is an integer reference-lattice
+translation, not a Cartesian vector.
 The authoritative pair identity is `spec.pair_keys`, which is covered by
 `spec_hash`. The top-level `canonical_pair_list` and `pair_keys` fields are
 compatibility views only; readers reject a manifest if either differs from
@@ -33,6 +35,11 @@ Unmarked legacy or user directories are never deleted by default. The explicit
 `--force-legacy-collision`, is required to replace one. The legacy `-J` path
 uses `replace_generated`, so clean `Atom_*` creation remains familiar and
 previously generated rsutil jobs can be regenerated safely.
+
+The manifest distinguishes primitive-cell site identity from RS electronic
+type identity. The RS input's `izp(site) -> atoms.label(type)` mapping remains
+authoritative, including when multiple sites share one type or chemically
+identical sites have distinct types.
 
 All job directories are populated and semantically checked in a same-filesystem
 staging area before any destination is changed. That fresh staged candidate is

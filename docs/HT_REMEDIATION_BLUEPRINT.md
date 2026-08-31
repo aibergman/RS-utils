@@ -79,6 +79,9 @@ pre-remediation implementation.
 - [x] **HT-R12** — Magnetic-reference-aware symmetry contract
 - [x] **HT-R13** — Installed-wheel clean-environment verification
 - [x] **HT-R14** — Final falsification closeout
+- [x] **HT-R15** — Source-faithful site/type exchange identity
+- [x] **HT-R16** — HT ownership and symmetry-context invariants
+- [x] **HT-R17** — Final repeated-type adversarial closeout
 
 No task may be marked complete before its acceptance tests pass. The historical
 R09 checkbox is reopened because the post-R09 self-review found additional
@@ -747,3 +750,64 @@ No remote CI result was available from this checkout: `origin/HT` remains at
 is recorded as unavailable evidence, not as a remote pass claim. The support
 boundary and remaining unsupported domains are recorded in
 `docs/HT_READINESS_REPORT.md`.
+
+### HT-R15 decision and evidence
+
+HT-R15 is closed. The public `fable_v4` source audit confirms that `ntot` and
+`crd` describe primitive-cell entries, `izp(site)` maps those entries to RS
+types, cluster `iz` is used to select symbolic atoms, `ijpair` contains cluster
+atom indices, and exchange output writes `lattice%iz(i), lattice%iz(j)`.
+See [`system_data.f90`](https://github.com/rslmtoasa/rslmtoasa/blob/fable_v4/source/types/system_data.f90)
+and [`exchange.f90`](https://raw.githubusercontent.com/rslmtoasa/rslmtoasa/fable_v4/source/exchange.f90#L1031-L1071).
+
+`StructureSite.rs_type_index` now preserves the one-based RS type identity
+separately from the zero-based site index and chemical element. Reference
+loading uses `crd -> izp -> atoms.label`, pymatgen symmetry sites carry the
+same evidence, and ASE/JSON round trips preserve it. Exchange manifests are
+now schema `rsutil-exchange-v3` and include self-contained endpoint type and
+displacement evidence. Result mapping validates output type columns against
+that evidence and geometry; repeated-type ambiguity fails explicitly.
+
+The focused R15 suite passed:
+
+```text
+python -m pytest -q tests/test_ht15_site_types.py tests/test_ht15_ase.py tests/test_ht12_exchange_results.py tests/test_ht10_exchange_jobs.py
+43 passed, 2 warnings
+```
+
+### HT-R16 decision and evidence
+
+HT-R16 is closed. Campaign reuse now checks root-owned parent namelists only;
+valid nested rsutil exchange manifests establish a separate ownership root,
+while unknown nested scientific inputs and invalid child manifests fail closed.
+`MagneticSymmetryContext` rejects contradictory SOC values for known `nsp=1..4`
+and retains explicit conservative behavior for `nsp=None` and noncollinear
+contexts. The SOC symmetry docstring and raw-anisotropic-tensor reverse
+diagnostic name match the implementation.
+
+The focused R16 suite passed:
+
+```text
+python -m pytest -q tests/test_ht16_campaign.py tests/test_ht17_campaign.py tests/test_ht09_exchange_symmetry.py tests/test_ht10_exchange_jobs.py tests/test_ht15_site_types.py
+56 passed, 11 warnings
+```
+
+### HT-R17 decision and evidence
+
+HT-R17 is closed. The installed artifact was built as
+`rsutil-0.10.0-cp311-cp311-macosx_26_0_arm64.whl` with Python 3.11.16,
+macOS arm64, GNU Fortran 16.2.0, and CMake 4.4.3. It was installed into an
+external Python environment with `pip check` reporting no broken
+requirements. `rsutil.__file__` and the compiled `rsutil.so` both resolved
+under that environment's site-packages, with `PYTHONPATH` removed.
+
+The copied installed-wheel suite passed **177 tests, 16 known spglib
+deprecation warnings**. The repeated-type controls covered the two-site/one-
+type Co contract, same-chemistry distinct Mn types, source type/geometry
+exchange mapping, and fail-closed equal-type/equal-geometry ambiguity. The
+full source checkout suite also passed 177 tests with the same 16 warnings.
+
+All HT-R15/R16 gates remain green, so the branch is restored to the documented
+support boundary: **READY for pilot HT use within the documented support
+matrix**. This does not claim support for the explicitly restricted magnetic,
+transport/damping, tensor, or future UppASD domains.

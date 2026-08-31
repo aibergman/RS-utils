@@ -168,6 +168,60 @@ def test_runtime_outputs_do_not_change_materialized_input_identity(tmp_path: Pat
     assert reused.entries[0].entry_id == generated.entries[0].entry_id
 
 
+def _valid_nested_exchange_manifest() -> dict:
+    spec = {
+        "pair_keys": [{"i": 0, "j": 0, "R": [0, 0, 0]}],
+        "legacy_ijpair": [[1], [1]],
+    }
+    from rsutil.core.hashing import hash_json
+
+    return {
+        "schema_version": "rsutil-exchange-v1",
+        "owner": "rsutil",
+        "operation": "exchange_job",
+        "spec": spec,
+        "spec_hash": hash_json(spec),
+        "canonical_pair_list": spec["pair_keys"],
+        "pair_keys": spec["pair_keys"],
+        "legacy_ijpair": spec["legacy_ijpair"],
+    }
+
+
+def test_parent_reuse_ignores_valid_nested_exchange_inputs(tmp_path: Path) -> None:
+    _source(tmp_path, "bccFe", "bcc")
+    _source(tmp_path, "FeN", "fen")
+    campaign = _campaign(tmp_path)
+    generator = CampaignGenerator(setup_service=SetupService(runner=_FakeRunner()))
+    destination = tmp_path / "output"
+    generated = generator.generate(campaign, destination, base_dir=tmp_path)
+    run_dir = destination / generated.entries[0].run_path
+    child = run_dir / "Atom_1"
+    child.mkdir()
+    (child / "input.nml").write_text("&calculation\n post_processing='exchange'\n/\n", encoding="utf-8")
+    (child / "rsutil_exchange_manifest.json").write_text(
+        json.dumps(_valid_nested_exchange_manifest()), encoding="utf-8"
+    )
+
+    reused = generator.generate(campaign, destination, base_dir=tmp_path)
+    assert reused.entries[0].entry_id == generated.entries[0].entry_id
+
+
+def test_parent_reuse_rejects_unowned_nested_scientific_input(tmp_path: Path) -> None:
+    _source(tmp_path, "bccFe", "bcc")
+    _source(tmp_path, "FeN", "fen")
+    campaign = _campaign(tmp_path)
+    generator = CampaignGenerator(setup_service=SetupService(runner=_FakeRunner()))
+    destination = tmp_path / "output"
+    generated = generator.generate(campaign, destination, base_dir=tmp_path)
+    run_dir = destination / generated.entries[0].run_path
+    child = run_dir / "unknown"
+    child.mkdir()
+    (child / "input.nml").write_text("&calculation\n/\n", encoding="utf-8")
+
+    with pytest.raises(CampaignCollisionError, match="UNOWNED_DESCENDANT"):
+        generator.generate(campaign, destination, base_dir=tmp_path)
+
+
 def test_reuse_rejects_coordinated_input_and_historical_manifest_tampering(tmp_path: Path) -> None:
     _source(tmp_path, "bccFe", "bcc")
     _source(tmp_path, "FeN", "fen")

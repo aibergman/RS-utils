@@ -79,14 +79,15 @@ field; legacy data with no recoverable physical scale is labeled `unknown` or
 
 ## Pair mapping and validation
 
-Rows are mapped using the one-based indices plus Cartesian displacement against
-the authoritative `spec.pair_keys` list in `rsutil_exchange_manifest.json` and
-the supplied reference structure.  The manifest specification hash and any
-retained top-level compatibility pair views are checked before mapping. A
-missing or mismatched/ambiguous mapping is fatal. If no manifest is supplied,
-a reference structure is still required so the integer translation can be
-reconstructed from the displacement. Row order and `Atom_*` directory names
-are never scientific identity.
+Chemical element, RS type, and primitive-cell site are different identities.
+The primitive site is identified geometrically by `PairKey(i,j,R)` and carries
+the source RS type from `izp`; exchange-output `itype`/`jtype` are RS type
+identities, never primitive-site indices. Rows are mapped using those type
+values plus Cartesian displacement against the self-contained pair evidence in
+`rsutil_exchange_manifest.json` and, when available, the supplied reference
+structure. A missing, mismatched, or ambiguous mapping is fatal. Unambiguous
+legacy manifests remain readable. RS-utils does not independently merge or
+split chemically identical RS sites.
 
 Parser failures are raised as result-parser errors.  Physics validation is
 stored separately in `ExchangeSet.validation`: when both directions are

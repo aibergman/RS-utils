@@ -202,6 +202,26 @@ def test_explicit_ferromagnetic_context_preserves_supported_domains() -> None:
     assert context.reference == "collinear_fm"
 
 
+@pytest.mark.parametrize("nsp,soc", [(1, True), (2, False), (3, True), (4, False)])
+def test_known_nsp_rejects_contradictory_soc_context(nsp: int, soc: bool) -> None:
+    with pytest.raises(ValueError, match="conflicts with known nsp"):
+        MagneticSymmetryContext(nsp=nsp, soc=soc)
+
+
+def test_unknown_nsp_context_remains_explicit_and_conservative() -> None:
+    context = MagneticSymmetryContext(nsp=None, soc=True)
+    assert context.soc is True
+    assert context.reduction_supported is False
+
+
+def test_noncollinear_nsp_cannot_claim_supported_collinear_reduction() -> None:
+    context = MagneticSymmetryContext(
+        reference_class="collinear_fm", nsp=3, soc=False
+    )
+    assert context.reduction_supported is False
+    assert "noncollinear" in context.reduction_reason
+
+
 def test_distinct_rs_labels_block_same_element_site_merging() -> None:
     structure = Structure(
         Lattice.cubic(2.86),

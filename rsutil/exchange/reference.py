@@ -85,19 +85,27 @@ def read_namelists(
 def build_structure_and_analyzer(
     lattice_nml: dict, input_nml: dict, *, cartesian: bool = True
 ) -> tuple[Structure, SpacegroupAnalyzer]:
-    """Build the legacy pymatgen structure used for neighbor discovery."""
+    """Build the pymatgen structure from RS primitive sites and ``izp``.
+
+    ``crd`` is indexed by primitive-cell site while ``atoms.label`` is
+    indexed by RS electronic type.  ``izp`` is the source-faithful bridge
+    between those two tables.
+    """
 
     lattice = np.asarray(lattice_nml["lattice"]["a"], dtype=float)
     basis = np.asarray(lattice_nml["lattice"]["crd"], dtype=float)
-    labels = _as_list(input_nml["atoms"]["label"])
+    labels, type_indices = _rs_site_types(lattice_nml, input_nml)
     lattice_matrix = Lattice(lattice)
     if cartesian:
         basis = lattice_matrix.get_fractional_coords(basis)
     structure = Structure(
         lattice_matrix,
-        [_element(str(label)) for label in labels],
+        [_element(labels[type_index - 1]) for type_index in type_indices],
         basis,
-        site_properties={"rs_label": [str(label) for label in labels]},
+        site_properties={
+            "rs_label": [labels[type_index - 1] for type_index in type_indices],
+            "rs_type_index": type_indices,
+        },
     )
     return structure, SpacegroupAnalyzer(structure)
 
@@ -107,15 +115,16 @@ def build_rs_structure(lattice_nml: dict, input_nml: dict) -> RSStructure:
 
     lattice = np.asarray(lattice_nml["lattice"]["a"], dtype=float)
     basis = np.asarray(lattice_nml["lattice"]["crd"], dtype=float)
-    labels = _as_list(input_nml["atoms"]["label"])
+    labels, type_indices = _rs_site_types(lattice_nml, input_nml)
     sites = tuple(
         StructureSite(
             index=index,
             position=tuple(float(value) for value in position),
-            element=_element(label),
-            rs_label=str(label),
+            element=_element(labels[type_index - 1]),
+            rs_label=labels[type_index - 1],
+            rs_type_index=type_index,
         )
-        for index, (label, position) in enumerate(zip(labels, basis, strict=True))
+        for index, (type_index, position) in enumerate(zip(type_indices, basis, strict=True))
     )
     return RSStructure(
         lattice_vectors=tuple(tuple(float(value) for value in row) for row in lattice),
@@ -123,6 +132,26 @@ def build_rs_structure(lattice_nml: dict, input_nml: dict) -> RSStructure:
         coordinate_convention="cartesian",
         sites=sites,
     )
+
+
+def _rs_site_types(lattice_nml: dict, input_nml: dict) -> tuple[list[str], tuple[int, ...]]:
+    """Return source RS labels and the one-based type for each basis site."""
+
+    try:
+        labels = [str(value) for value in _as_list(input_nml["atoms"]["label"])]
+        type_values = tuple(int(value) for value in _as_list(lattice_nml["lattice"]["izp"]))
+        basis = _as_list(lattice_nml["lattice"]["crd"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError("RS reference requires atoms.label, lattice.crd, and lattice.izp") from exc
+    if not labels:
+        raise ValueError("RS reference must define at least one atoms.label RS type")
+    if len(type_values) != len(basis):
+        raise ValueError(
+            "lattice.izp must contain exactly one RS type index for each lattice.crd site"
+        )
+    if any(type_index < 1 or type_index > len(labels) for type_index in type_values):
+        raise ValueError("lattice.izp contains an RS type index outside atoms.label")
+    return labels, type_values
 
 
 def _recursion_sites(lattice_nml: dict) -> tuple[int, ...]:

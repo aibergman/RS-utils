@@ -20,8 +20,10 @@ from .pairs import map_cluster_neighbor
 
 
 EXCHANGE_MANIFEST_FILENAME = "rsutil_exchange_manifest.json"
-EXCHANGE_MANIFEST_SCHEMA = "rsutil-exchange-v2"
-_SUPPORTED_EXCHANGE_MANIFEST_SCHEMAS = frozenset({"rsutil-exchange-v1", EXCHANGE_MANIFEST_SCHEMA})
+EXCHANGE_MANIFEST_SCHEMA = "rsutil-exchange-v3"
+_SUPPORTED_EXCHANGE_MANIFEST_SCHEMAS = frozenset(
+    {"rsutil-exchange-v1", "rsutil-exchange-v2", EXCHANGE_MANIFEST_SCHEMA}
+)
 _COLLISION_POLICIES = frozenset({"error", "replace_generated", "reuse_if_identical"})
 _RUNTIME_OUTPUT_NAMES = frozenset(
     {
@@ -171,6 +173,12 @@ class ExchangeJobSpec:
         return tuple(sorted(self.pair_keys, key=lambda key: key.sort_key))
 
     @property
+    def canonical_pair_records(self) -> tuple[ExchangePair, ...]:
+        """Return pairs in the same deterministic order as ``pair_keys``."""
+
+        return tuple(sorted(self.pairs, key=lambda pair: pair.key.sort_key))
+
+    @property
     def spec_hash(self) -> str:
         """Deterministic identity of this job's scientific/job specification."""
 
@@ -288,6 +296,17 @@ def _spec_payload(job: ExchangeJobSpec) -> dict[str, Any]:
     """Return the deterministic identity payload for a planned job."""
 
     pair_keys = [key.to_dict() for key in job.canonical_pair_list]
+    pair_records = [
+        {
+            "key": pair.key.to_dict(),
+            "rs_type_i": pair.rs_type_i,
+            "rs_type_j": pair.rs_type_j,
+            "cartesian_displacement": list(pair.cartesian_displacement),
+            "distance": pair.distance,
+            "length_unit": pair.length_unit,
+        }
+        for pair in job.canonical_pair_records
+    ]
     return {
         "atom_index": job.atom_index,
         "center_cluster_index": job.center_cluster_index,
@@ -310,6 +329,7 @@ def _spec_payload(job: ExchangeJobSpec) -> dict[str, Any]:
         "symmetry_reduction_applied": job.symmetry_reduction_applied,
         "symmetry_reduction_reason": job.symmetry_reduction_reason,
         "pair_keys": pair_keys,
+        "pairs": pair_records,
         "legacy_ijpair": [
             [job.atom_index] * len(job.matching_indices),
             list(job.matching_indices),
@@ -335,6 +355,7 @@ def build_exchange_manifest(
         "spec": spec,
         "canonical_pair_list": spec["pair_keys"],
         "pair_keys": spec["pair_keys"],
+        "pairs": spec["pairs"],
         "legacy_ijpair": spec["legacy_ijpair"],
         "source_run": {
             "identity": job.source_run_identity,
@@ -389,6 +410,25 @@ def _validate_manifest_pair_identity(
     if not isinstance(spec, Mapping) or not isinstance(spec.get("pair_keys"), list):
         raise ExchangeManifestError(f"{source} has no authoritative spec.pair_keys")
     authoritative = spec["pair_keys"]
+    pair_records = spec.get("pairs")
+    if pair_records is not None:
+        if not isinstance(pair_records, list) or len(pair_records) != len(authoritative):
+            raise ExchangeManifestError(f"{source} has an invalid pair evidence list")
+        for expected, record in zip(authoritative, pair_records):
+            if not isinstance(record, Mapping) or record.get("key") != expected:
+                raise ExchangeManifestError(f"{source} pair evidence does not match pair_keys")
+            for name in ("rs_type_i", "rs_type_j"):
+                value = record.get(name)
+                if value is not None and (
+                    isinstance(value, bool) or not isinstance(value, int) or value < 1
+                ):
+                    raise ExchangeManifestError(f"{source} contains invalid {name} pair evidence")
+            displacement = record.get("cartesian_displacement")
+            if not isinstance(displacement, list) or len(displacement) != 3:
+                raise ExchangeManifestError(f"{source} contains invalid pair displacement evidence")
+        top_level_records = manifest.get("pairs")
+        if top_level_records is not None and top_level_records != pair_records:
+            raise ExchangeManifestError(f"{source} pairs do not match authoritative pair evidence")
     for name in ("canonical_pair_list", "pair_keys"):
         view = manifest.get(name)
         if view is not None and view != authoritative:

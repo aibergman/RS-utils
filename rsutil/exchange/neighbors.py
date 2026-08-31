@@ -95,6 +95,11 @@ def _canonical_from_pymatgen(structure: Structure) -> RSStructure:
                     if site.properties.get("rs_type") is not None
                     else None
                 ),
+                rs_type_index=(
+                    int(site.properties["rs_type_index"])
+                    if site.properties.get("rs_type_index") is not None
+                    else None
+                ),
             )
             for index, site in enumerate(structure.sites)
         ),

@@ -105,6 +105,9 @@ class StructureSite:
     rs_label: str | None = None
     rs_type: str | None = None
     metadata: Mapping[str, Any] = field(default_factory=dict)
+    # RS-LMTO's one-based electronic type identity.  This is distinct from
+    # the zero-based primitive-cell site index and from the chemical element.
+    rs_type_index: int | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.index, int) or isinstance(self.index, bool) or self.index < 0:
@@ -117,6 +120,14 @@ class StructureSite:
             raise ValidationError(f"invalid chemical element symbol: {self.element!r}")
         canonical_element = element[0].upper() + element[1:].lower()
         object.__setattr__(self, "element", canonical_element)
+        if self.rs_type_index is not None:
+            if (
+                not isinstance(self.rs_type_index, int)
+                or isinstance(self.rs_type_index, bool)
+                or self.rs_type_index < 1
+            ):
+                raise ValidationError("rs_type_index must be a positive integer")
+            object.__setattr__(self, "rs_type_index", int(self.rs_type_index))
         if self.atomic_number is not None:
             if (
                 not isinstance(self.atomic_number, int)
@@ -140,6 +151,7 @@ class StructureSite:
             "rs_label": self.rs_label,
             "rs_type": self.rs_type,
             "metadata": dict(self.metadata),
+            "rs_type_index": self.rs_type_index,
         }
 
     @classmethod
@@ -152,6 +164,7 @@ class StructureSite:
             rs_label=data.get("rs_label"),
             rs_type=data.get("rs_type"),
             metadata=data.get("metadata"),
+            rs_type_index=data.get("rs_type_index"),
         )
 
 
@@ -657,6 +670,8 @@ class ExchangePair:
     shell: int | float | str | None = None
     shell_metadata: Mapping[str, Any] = field(default_factory=dict)
     provenance: Mapping[str, Any] = field(default_factory=dict)
+    rs_type_i: int | None = None
+    rs_type_j: int | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.key, PairKey):
@@ -673,6 +688,14 @@ class ExchangePair:
         if not isinstance(self.length_unit, str) or not self.length_unit.strip():
             raise ValidationError("pair length_unit must be a non-empty string")
         object.__setattr__(self, "length_unit", self.length_unit.strip())
+        for name in ("rs_type_i", "rs_type_j"):
+            value = getattr(self, name)
+            if value is not None and (
+                not isinstance(value, int) or isinstance(value, bool) or value < 1
+            ):
+                raise ValidationError(f"{name} must be a positive integer when supplied")
+            if value is not None:
+                object.__setattr__(self, name, int(value))
         for name in ("species_i", "species_j"):
             value = getattr(self, name)
             if not isinstance(value, str) or not value.strip():
@@ -709,6 +732,8 @@ class ExchangePair:
             "species_j": self.species_j,
             "label_i": self.label_i,
             "label_j": self.label_j,
+            "rs_type_i": self.rs_type_i,
+            "rs_type_j": self.rs_type_j,
             "cluster_index": self.cluster_index,
             "shell": self.shell,
             "shell_metadata": dict(self.shell_metadata),
@@ -726,6 +751,8 @@ class ExchangePair:
             length_unit=str(data.get("length_unit", "unknown")),
             label_i=data.get("label_i"),
             label_j=data.get("label_j"),
+            rs_type_i=data.get("rs_type_i"),
+            rs_type_j=data.get("rs_type_j"),
             cluster_index=data.get("cluster_index"),
             shell=data.get("shell"),
             shell_metadata=data.get("shell_metadata"),

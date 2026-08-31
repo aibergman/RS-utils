@@ -1,7 +1,14 @@
-# RS-utils HT readiness report — HT-R10…R14 closeout
+# RS-utils HT readiness report — HT-R15…R17 final shape-up
 
-> **HT FOUNDATION READY FOR PILOT USE WITHIN THE SUPPORT MATRIX — HT-R14
+> **READY FOR PILOT HT USE WITHIN THE DOCUMENTED SUPPORT MATRIX — HT-R17
 > COMPLETE.**
+
+The R15/R16 identity, ownership, and magnetic-context shape-up is complete.
+The installed-wheel closeout passed 177 tests with 16 known spglib deprecation
+warnings. The wheel was `rsutil-0.10.0-cp311-cp311-macosx_26_0_arm64.whl`;
+both the Python package and compiled extension resolved from the external
+environment's site-packages with `PYTHONPATH` removed. The source checkout
+suite passed the same 177 tests and warning count.
 >
 > The earlier R09 conclusion is superseded/reopened by the post-R09
 > self-review. Its historical evidence is retained below, but it must not be
@@ -38,7 +45,7 @@ documented by R08.
 | Unequal setup counts | Valid source-derived surface counts passed; missing recursion entries and inconsistent `ntype` were rejected. See `tests/test_setup_validation.py`. |
 | Execution/state separation | Exit 0 + `Not converged` => `COMPLETED_NOT_CONVERGED`; nonzero exit, including stale good output => `FAILED`; malformed => `COMPLETED_INVALID`; unknown convergence never succeeds. See `tests/test_ht17_campaign.py`. |
 | Reuse and identity | Unchanged materialized input reused; mutation or missing input rejected. See `tests/test_ht16_campaign.py`. |
-| Exchange mapping | Duplicate/stale/tampered or unauthenticated pair views rejected without replacement. See `tests/test_ht10_exchange_jobs.py` and `tests/test_ht12_exchange_results.py`. |
+| Exchange mapping | Source-faithful `izp` site-to-type mapping, repeated-type geometry mapping, and duplicate/stale/tampered pair views are covered; exchange output type columns are never treated as site numbers. See `tests/test_ht15_site_types.py`, `tests/test_ht10_exchange_jobs.py`, and `tests/test_ht12_exchange_results.py`. |
 | Magnetic symmetry and RS identity | AFM/noncollinear cases do not receive unproven reduction; site/type and distinct RS labels remain identity-bearing. See `tests/test_ht08_exchange_service.py` and `tests/test_ht09_exchange_symmetry.py`. |
 | Worker failure and publication | Worker failure/`STOP` is isolated from the parent and partial destinations are not published. See `tests/test_fortran_setup_runner.py`. |
 | Randomness | Unseeded deterministic setup is reproducible; active unseeded stochastic setup is marked nonreproducible. See `tests/test_setup_validation.py`. |
@@ -348,9 +355,12 @@ calculation authority; its fixed filenames and fatal-stop paths are contained
 by the worker boundary.
 
 Exchange identity is the typed periodic key `(i, j, R)`, with integer lattice
-translation `R`. Cartesian displacement, distance, species, shell, and
-`Atom_*` directory names are derived/provenance fields. Versioned result
-models preserve units, parser provenance, raw source hashes, and validation
+translation `R`; primitive sites are identified geometrically. Each site also
+carries its source RS type from `izp`, while exchange-output endpoint integers
+are RS type identities and are never interpreted as site numbers. Cartesian
+displacement, distance, species, shell, and `Atom_*` directory names are
+derived/provenance fields. Versioned result models preserve units, parser
+provenance, raw source hashes, and validation
 diagnostics. Campaign generation writes relocatable manifests and a stable
 index; Slurm support only renders a reviewed array script and local status/
 collection tools do not query or control a scheduler.

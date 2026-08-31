@@ -55,6 +55,11 @@ counts; they are not interchangeable:
 - `nbulk_bulk` is a mode input used to derive bulk/reference counts; it is
   not treated as a universal array size.
 
+For exchange/reference structures, `crd(:, site)` is the primitive-cell site
+table, `izp(site)` is its one-based RS electronic type index, and
+`atoms.label(type)` is the symbolic type label. RS-utils preserves this
+source mapping; it does not infer or reclassify RS types from chemistry.
+
 For surface inputs (`calctype='S'`), the validator checks the source-derived
 relationships `nrec = nlay` and `ntype = nbulk_bulk + nlay` when those fields
 are available. For layered/interface inputs (`calctype='L'`), it checks

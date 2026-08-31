@@ -369,13 +369,34 @@ def _validate_reusable_run(
                 f"INPUT_MODIFIED: materialized input differs from freshly generated expectation: {path}"
             )
 
-    # Setup-generated namelists are scientific inputs. Runtime artifacts
-    # (reports, execution records, logs, etc.) remain outside the generation
-    # identity and may be added later.
+    # Setup-generated namelists at the campaign-run root are scientific
+    # inputs. Nested workflows own their own directories and manifests; the
+    # parent must not reinterpret their namelists as parent inputs.
     if run_dir.is_dir():
+        for path in run_dir.glob("*.nml"):
+            if path.is_file() and path.name not in expected_names:
+                raise CampaignCollisionError(
+                    f"UNEXPECTED_OWNED_FILE: unrecorded scientific input: {path}"
+                )
         for path in run_dir.rglob("*.nml"):
-            if path.is_file() and path.relative_to(run_dir).as_posix() not in expected_names:
-                raise CampaignCollisionError(f"UNEXPECTED_OWNED_FILE: unrecorded scientific input: {path}")
+            if not path.is_file() or path.parent == run_dir:
+                continue
+            relative = path.relative_to(run_dir)
+            child_root = run_dir / relative.parts[0]
+            child_manifest = child_root / "rsutil_exchange_manifest.json"
+            if child_manifest.is_file():
+                try:
+                    from ..exchange.jobs import read_exchange_manifest
+
+                    read_exchange_manifest(child_manifest)
+                except Exception as exc:
+                    raise CampaignCollisionError(
+                        f"UNOWNED_DESCENDANT: nested scientific input has an invalid child manifest: {path}"
+                    ) from exc
+                continue
+            raise CampaignCollisionError(
+                f"UNOWNED_DESCENDANT: unowned nested scientific input: {path}"
+            )
 
 
 def _logicalize_manifest_paths(value: Any, *, lattice: Path, input_nml: Path) -> Any:

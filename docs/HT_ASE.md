@@ -21,6 +21,10 @@ structure = from_ase(atoms)
 round_tripped = to_ase(structure)
 ```
 
+When present, numeric RS type identity is preserved through the
+`rsutil_rs_type_indices` metadata key. It is separate from free-text RS labels
+and from the primitive-cell site index.
+
 The `Atoms <-> RSStructure` conversion above is the supported HT ASE
 boundary. Full ASE-to-setup-source generation is retained only as an
 explicitly opt-in experimental convenience; it emits placeholder LMTO policy

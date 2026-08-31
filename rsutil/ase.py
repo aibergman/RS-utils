@@ -18,7 +18,8 @@ The adapter preserves JSON-compatible ``Atoms.info`` under
 canonical ``numbers`` and ``positions`` arrays) under
 ``RSStructure.metadata['ase_arrays']``.  Their dtypes are recorded where
 possible.  RS labels/types use the optional ``rsutil_rs_labels`` and
-``rsutil_rs_types`` info keys when present.
+``rsutil_rs_types`` info keys when present. Numeric RS type identities use
+the separate ``rsutil_rs_type_indices`` info key.
 """
 
 from __future__ import annotations
@@ -124,10 +125,15 @@ def from_ase(atoms: Any) -> RSStructure:
 
     labels = _site_values(atoms.info, "rsutil_rs_labels", "rs_labels")
     types = _site_values(atoms.info, "rsutil_rs_types", "rs_types")
+    type_indices = _site_values(
+        atoms.info, "rsutil_rs_type_indices", "rs_type_indices"
+    )
     if labels is not None and len(labels) != len(atoms):
         raise ValueError("ASE RS label metadata must have one entry per atom")
     if types is not None and len(types) != len(atoms):
         raise ValueError("ASE RS type metadata must have one entry per atom")
+    if type_indices is not None and len(type_indices) != len(atoms):
+        raise ValueError("ASE RS type-index metadata must have one entry per atom")
 
     symbols = atoms.get_chemical_symbols()
     atomic_numbers = atoms.get_atomic_numbers()
@@ -139,6 +145,7 @@ def from_ase(atoms: Any) -> RSStructure:
             atomic_number=(int(atomic_numbers[index]) or None),
             rs_label=None if labels is None else str(labels[index]),
             rs_type=None if types is None else str(types[index]),
+            rs_type_index=None if type_indices is None else int(type_indices[index]),
         )
         for index in range(len(atoms))
     )
@@ -211,10 +218,13 @@ def to_ase(structure: RSStructure) -> Any:
                 continue
     labels = [site.rs_label for site in structure.sites]
     types = [site.rs_type for site in structure.sites]
+    type_indices = [site.rs_type_index for site in structure.sites]
     if any(value is not None for value in labels):
         atoms.info["rsutil_rs_labels"] = labels
     if any(value is not None for value in types):
         atoms.info["rsutil_rs_types"] = types
+    if any(value is not None for value in type_indices):
+        atoms.info["rsutil_rs_type_indices"] = type_indices
 
     arrays = metadata.get("ase_arrays", {})
     dtypes = metadata.get("ase_array_dtypes", {})

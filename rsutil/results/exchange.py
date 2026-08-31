@@ -42,7 +42,7 @@ from .units import MILLI_RYDBERG, Quantity, UNKNOWN_UNIT, Unit, scalar, vector
 _NUMBER = r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[EeDd][+-]?\d+)?"
 _NUMBER_RE = re.compile(rf"^{_NUMBER}$")
 _MANIFEST_NAME = "rsutil_exchange_manifest.json"
-_SCHEMAS = frozenset({"rsutil-exchange-v1", "rsutil-exchange-v2"})
+_SCHEMAS = frozenset({"rsutil-exchange-v1", "rsutil-exchange-v2", "rsutil-exchange-v3"})
 _FABLE_V4_MRY_STEMS = frozenset(
     {
         "jij",
@@ -220,7 +220,7 @@ def validate_exchange_set(
             expected = tuple(tuple(float(value) for value in row) for row in np.asarray(first.tensor.value).T)
             actual = tuple(tuple(float(value) for value in row) for row in np.asarray(second.tensor.value))
             if not _close(expected, actual, atol=atol, rtol=rtol):
-                diagnostics.append(_reverse_diagnostic("exchange_tensor_transpose", key, reverse, severity))
+                diagnostics.append(_reverse_diagnostic("anisotropic_exchange_tensor_transpose", key, reverse, severity))
     return ParseValidation(valid=not any(item.severity is ParseSeverity.ERROR for item in diagnostics), diagnostics=tuple(diagnostics))
 
 
@@ -292,6 +292,23 @@ def _load_manifest(value: str | Path | Mapping[str, Any] | None) -> dict[str, An
                 )
         if data.get("legacy_ijpair") is not None and data["legacy_ijpair"] != spec.get("legacy_ijpair"):
             raise MalformedResultError("exchange manifest legacy_ijpair does not match spec")
+        pair_records = spec.get("pairs")
+        if pair_records is not None:
+            if not isinstance(pair_records, list) or len(pair_records) != len(keys):
+                raise MalformedResultError("exchange manifest spec has invalid pair evidence")
+            if data.get("pairs") is not None and data["pairs"] != pair_records:
+                raise MalformedResultError("exchange manifest pairs do not match spec")
+            for key, record in zip(keys, pair_records):
+                if not isinstance(record, Mapping) or record.get("key") != key:
+                    raise MalformedResultError("exchange manifest pair evidence does not match pair_keys")
+                for name in ("rs_type_i", "rs_type_j"):
+                    type_index = record.get(name)
+                    if type_index is not None and (
+                        isinstance(type_index, bool)
+                        or not isinstance(type_index, int)
+                        or type_index < 1
+                    ):
+                        raise MalformedResultError(f"exchange manifest contains invalid {name}")
     else:
         # Older hand-authored parser manifests may contain only one pair-list
         # view.  If compatibility views are duplicated, they must still agree.
@@ -305,6 +322,10 @@ def _load_manifest(value: str | Path | Mapping[str, Any] | None) -> dict[str, An
         data["_canonical_keys"] = tuple(PairKey.from_dict(item) for item in keys)
     except (KeyError, TypeError, ValueError) as exc:
         raise MalformedResultError("exchange manifest contains invalid canonical pair keys") from exc
+    pair_records = spec.get("pairs") if isinstance(spec, Mapping) else None
+    if pair_records is None:
+        pair_records = [{"key": key} for key in keys]
+    data["_pair_records"] = tuple(dict(record) for record in pair_records)
     return data
 
 
@@ -406,28 +427,59 @@ def _map_row(
 ) -> PairKey:
     values = row.values
     i_one, j_one = _positive_int(values[0], row, "itype"), _positive_int(values[1], row, "jtype")
+    observed_distance = values[-1] if kind != "tensor" or len(values) == 15 else None
     if manifest is not None:
-        candidates = [key for key in manifest["_canonical_keys"] if key.i + 1 == i_one and key.j + 1 == j_one]
-    else:
-        candidates = []
-
-    if structure is not None:
-        if i_one > len(structure.sites) or j_one > len(structure.sites):
-            raise InteractionMappingError(f"row at {row.source}:{row.line} refers to a site outside the structure")
-        if manifest is None:
-            inferred = _infer_key_from_geometry(i_one - 1, j_one - 1, values[2:5], structure, tolerance)
-            candidates = [inferred]
+        records = list(manifest["_pair_records"])
+        typed = any(record.get("rs_type_i") is not None for record in records)
+        if typed:
+            records = [
+                record
+                for record in records
+                if record.get("rs_type_i") == i_one and record.get("rs_type_j") == j_one
+            ]
         else:
-            candidates = [
-                key for key in candidates
+            # v1/v2 manifests predate the source-faithful type contract.  Their
+            # site-number mapping remains readable only as a compatibility path.
+            records = [
+                record for record in records
+                if PairKey.from_dict(record["key"]).i + 1 == i_one
+                and PairKey.from_dict(record["key"]).j + 1 == j_one
+            ]
+        if structure is not None:
+            if typed and any(
+                type_index is not None
+                and type_index != structure.sites[index].rs_type_index
+                for record in records
+                for index, type_index in (
+                    (PairKey.from_dict(record["key"]).i, record.get("rs_type_i")),
+                    (PairKey.from_dict(record["key"]).j, record.get("rs_type_j")),
+                )
+            ):
+                raise InteractionMappingError(
+                    f"row at {row.source}:{row.line} conflicts with structure RS type evidence"
+                )
+            records = [
+                record for record in records
                 if _geometry_matches(
-                    key,
+                    PairKey.from_dict(record["key"]),
                     values[2:5],
-                    values[-1] if kind != "tensor" or len(values) == 15 else None,
+                    observed_distance,
                     structure,
                     tolerance,
                 )
             ]
+        elif typed:
+            records = [
+                record for record in records
+                if _manifest_geometry_matches(record, values[2:5], observed_distance, tolerance)
+            ]
+        candidates = [PairKey.from_dict(record["key"]) for record in records]
+    elif structure is not None:
+        candidates = _structure_candidates(
+            structure, i_one, j_one, values[2:5], observed_distance, tolerance
+        )
+    else:
+        candidates = []
     if len(candidates) != 1:
         if not candidates:
             raise InteractionMappingError(
@@ -437,6 +489,56 @@ def _map_row(
             f"row at {row.source}:{row.line} maps ambiguously to canonical pairs: {candidates}"
         )
     return candidates[0]
+
+
+def _structure_candidates(
+    structure: RSStructure,
+    i_one: int,
+    j_one: int,
+    displacement: Sequence[float],
+    distance: float | None,
+    tolerance: float,
+) -> list[PairKey]:
+    """Find site pairs by source type and geometry without assuming site=type."""
+
+    all_types = [site.rs_type_index for site in structure.sites]
+    if any(type_index is not None for type_index in all_types):
+        i_sites = [index for index, type_index in enumerate(all_types) if type_index == i_one]
+        j_sites = [index for index, type_index in enumerate(all_types) if type_index == j_one]
+    else:
+        # Non-RS structures retain the historical site-index fallback.
+        i_sites = [i_one - 1] if 1 <= i_one <= len(structure.sites) else []
+        j_sites = [j_one - 1] if 1 <= j_one <= len(structure.sites) else []
+    candidates: list[PairKey] = []
+    for i_index in i_sites:
+        for j_index in j_sites:
+            try:
+                key = _infer_key_from_geometry(
+                    i_index, j_index, displacement, structure, tolerance
+                )
+            except InteractionMappingError:
+                continue
+            if _geometry_matches(key, displacement, distance, structure, tolerance):
+                candidates.append(key)
+    return list(dict.fromkeys(candidates))
+
+
+def _manifest_geometry_matches(
+    record: Mapping[str, Any],
+    displacement: Sequence[float],
+    distance: float | None,
+    tolerance: float,
+) -> bool:
+    expected = record.get("cartesian_displacement")
+    if expected is None:
+        return True
+    if not np.allclose(np.asarray(expected, dtype=float), np.asarray(displacement, dtype=float), atol=tolerance, rtol=0):
+        return False
+    recorded_distance = record.get("distance")
+    if distance is not None and recorded_distance is not None:
+        if not math.isclose(float(distance), float(recorded_distance), abs_tol=tolerance, rel_tol=1e-5):
+            return False
+    return True
 
 
 def _record_from_row(
@@ -460,6 +562,8 @@ def _record_from_row(
             length_unit=structure.length_unit,
             label_i=structure.sites[key.i].rs_label,
             label_j=structure.sites[key.j].rs_label,
+            rs_type_i=structure.sites[key.i].rs_type_index,
+            rs_type_j=structure.sites[key.j].rs_type_index,
             provenance={"geometry_source": "reference_structure"},
         )
     quantities: dict[str, Quantity | None] = {

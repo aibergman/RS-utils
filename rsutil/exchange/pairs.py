@@ -273,6 +273,8 @@ def map_cluster_neighbor(
         length_unit=structure.length_unit,
         label_i=structure.sites[key.i].rs_label,
         label_j=structure.sites[key.j].rs_label,
+        rs_type_i=structure.sites[key.i].rs_type_index,
+        rs_type_j=structure.sites[key.j].rs_type_index,
         cluster_index=(int(entry_index) if entry_index is not None else None),
         shell=shell,
         shell_metadata=shell_metadata,

@@ -28,6 +28,7 @@ def _atoms(cell, pbc):
     atoms.set_tags([4, 7, 9])
     atoms.info["database_id"] = "example-17"
     atoms.info["rsutil_rs_labels"] = ["Fe1", "Pt1", "N1"]
+    atoms.info["rsutil_rs_type_indices"] = [1, 2, 3]
     atoms.new_array("site_weights", np.asarray([1.0, 2.0, 3.0]))
     return atoms
 
@@ -58,6 +59,8 @@ def test_ase_round_trip_preserves_geometry_order_pbc_and_metadata(cell, pbc) -> 
     np.testing.assert_allclose(restored.arrays["site_weights"], atoms.arrays["site_weights"])
     assert restored.info["database_id"] == "example-17"
     assert restored.info["rsutil_rs_labels"] == ["Fe1", "Pt1", "N1"]
+    assert restored.info["rsutil_rs_type_indices"] == [1, 2, 3]
+    assert [site.rs_type_index for site in structure.sites] == [1, 2, 3]
 
 
 def test_fractional_structure_is_converted_using_row_cell_orientation() -> None:
