@@ -56,8 +56,17 @@ __version__ = "0.10.0"
 
 from .setup_runner import FortranSetupRunner
 from .setup_service import SetupService, run_setup
+from .results import SCFResult, parse_run
 
-__all__ = ['process_lattice', 'bands', 'FortranSetupRunner', 'SetupService', 'run_setup']
+__all__ = [
+    'process_lattice',
+    'bands',
+    'FortranSetupRunner',
+    'SetupService',
+    'run_setup',
+    'SCFResult',
+    'parse_run',
+]
 
 
 def __getattr__(name):

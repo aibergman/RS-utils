@@ -58,7 +58,7 @@ filenames remain local to that workspace.
 - [x] **HT-08** — Extract `-J` behind the exchange service
 - [x] **HT-09** — Correct exchange symmetry reduction
 - [x] **HT-10** — Transactional exchange job writer and manifests
-- [ ] **HT-11** — Result parser foundation and SCF model
+- [x] **HT-11** — Result parser foundation and SCF model
 - [ ] **HT-12** — Exchange, DMI, and tensor result parsing
 - [ ] **HT-13** — Transport and damping result contracts
 - [ ] **HT-14** — Versioned TB model and ML export
@@ -279,3 +279,24 @@ No scientific or functional code was changed for HT-00.
   reused by default; unmarked legacy/user directories require explicit
   `force_legacy_collision=True`. Legacy `-J` retains the `Atom_*` layout and
   uses the owned-directory replacement policy. See `docs/HT_EXCHANGE_JOBS.md`.
+
+### HT-11 decisions
+
+- Added the dependency-light `rsutil.results` package with versioned
+  `ElectronicResult`/`SCFResult` models, explicit `Quantity` units,
+  `ParserProvenance` source hashes, separate parse diagnostics and validation,
+  and deterministic JSON-compatible serialization.
+- `parse_run(path)` accepts either an explicit run directory or `report.out`.
+  It parses the stable report records for Fermi energy, energies, moments,
+  orientations, occupations, charge transfer, and RMS difference while
+  retaining unknown units where the upstream text contract does not establish
+  a unit. Atom labels are converted from the report's one-based form to the
+  core's zero-based site index.
+- Convergence is populated only from explicit `Converged!` or `Not converged!`
+  markers in `out.scf`/`out.cold`; a report alone yields `unknown`. The legacy
+  exchange Fermi reader is now a compatibility wrapper around this parser.
+- Material evidence limitation: this checkout contains the checked-in
+  B2Fe/FePt reports and a local `fable_v3` source checkout, while no fable_v4
+  source is present in the repository. The inspected report-writing contract
+  does not emit convergence or units for total energies/moments, so those
+  fields remain explicitly unknown rather than being inferred.
