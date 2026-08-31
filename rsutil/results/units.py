@@ -14,15 +14,25 @@ from typing import Any, Sequence
 
 class Unit(str, Enum):
     RY = "Ry"
+    ELECTRONVOLT = "eV"
     ELECTRON = "electron"
     MU_B = "mu_B"
+    SIEMENS_PER_METER = "S/m"
+    SIEMENS_PER_CENTIMETER = "S/cm"
+    PER_SECOND = "1/s"
+    DIMENSIONLESS = "dimensionless"
     UNKNOWN = "unknown"
 
 
 RYDBERG = Unit.RY
 RY = RYDBERG
+ELECTRONVOLT = Unit.ELECTRONVOLT
 ELECTRONS = Unit.ELECTRON
 MU_B = Unit.MU_B
+SIEMENS_PER_METER = Unit.SIEMENS_PER_METER
+SIEMENS_PER_CENTIMETER = Unit.SIEMENS_PER_CENTIMETER
+PER_SECOND = Unit.PER_SECOND
+DIMENSIONLESS = Unit.DIMENSIONLESS
 UNKNOWN_UNIT = Unit.UNKNOWN
 
 
@@ -73,10 +83,15 @@ def _json_value(value: Any) -> Any:
 
 __all__ = [
     "ELECTRONS",
+    "ELECTRONVOLT",
+    "DIMENSIONLESS",
     "MU_B",
+    "PER_SECOND",
     "Quantity",
     "RY",
     "RYDBERG",
+    "SIEMENS_PER_CENTIMETER",
+    "SIEMENS_PER_METER",
     "UNKNOWN_UNIT",
     "Unit",
     "scalar",

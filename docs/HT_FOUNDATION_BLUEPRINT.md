@@ -60,7 +60,7 @@ filenames remain local to that workspace.
 - [x] **HT-10** — Transactional exchange job writer and manifests
 - [x] **HT-11** — Result parser foundation and SCF model
 - [x] **HT-12** — Exchange, DMI, and tensor result parsing
-- [ ] **HT-13** — Transport and damping result contracts
+- [x] **HT-13** — Transport and damping result contracts
 - [ ] **HT-14** — Versioned TB model and ML export
 - [ ] **HT-15** — ASE structure interoperability
 - [ ] **HT-16** — Deterministic campaign specification and generation
@@ -307,3 +307,9 @@ No scientific or functional code was changed for HT-00.
 - Added strict parsers for the real checked-in `jijso.out`/`jijfo.out` scalar and `dijso.out`/`dijfo.out` DMI table schemas. Rows are mapped by one-based output indices plus Cartesian displacement against the exchange manifest/reference structure; raw row order and `Atom_*` names are not used as identity. Ambiguous or mismatched mapping fails explicitly.
 - Added explicit tensor-shaped row support only when a filename/header identifies a tensor, plus separate reverse-pair physics validation (J symmetric, D antisymmetric, tensor transpose) that reports warnings by default and does not impose crystal constraints.
 - Material evidence limitation: this checkout contains no `fable_v4/source/exchange.f90` or real fable_v4 tensor fixture. The scalar/DMI documentation is based on the checked-in MnSi outputs and `docs/notes/RSLMTO_format.md`; tensor parsing remains fail-closed pending upstream fable_v4 evidence.
+
+### HT-13 decisions
+
+- The checked-out RS-utils tree contains no `fable_v4` source, conductivity/Kubo/KPM implementation, Gilbert-damping implementation, transport/damping writer, or corresponding fixture. No transport or damping text format is therefore production-supported; the evidence and future upstream requirement are recorded in `docs/HT_TRANSPORT_DAMPING_FORMATS.md`.
+- Added `rsutil.results.transport` with explicit `ConductivityResult` and `DampingResult` contracts. They require units, axes, component/index ordering, method, channel, approximation, and parser provenance, and validate the declared value shape.
+- Added a deliberately small registry and fail-closed parser entry points. Candidate files return `UNSUPPORTED_AMBIGUOUS` with output/input/lattice/manifest hashes and no guessed values; missing files remain explicit missing-file errors. No RS-LMTO scientific source was changed.
