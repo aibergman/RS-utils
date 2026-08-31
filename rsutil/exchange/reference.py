@@ -92,7 +92,12 @@ def build_structure_and_analyzer(
     lattice_matrix = Lattice(lattice)
     if cartesian:
         basis = lattice_matrix.get_fractional_coords(basis)
-    structure = Structure(lattice_matrix, labels, basis)
+    structure = Structure(
+        lattice_matrix,
+        [_element(str(label)) for label in labels],
+        basis,
+        site_properties={"rs_label": [str(label) for label in labels]},
+    )
     return structure, SpacegroupAnalyzer(structure)
 
 

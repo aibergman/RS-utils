@@ -122,6 +122,7 @@ class ExchangeJobSpec:
     reduction: str = "full"
     soc: bool = False
     magnetic_axis: tuple[float, float, float] | None = None
+    magnetic_reference: str = "collinear_fm"
     fermi_energy_source: str = "report.out"
     required_atom_files: tuple[str, ...] = ()
     source_run_identity: str = ""
@@ -163,6 +164,7 @@ def construct_exchange_jobs(
     reduction: str = "full",
     soc: bool = False,
     magnetic_axis: tuple[float, float, float] | None = None,
+    magnetic_reference: str = "collinear_fm",
     fermi_energy_source: str = "report.out",
     required_atom_files: Sequence[str] | None = None,
     source_run_identity: str = "",
@@ -209,6 +211,7 @@ def construct_exchange_jobs(
                 magnetic_axis=(
                     None if magnetic_axis is None else tuple(float(value) for value in magnetic_axis)
                 ),
+                magnetic_reference=str(magnetic_reference),
                 fermi_energy_source=str(fermi_energy_source),
                 required_atom_files=output_files,
                 source_run_identity=str(source_run_identity),
@@ -247,6 +250,7 @@ def _spec_payload(job: ExchangeJobSpec) -> dict[str, Any]:
         "reduction": job.reduction,
         "soc": job.soc,
         "magnetic_axis": None if job.magnetic_axis is None else list(job.magnetic_axis),
+        "magnetic_reference": job.magnetic_reference,
         "fermi_energy": float(job.input_nml["energy"]["fermi"]),
         "fermi_energy_source": job.fermi_energy_source,
         "required_atom_files": list(job.required_atom_files),

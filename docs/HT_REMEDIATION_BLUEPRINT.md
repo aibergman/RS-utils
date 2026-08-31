@@ -69,7 +69,7 @@ pre-remediation implementation.
 - [x] **HT-R02** — Restore complete RS-LMTO setup/lattice validation semantics
 - [x] **HT-R03** — Implement scientific campaign state and execution evidence
 - [x] **HT-R04** — Harden manifests, pair identity, and reuse integrity
-- [ ] **HT-R05** — Bound and harden exchange symmetry/magnetic-reference semantics
+- [x] **HT-R05** — Bound and harden exchange symmetry/magnetic-reference semantics
 - [ ] **HT-R06** — Complete transport/damping source audit against `fable_v4`
 - [ ] **HT-R07** — Provenance, ASE, path, indexing, and dead-code cleanup
 - [ ] **HT-R08** — Make packaging, test environment, and CI reproducible
@@ -294,4 +294,41 @@ tests/test_ht12_exchange_results.py  10 passed
 tests/test_ht16_campaign.py           7 passed
 tests/test_ht17_campaign.py          12 passed
 full feasible suite                 120 passed, 10 warnings
+```
+
+## HT-R05 decision and evidence
+
+The exchange reducer now has an explicit `MagneticSymmetryContext`. The only
+reduction domain claimed is collinear ferromagnetism: without SOC, exact
+chemical periodic operations are used; with SOC, operations must also
+preserve the declared global magnetization axis as an axial vector, including
+the determinant sign for improper operations. The legacy `--soc` path remains
+the `+z` global-axis convention.
+
+AFM, ferrimagnetic, generic noncollinear, magnetic-space-group, time-reversal,
+and unknown contexts are represented but resolve to identity-only reduction.
+They cannot silently inherit chemical FM equivalence. The canonical
+`RSStructure` site labels/types are carried into symmetry mapping, so same-
+element sites with distinct RS identity cannot be merged. Missing symmetry
+analyzer evidence also retains all neighbors. The job specification records
+the magnetic reference class so generated-job identity includes the reduction
+domain.
+
+The current public [`fable_v4` control contract`](https://raw.githubusercontent.com/rslmtoasa/rslmtoasa/fable_v4/source/control.f90#L51-L66)
+distinguishes collinear and noncollinear modes and SOC combinations, while
+[`exchange.f90`](https://raw.githubusercontent.com/rslmtoasa/rslmtoasa/fable_v4/source/exchange.f90#L148-L166)
+consumes the explicit pair list; no upstream magnetic-space-group reduction
+contract was inferred.
+
+Regression coverage includes FM periodic reduction, analyzer-absent fallback,
+SOC axial filtering, distinct same-element RS labels, exact pair-orbit
+identity, and no-reduction controls for AFM/ferrimagnetic/noncollinear and
+other unproven contexts. The required focused suites pass:
+
+```text
+tests/test_ht07_pair_identity.py       6 passed
+tests/test_ht08_exchange_service.py    6 passed
+tests/test_ht09_exchange_symmetry.py    8 passed
+tests/test_ht10_exchange_jobs.py        7 passed
+full feasible suite                   126 passed, 12 warnings
 ```

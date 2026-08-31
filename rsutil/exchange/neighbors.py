@@ -12,6 +12,7 @@ from rsutil.core import RSStructure, StructureSite
 
 from .pairs import map_cluster_neighbor
 from .symmetry import (
+    MagneticSymmetryContext,
     allowed_public_symmetry_operations,
     periodic_symmetry_operations,
     reduce_pair_keys,
@@ -83,30 +84,36 @@ def _canonical_from_pymatgen(structure: Structure) -> RSStructure:
                 index=index,
                 position=tuple(float(value) for value in site.frac_coords),
                 element=str(site.specie.symbol),
-                rs_label=str(site.species_string),
+                rs_label=(
+                    str(site.properties["rs_label"])
+                    if site.properties.get("rs_label") is not None
+                    else str(site.species_string)
+                ),
+                rs_type=(
+                    str(site.properties["rs_type"])
+                    if site.properties.get("rs_type") is not None
+                    else None
+                ),
             )
             for index, site in enumerate(structure.sites)
         ),
     )
 
 
-def _reference_indices(
+def _normalize_reference_sites(
     recursion_sites: Sequence[int], site_count: int
 ) -> tuple[int, ...]:
-    """Convert legacy one-based recursion indices to canonical indices."""
+    """Normalize the legacy one-based boundary to canonical zero-based sites."""
 
     result: list[int] = []
     for value in recursion_sites:
         integer = int(value)
         if 1 <= integer <= site_count:
             result.append(integer - 1)
-        elif 0 <= integer < site_count:
-            # Keep direct Python callers that already use zero-based indices
-            # usable; the service path uses the unambiguous legacy one-based
-            # values from lattice.nml.
-            result.append(integer)
         else:
-            raise ValueError(f"recursion site {integer} is outside the reference cell")
+            raise ValueError(
+                f"legacy recursion site {integer} is outside the reference cell"
+            )
     return tuple(result)
 
 
@@ -120,23 +127,36 @@ def discover_exact_unique_neighbors(
     canonical_structure: RSStructure | None = None,
     soc: bool = False,
     magnetic_axis: tuple[float, float, float] | None = None,
+    magnetic_context: MagneticSymmetryContext | None = None,
+    magnetic_reference: str | None = None,
     tolerance: float = 1e-8,
     verbose: bool = False,
 ) -> dict[int, list[Any]]:
-    """Reduce discovered neighbors by exact periodic ``PairKey`` orbits."""
+    """Reduce neighbors using canonical zero-based sites internally.
+
+    ``recursion_sites`` is the legacy one-based RS-LMTO boundary.  It is
+    normalized once before any pair mapping; the pair-key symmetry machinery
+    never performs index-base inference.
+    """
 
     if analyzer is None:
         # No crystallographic operation source means no scientifically valid
         # reduction.  Returning all pairs is the conservative behavior.
         return discover_default_neighbors(cluster, recursion_sites, cutoff=cutoff, verbose=verbose)
     canonical = canonical_structure or _canonical_from_pymatgen(structure)
-    center_sites = _reference_indices(recursion_sites, len(canonical.sites))
+    center_sites = _normalize_reference_sites(recursion_sites, len(canonical.sites))
     all_neighbors = discover_default_neighbors(cluster, recursion_sites, cutoff=cutoff, verbose=False)
     operations = periodic_symmetry_operations(
         structure,
         analyzer,
         soc=soc,
         magnetic_axis=magnetic_axis,
+        magnetic_context=magnetic_context,
+        magnetic_reference=magnetic_reference,
+        site_identities=tuple(
+            (site.element, site.rs_label, site.rs_type)
+            for site in canonical.sites
+        ),
         tolerance=tolerance,
     )
     mapped: dict[int, list[tuple[Any, Any]]] = {}
@@ -186,6 +206,8 @@ def discover_legacy_unique_neighbors(
     canonical_structure: RSStructure | None = None,
     soc: bool = False,
     magnetic_axis: tuple[float, float, float] | None = None,
+    magnetic_context: MagneticSymmetryContext | None = None,
+    magnetic_reference: str | None = None,
     verbose: bool = False,
 ) -> dict[int, list[Any]]:
     """Compatibility wrapper for exact periodic symmetry reduction.
@@ -207,6 +229,8 @@ def discover_legacy_unique_neighbors(
         canonical_structure=canonical_structure,
         soc=soc,
         magnetic_axis=magnetic_axis,
+        magnetic_context=magnetic_context,
+        magnetic_reference=magnetic_reference,
         verbose=verbose,
     )
 
@@ -223,6 +247,8 @@ def discover_neighbors(
     canonical_structure: RSStructure | None = None,
     soc: bool = False,
     magnetic_axis: tuple[float, float, float] | None = None,
+    magnetic_context: MagneticSymmetryContext | None = None,
+    magnetic_reference: str | None = None,
     full_pairs: bool = False,
     verbose: bool = False,
 ) -> dict[int, list[Any]]:
@@ -239,6 +265,8 @@ def discover_neighbors(
             canonical_structure=canonical_structure,
             soc=soc,
             magnetic_axis=magnetic_axis,
+            magnetic_context=magnetic_context,
+            magnetic_reference=magnetic_reference,
             verbose=verbose,
         )
     return discover_default_neighbors(

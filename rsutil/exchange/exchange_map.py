@@ -72,6 +72,7 @@ def get_unique_neighbors_per_shell(
     verbose: bool = False,
     spacegroup_analyzer: SpacegroupAnalyzer | None = None,
     structure: Structure | None = None,
+    magnetic_reference: str | None = None,
 ) -> dict[int, list]:
     """Compatibility wrapper for the pre-HT-09 unique-neighbor reducer."""
 
@@ -82,6 +83,7 @@ def get_unique_neighbors_per_shell(
         shell_width=shell_width,
         analyzer=spacegroup_analyzer,
         structure=structure,
+        magnetic_reference=magnetic_reference,
         verbose=verbose,
     )
 
@@ -171,6 +173,7 @@ def exchange_map(
     soc: bool = False,
     full_pairs: bool = False,
     magnetic_axis: tuple[float, float, float] | None = None,
+    magnetic_reference: str | None = None,
     rij_out: str | None = None,
     rij_fmt: str = "json",
     source_dir: str | Path = ".",
@@ -187,6 +190,7 @@ def exchange_map(
         soc=soc,
         full_pairs=full_pairs,
         magnetic_axis=magnetic_axis,
+        magnetic_reference=magnetic_reference,
         rij_out=rij_out,
         rij_fmt=rij_fmt,
         collision_policy=collision_policy,

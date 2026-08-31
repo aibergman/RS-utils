@@ -116,3 +116,14 @@ def test_full_pairs_opt_out_reproduces_unreduced_inventory(tmp_path: Path) -> No
 
     assert len(full.pairs) > len(reduced.pairs)
     assert all(len(job.pairs) > 1 for job in full.jobs)
+
+
+def test_unproven_afm_reference_disables_unique_reduction(tmp_path: Path) -> None:
+    _copy_exchange_fixture(tmp_path)
+    service = ExchangeService(tmp_path)
+
+    afm = service.plan(cutoff=1.0, unique=True, magnetic_reference="afm")
+    full = service.plan(cutoff=1.0, unique=True, full_pairs=True)
+
+    assert set(afm.pair_keys) == set(full.pair_keys)
+    assert all(job.magnetic_reference == "afm" for job in afm.jobs)

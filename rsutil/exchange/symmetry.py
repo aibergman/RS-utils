@@ -28,6 +28,76 @@ class SymmetryMappingError(ValueError):
     """A crystallographic operation cannot be mapped to exact site data."""
 
 
+MAGNETIC_REFERENCE_COLLINEAR_FM = "collinear_fm"
+MAGNETIC_REFERENCE_AFM = "afm"
+MAGNETIC_REFERENCE_FERRIMAGNETIC = "ferrimagnetic"
+MAGNETIC_REFERENCE_NONCOLLINEAR = "noncollinear"
+MAGNETIC_REFERENCE_MAGNETIC_SPACE_GROUP = "magnetic_space_group"
+MAGNETIC_REFERENCE_UNKNOWN = "unknown"
+_MAGNETIC_REFERENCE_CLASSES = frozenset(
+    {
+        MAGNETIC_REFERENCE_COLLINEAR_FM,
+        MAGNETIC_REFERENCE_AFM,
+        MAGNETIC_REFERENCE_FERRIMAGNETIC,
+        MAGNETIC_REFERENCE_NONCOLLINEAR,
+        MAGNETIC_REFERENCE_MAGNETIC_SPACE_GROUP,
+        MAGNETIC_REFERENCE_UNKNOWN,
+    }
+)
+
+
+@dataclass(frozen=True)
+class MagneticSymmetryContext:
+    """The deliberately small magnetic contract used by pair reduction.
+
+    Only a collinear ferromagnetic reference is currently proven.  With SOC,
+    that reference additionally requires one global Cartesian magnetization
+    axis.  Other magnetic classes are represented so callers can state their
+    context, but resolve to identity-only reduction until a site-resolved
+    magnetic-space-group contract is implemented.
+    """
+
+    reference_class: str = MAGNETIC_REFERENCE_COLLINEAR_FM
+    soc: bool = False
+    magnetic_axis: tuple[float, float, float] | None = None
+
+    def __post_init__(self) -> None:
+        reference_class = str(self.reference_class).strip().lower()
+        if reference_class not in _MAGNETIC_REFERENCE_CLASSES:
+            raise ValueError(
+                f"unsupported magnetic reference class: {self.reference_class!r}"
+            )
+        object.__setattr__(self, "reference_class", reference_class)
+        object.__setattr__(self, "soc", bool(self.soc))
+        if self.magnetic_axis is not None:
+            axis = tuple(float(value) for value in self.magnetic_axis)
+            if len(axis) != 3 or not np.all(np.isfinite(axis)):
+                raise ValueError("magnetic_axis must contain three finite values")
+            if float(np.linalg.norm(axis)) <= 0:
+                raise ValueError("magnetic_axis must be non-zero")
+            object.__setattr__(self, "magnetic_axis", axis)
+
+    @property
+    def reduction_supported(self) -> bool:
+        """Whether the supplied context is within the proven domain."""
+
+        return self.reference_class == MAGNETIC_REFERENCE_COLLINEAR_FM
+
+    @property
+    def reference(self) -> str:
+        """Compatibility spelling for the selected magnetic class."""
+
+        return self.reference_class
+
+    @property
+    def normalized_axis(self) -> tuple[float, float, float] | None:
+        if self.magnetic_axis is None:
+            return None
+        axis = np.asarray(self.magnetic_axis, dtype=float)
+        axis /= np.linalg.norm(axis)
+        return tuple(float(value) for value in axis)
+
+
 @dataclass(frozen=True)
 class PeriodicSymmetryOperation:
     """A structure-preserving operation in exact periodic form.
@@ -99,11 +169,19 @@ class PairSymmetryReduction:
         )
 
 
-def _as_species(site: Any) -> str:
+def _site_identity(site: Any) -> tuple[str, str | None, str | None]:
+    properties = getattr(site, "properties", {})
+    if not isinstance(properties, dict):
+        properties = {}
     specie = getattr(site, "specie", None)
-    if specie is not None and hasattr(specie, "symbol"):
-        return str(specie.symbol)
-    return str(getattr(site, "species_string", ""))
+    element = str(specie.symbol) if specie is not None and hasattr(specie, "symbol") else str(getattr(site, "species_string", ""))
+    label = properties.get("rs_label")
+    rs_type = properties.get("rs_type")
+    return (
+        element,
+        None if label is None else str(label),
+        None if rs_type is None else str(rs_type),
+    )
 
 
 def _integer_rotation(operation: Any, tolerance: float) -> np.ndarray | None:
@@ -123,16 +201,19 @@ def _site_mapping(
     rotation: np.ndarray,
     translation: np.ndarray,
     tolerance: float,
+    site_identities: Sequence[tuple[str, str | None, str | None]] | None = None,
 ) -> tuple[tuple[int, ...], tuple[tuple[int, int, int], ...]] | None:
     fractional = np.asarray(structure.frac_coords, dtype=float)
-    species = tuple(_as_species(site) for site in structure.sites)
+    identities = tuple(site_identities or (_site_identity(site) for site in structure.sites))
+    if len(identities) != len(structure.sites):
+        raise ValueError("site_identities must match the structure site count")
     permutation: list[int] = []
     shifts: list[tuple[int, int, int]] = []
     for index, position in enumerate(fractional):
         transformed = rotation @ position + translation
         candidates: list[tuple[int, np.ndarray]] = []
         for target, target_position in enumerate(fractional):
-            if species[target] != species[index]:
+            if identities[target] != identities[index]:
                 continue
             shift = np.rint(transformed - target_position).astype(int)
             residual = transformed - target_position - shift
@@ -169,6 +250,9 @@ def periodic_symmetry_operations(
     *,
     soc: bool = False,
     magnetic_axis: Sequence[float] | None = None,
+    magnetic_context: MagneticSymmetryContext | None = None,
+    magnetic_reference: str | None = None,
+    site_identities: Sequence[tuple[str, str | None, str | None]] | None = None,
     tolerance: float = 1e-8,
 ) -> tuple[PeriodicSymmetryOperation, ...]:
     """Return exact structure-preserving operations from public pymatgen APIs.
@@ -182,12 +266,24 @@ def periodic_symmetry_operations(
     intentionally not a generic magnetic-space-group implementation.
     """
 
+    if magnetic_context is not None and magnetic_reference is not None:
+        raise ValueError("provide magnetic_context or magnetic_reference, not both")
+    if magnetic_context is not None and magnetic_axis is not None:
+        raise ValueError("provide magnetic_axis through magnetic_context, not both")
+    if magnetic_context is None:
+        magnetic_context = MagneticSymmetryContext(
+            reference_class=magnetic_reference or MAGNETIC_REFERENCE_COLLINEAR_FM,
+            soc=soc,
+            magnetic_axis=magnetic_axis,
+        )
+    elif soc and not magnetic_context.soc:
+        raise ValueError("soc=True conflicts with magnetic_context.soc=False")
     analyzer = analyzer or SpacegroupAnalyzer(structure)
     if tolerance <= 0:
         raise ValueError("symmetry tolerance must be positive")
     axis: np.ndarray | None = None
-    if soc:
-        raw_axis = (0.0, 0.0, 1.0) if magnetic_axis is None else magnetic_axis
+    if magnetic_context.soc:
+        raw_axis = (0.0, 0.0, 1.0) if magnetic_context.magnetic_axis is None else magnetic_context.magnetic_axis
         axis = np.asarray(tuple(raw_axis), dtype=float)
         if axis.shape != (3,) or not np.all(np.isfinite(axis)):
             raise ValueError("magnetic_axis must contain three finite values")
@@ -195,6 +291,9 @@ def periodic_symmetry_operations(
         if norm <= tolerance:
             raise ValueError("magnetic_axis must be non-zero")
         axis = axis / norm
+
+    if not magnetic_context.reduction_supported:
+        return (_identity_operation(len(structure.sites)),)
 
     result: list[PeriodicSymmetryOperation] = []
     for source_index, operation in enumerate(analyzer.get_symmetry_operations()):
@@ -204,7 +303,13 @@ def periodic_symmetry_operations(
         translation = np.asarray(operation.translation_vector, dtype=float)
         if translation.shape != (3,) or not np.all(np.isfinite(translation)):
             continue
-        mapping = _site_mapping(structure, rotation, translation, tolerance)
+        mapping = _site_mapping(
+            structure,
+            rotation,
+            translation,
+            tolerance,
+            site_identities=site_identities,
+        )
         if mapping is None:
             # An uncertain mapping cannot be used to eliminate a calculation.
             continue
@@ -239,18 +344,19 @@ def periodic_symmetry_operations(
         )
         for operation in result
     ):
-        identity_mapping = tuple(range(len(structure.sites)))
-        result.insert(
-            0,
-            PeriodicSymmetryOperation(
-                rotation=((1, 0, 0), (0, 1, 0), (0, 0, 1)),
-                translation=(0.0, 0.0, 0.0),
-                site_permutation=identity_mapping,
-                site_translation=tuple((0, 0, 0) for _ in identity_mapping),
-                source_index=None,
-            ),
-        )
+        result.insert(0, _identity_operation(len(structure.sites)))
     return tuple(result)
+
+
+def _identity_operation(site_count: int) -> PeriodicSymmetryOperation:
+    identity_mapping = tuple(range(site_count))
+    return PeriodicSymmetryOperation(
+        rotation=((1, 0, 0), (0, 1, 0), (0, 0, 1)),
+        translation=(0.0, 0.0, 0.0),
+        site_permutation=identity_mapping,
+        site_translation=tuple((0, 0, 0) for _ in identity_mapping),
+        source_index=None,
+    )
 
 
 def pair_key_transform(
@@ -325,6 +431,9 @@ def allowed_public_symmetry_operations(
     *,
     soc: bool = False,
     magnetic_axis: Sequence[float] | None = None,
+    magnetic_context: MagneticSymmetryContext | None = None,
+    magnetic_reference: str | None = None,
+    site_identities: Sequence[tuple[str, str | None, str | None]] | None = None,
     tolerance: float = 1e-8,
 ) -> list[Any]:
     """Compatibility view of the allowed public pymatgen operations."""
@@ -337,6 +446,9 @@ def allowed_public_symmetry_operations(
             analyzer,
             soc=soc,
             magnetic_axis=magnetic_axis,
+            magnetic_context=magnetic_context,
+            magnetic_reference=magnetic_reference,
+            site_identities=site_identities,
             tolerance=tolerance,
         )
         if operation.source_index is not None
@@ -345,6 +457,13 @@ def allowed_public_symmetry_operations(
 
 
 __all__ = [
+    "MAGNETIC_REFERENCE_AFM",
+    "MAGNETIC_REFERENCE_COLLINEAR_FM",
+    "MAGNETIC_REFERENCE_FERRIMAGNETIC",
+    "MAGNETIC_REFERENCE_MAGNETIC_SPACE_GROUP",
+    "MAGNETIC_REFERENCE_NONCOLLINEAR",
+    "MAGNETIC_REFERENCE_UNKNOWN",
+    "MagneticSymmetryContext",
     "PairSymmetryReduction",
     "PeriodicSymmetryOperation",
     "SymmetryMappingError",

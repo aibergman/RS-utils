@@ -19,6 +19,7 @@ from .jobs import (
 from .neighbors import discover_neighbors
 from .pairs import legacy_displacement_mapping
 from .reference import ReferenceCalculation, read_reference_calculation
+from .symmetry import MagneticSymmetryContext
 from .writer import write_Rij_mappings
 
 
@@ -121,6 +122,8 @@ class ExchangeService:
         soc: bool = False,
         full_pairs: bool = False,
         magnetic_axis: tuple[float, float, float] | None = None,
+        magnetic_context: MagneticSymmetryContext | None = None,
+        magnetic_reference: str | None = None,
         verbose: bool = False,
         input_path: str | Path | None = None,
         lattice_path: str | Path | None = None,
@@ -128,6 +131,13 @@ class ExchangeService:
         report_path: str | Path | None = None,
     ) -> ExchangePlan:
         """Read inputs, discover neighbors, and construct canonical jobs."""
+
+        effective_soc = magnetic_context.soc if magnetic_context is not None else soc
+        effective_axis = (
+            magnetic_context.magnetic_axis
+            if magnetic_context is not None and magnetic_axis is None
+            else magnetic_axis
+        )
 
         reference = read_reference_calculation(
             self.source_dir,
@@ -148,8 +158,10 @@ class ExchangeService:
             analyzer=reference.analyzer,
             structure=reference.structure,
             canonical_structure=reference.canonical_structure,
-            soc=soc,
-            magnetic_axis=magnetic_axis,
+            soc=effective_soc,
+            magnetic_axis=effective_axis,
+            magnetic_context=magnetic_context,
+            magnetic_reference=magnetic_reference,
             full_pairs=full_pairs,
             verbose=verbose,
         )
@@ -163,8 +175,17 @@ class ExchangeService:
             output_root=self.source_dir,
             cutoff=cutoff,
             reduction="unique" if unique and not full_pairs else "full",
-            soc=soc,
-            magnetic_axis=magnetic_axis,
+            soc=effective_soc,
+            magnetic_axis=effective_axis,
+            magnetic_reference=(
+                magnetic_reference
+                if magnetic_reference is not None
+                else (
+                    magnetic_context.reference_class
+                    if magnetic_context is not None
+                    else "collinear_fm"
+                )
+            ),
             fermi_energy_source=_logical_source_path(reference.report_path, self.source_dir),
             required_atom_files=required_files,
             source_run_identity=source_identity,
@@ -186,6 +207,8 @@ class ExchangeService:
         soc: bool = False,
         full_pairs: bool = False,
         magnetic_axis: tuple[float, float, float] | None = None,
+        magnetic_context: MagneticSymmetryContext | None = None,
+        magnetic_reference: str | None = None,
         rij_out: str | Path | None = None,
         rij_fmt: str = "json",
         verbose: bool = False,
@@ -205,6 +228,8 @@ class ExchangeService:
             soc=soc,
             full_pairs=full_pairs,
             magnetic_axis=magnetic_axis,
+            magnetic_context=magnetic_context,
+            magnetic_reference=magnetic_reference,
             verbose=verbose,
             input_path=input_path,
             lattice_path=lattice_path,
