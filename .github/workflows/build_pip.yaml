@@ -47,10 +47,43 @@ jobs:
         run: |
           python -m pip install --upgrade pip
 
+      - name: Confirm source package starts without a native artifact
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          package_dir = Path("rsutil")
+          native = sorted(
+              path
+              for pattern in ("rsutil*.so", "rsutil*.dylib", "rsutil*.pyd", "rsutil*.dll")
+              for path in package_dir.glob(pattern)
+              if path.is_file()
+          )
+          assert not native, f"stale native artifacts found before install: {native}"
+          print("source package is free of native build artifacts")
+          PY
+
       - name: Install editable package and HT test dependencies
         run: |
           python -m pip install -e '.[test]'
           python -m pip check
+
+      - name: Assert editable package and native extension paths
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import rsutil
+
+          package_path = Path(rsutil.__file__).resolve()
+          assert rsutil._rsutil is not None
+          assert rsutil.lib_path is not None
+          native_path = Path(rsutil.lib_path).resolve()
+          assert native_path.is_file()
+          assert native_path.parent == package_path.parent
+          assert native_path.suffix in {".so", ".dylib", ".pyd", ".dll"}
+          print(f"rsutil Python: {package_path}")
+          print(f"rsutil native: {native_path}")
+          PY
 
       - name: Run source/editable tests
         run: |
@@ -116,8 +149,13 @@ jobs:
           native_spec = importlib.util.find_spec("rsutil.rsutil")
           assert native_spec is not None and native_spec.origin is not None
           native_path = pathlib.Path(native_spec.origin).resolve()
+          assert rsutil._rsutil is not None
+          assert rsutil.lib_path is not None
+          loaded_native_path = pathlib.Path(rsutil.lib_path).resolve()
           assert any(root == package_path or root in package_path.parents for root in site_roots)
           assert any(root == native_path or root in native_path.parents for root in site_roots)
+          assert native_path.parent == package_path.parent
+          assert loaded_native_path == native_path
           assert native_path.suffix in {".so", ".dylib", ".pyd"}
           print(f"Python: {sys.executable}")
           print(f"rsutil.__file__: {package_path}")

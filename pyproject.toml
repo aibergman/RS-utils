@@ -5,7 +5,8 @@ requires = ["setuptools>=61", "wheel", "cmake>=3.10", "f90wrap>0.2.10", "numpy>=
 skip = "pp* *-musllinux* cp36* cp37* cp38*"  # Skip PyPy and musl Linux builds
 before-build = "python -m pip install --upgrade 'numpy>1.19' ninja f90wrap scipy"
 test-requires = ["pytest>=7", "ase>=3.22", "matplotlib>=3.5", "scipy>=1.7", "spglib>=2.0"]
-test-command = "python -m pytest -q {project}/tests"
+test-sources = ["tests", "examples"]
+test-command = "python -m pytest -q tests"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

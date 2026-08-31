@@ -45,10 +45,9 @@ Calculate band structure:
     >>> bands = calc.calculate_bands(kpoints)
     >>> calc.plot_bands(kdist, bands, klabels, 'bands.png')
 """
-import os
-import glob
 import ctypes
 import importlib
+from pathlib import Path
 from typing import Optional
 
 from ._version import __version__
@@ -93,46 +92,28 @@ def __getattr__(name):
         return module
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
-# Dynamically determine the correct shared library filename
+# The native target is a package-local setuptools extension artifact. Keep the
+# search intentionally local so a broken install cannot be hidden by an old
+# build-tree library.
 lib_filename: Optional[str] = None
+lib_path: Optional[str] = None
 
-# First try: compiled shared object located inside package directory
-pkg_dir = os.path.dirname(__file__)
-for filename in os.listdir(pkg_dir):
-    if filename.startswith("rsutil") and filename.endswith(".so"):
-        lib_filename = filename
-        break
-
-# Fallback: if not found in package, search common build output directories
-if lib_filename is None:
-    # Look for build outputs (editable/develop builds) and wheelhouse
-    search_patterns = [
-        os.path.join("..", "build", "**", "rsutil*.so"),
-        os.path.join("..", "build", "lib*", "**", "rsutil*.so"),
-        os.path.join("..", "bdist.*", "**", "rsutil*.so"),
-        os.path.join("..", "wheelhouse", "**", "rsutil*.so"),
-    ]
-    candidates = []
-    for pat in search_patterns:
-        candidates.extend(glob.glob(os.path.join(pkg_dir, pat), recursive=True))
-    # If we found any candidate shared libs, pick the first (most likely)
-    if candidates:
-        # Use basename as lib_filename and adjust pkg_dir for loading below
-        lib_full = os.path.abspath(candidates[0])
-        lib_filename = os.path.basename(lib_full)
-        # Keep the build directory only as the native library location.  The
-        # library is loaded through ctypes below; adding this package directory
-        # to the import path would let files such as ``ase.py`` shadow dependencies.
-        lib_dir = os.path.dirname(lib_full)
-        # Also set pkg_dir so later join() will work if needed
-        pkg_dir = lib_dir
+pkg_dir = Path(__file__).resolve().parent
+native_candidates = sorted(
+    path
+    for pattern in ("rsutil*.so", "rsutil*.dylib", "rsutil*.pyd", "rsutil*.dll")
+    for path in pkg_dir.glob(pattern)
+    if path.is_file()
+)
+if native_candidates:
+    native_path = native_candidates[0]
+    lib_filename = native_path.name
+    lib_path = str(native_path)
 
 # Load the shared library if found, but don't fail if not available
 _rsutil = None
-if lib_filename is not None:
+if lib_path is not None:
     try:
-        # lib_filename may come from package dir or discovered build dir; use pkg_dir
-        lib_path: str = os.path.join(pkg_dir, lib_filename)
         _rsutil: ctypes.CDLL = ctypes.CDLL(lib_path)
         # Define process_lattice() signature with multiple arguments
         _rsutil.process_lattice.argtypes = [

@@ -40,8 +40,13 @@ model.
 ### Developer checkout
 
 ```bash
-pip install -e .
+pip install -e '.[test]'
 ```
+
+The editable install builds and exposes the native Fortran library in the
+rsutil/ package automatically. No manual shared-library copying or
+build_ext --inplace step is required. For the complete clean-checkout
+procedure, see [HT_TESTING.md](docs/HT_TESTING.md).
 
 Core runtime dependencies are `numpy`, `f90nml`, and `pymatgen`. Install
 `.[bands]` for band/DOS analysis and plotting, `.[visualization]` for the
@@ -65,8 +70,10 @@ python -m pip install -e '.[test]'
 python -m pytest -q
 ```
 
-For a clean-checkout procedure, including the required Linux Fortran
-toolchain, see [HT_TESTING.md](docs/HT_TESTING.md).
+Release wheels contain the ABI-qualified native library under rsutil/ and
+load it from that installed package directory. For a clean-checkout
+procedure, including the required Linux Fortran toolchain, see
+[HT_TESTING.md](docs/HT_TESTING.md).
 
 ## CLI Usage
 

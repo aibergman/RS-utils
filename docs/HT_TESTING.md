@@ -26,8 +26,10 @@ python -m pytest -q
 ```
 
 The editable install invokes the PEP 517 build backend and builds the
-protected Fortran extension in the environment. To build a wheel as a
-separate check, install the wheel builder and run:
+protected Fortran extension in the environment, placing the ABI-qualified
+artifact directly in the rsutil/ package. The install itself is sufficient;
+do not manually copy a shared library or run build_ext --inplace. To build a
+wheel as a separate check, install the wheel builder and run:
 
 ```bash
 python -m pip install build
@@ -85,6 +87,12 @@ env -u PYTHONPATH PATH="$wheel_venv/bin:$PATH" "$wheel_venv/bin/python" -m pytes
 The external copy is intentional: it prevents checkout files from satisfying
 imports or fixture lookups while the path assertion proves both the Python
 package and compiled extension came from the installed wheel.
+
+The release wheel therefore has the same package-local layout as the editable
+install: the native artifact is embedded under rsutil/ and is loaded from
+that installed package directory. The supported primary native release lane
+is Linux; other platforms remain subject to their existing compiler and CMake
+toolchain support.
 
 The optional extras are:
 

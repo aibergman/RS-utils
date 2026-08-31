@@ -2,7 +2,6 @@ import os
 import re
 import sys
 import subprocess
-import glob
 from pathlib import Path
 import setuptools
 from setuptools import setup, Extension
@@ -51,38 +50,57 @@ class CMakeExtension(Extension):
         self.sourcedir = os.path.abspath(sourcedir)
 
 class CMakeBuild(build_ext):
-    def run(self):
-        for ext in self.extensions:
-            self.build_extension(ext)
-
     def build_extension(self, ext):
-        extdir = os.path.abspath(os.path.dirname(self.get_ext_fullpath(ext.name)))
+        ext_fullpath = Path(self.get_ext_fullpath(ext.name)).resolve()
+        extdir = ext_fullpath.parent
+        extdir.mkdir(parents=True, exist_ok=True)
+
         cmake_args = [
             f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={extdir}",
             f"-DPython3_EXECUTABLE={sys.executable}",
-            f"-DPython3_ROOT_DIR={sys.prefix}",  # ✅ Add this to explicitly set the Python root
+            f"-DPython3_ROOT_DIR={sys.prefix}",
             "-DPYTHON_BINDINGS=ON",
         ]
 
         build_args = ["--config", "Release"]
 
-        if not os.path.exists(self.build_temp):
-            os.makedirs(self.build_temp)
+        build_temp = Path(self.build_temp)
+        build_temp.mkdir(parents=True, exist_ok=True)
 
-        subprocess.check_call(["cmake", ext.sourcedir] + cmake_args, cwd=self.build_temp)
-        subprocess.check_call(["cmake", "--build", "."] + build_args, cwd=self.build_temp)
+        subprocess.check_call(["cmake", ext.sourcedir] + cmake_args, cwd=build_temp)
+        subprocess.check_call(["cmake", "--build", "."] + build_args, cwd=build_temp)
 
-        # Locate the built shared library
-        shared_lib = os.path.join(extdir, "rsutil.so")
-        print('Attempting to copy shared library:', shared_lib)
+        # CMake emits the unqualified target name, while setuptools owns the
+        # ABI-qualified destination (and its editable-install location).
+        target_name = ext.name.rsplit(".", 1)[-1]
+        suffixes = (".so", ".dylib", ".pyd", ".dll")
+        output_dirs = (extdir, extdir / "Release", extdir / "Debug")
+        candidates = [
+            output_dir / f"{target_name}{suffix}"
+            for output_dir in output_dirs
+            for suffix in suffixes
+            if (output_dir / f"{target_name}{suffix}").is_file()
+        ]
 
-        if not os.path.exists(shared_lib):
-            raise FileNotFoundError(f"Expected shared library {shared_lib} not found!")
+        if len(candidates) != 1:
+            found = ", ".join(str(path) for path in candidates) or "none"
+            raise FileNotFoundError(
+                f"CMake did not produce exactly one {target_name} shared library "
+                f"in {extdir}; found: {found}"
+            )
 
-        # Ensure the library is copied into the rsutil package directory
-        package_dir = os.path.abspath(os.path.join(self.build_lib, "rsutil"))
-        os.makedirs(package_dir, exist_ok=True)
-        self.move_file(shared_lib, package_dir)
+        shared_lib = candidates[0]
+        if shared_lib != ext_fullpath:
+            # A previous build may have left the ABI-qualified destination in
+            # place. It is generated output, so replace it with this build's
+            # artifact before allowing setuptools to expose it.
+            if ext_fullpath.exists():
+                ext_fullpath.unlink()
+            self.move_file(shared_lib, ext_fullpath)
+        if not ext_fullpath.is_file():
+            raise FileNotFoundError(
+                f"Expected setuptools extension path {ext_fullpath} was not created"
+            )
 
 
 setup(
@@ -92,12 +110,12 @@ setup(
     author_email="anders.bergman@physics.uu.se",
     description="Utilities for the RS-LMTO code including band structure and DOS analysis",
     long_description="Utilities for the RS-LMTO code including lattice processing, visualization, exchange mapping, UppASD export, band structure calculations, and density of states analysis",
-    ext_modules=[CMakeExtension("rsutil")],
+    ext_modules=[CMakeExtension("rsutil.rsutil")],
     cmdclass={"build_ext": CMakeBuild},
     packages=setuptools.find_packages(exclude=["tests", "tests.*"]),
     include_package_data=True,  # ✅ Ensures package_data is included in the wheel
     zip_safe=False,
-    package_data={"rsutil": ["*.so", "viz/cpk_colors.json"]},
+    package_data={"rsutil": ["viz/cpk_colors.json"]},
     python_requires=">=3.9",
     install_requires=RUNTIME_REQUIRES,
     extras_require={
