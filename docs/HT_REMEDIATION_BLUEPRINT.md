@@ -72,7 +72,7 @@ pre-remediation implementation.
 - [x] **HT-R05** — Bound and harden exchange symmetry/magnetic-reference semantics
 - [x] **HT-R06** — Complete transport/damping source audit against `fable_v4`
 - [x] **HT-R07** — Provenance, ASE, path, indexing, and dead-code cleanup
-- [ ] **HT-R08** — Make packaging, test environment, and CI reproducible
+- [x] **HT-R08** — Make packaging, test environment, and CI reproducible
 - [ ] **HT-R09** — True adversarial HT closeout and pilot evidence
 
 No task may be marked complete before its acceptance tests pass. R04-R09 remain
@@ -415,3 +415,42 @@ Required verification:
 HT-R07 focused suites                 55 passed
 full feasible suite                  136 passed, 12 warnings
 ```
+
+## HT-R08 decision and evidence
+
+HT-R08 separates PEP 517 build requirements from package runtime and optional
+feature dependencies. The build system now contains only setuptools, wheel,
+CMake, f90wrap, and NumPy needed to build the extension. Core runtime
+requirements remain NumPy, f90nml, and pymatgen; ASE, band/DOS dependencies,
+and PyVista are exposed through named extras. The `test` extra includes every
+dependency imported by the complete checked-in suite, including ASE and the
+band-analysis stack. The package remains at version `0.10.0`; no release is
+being cut by this task.
+
+`docs/HT_TESTING.md` records the supported Python range and exact Linux
+clean-checkout commands, including the gfortran/CMake prerequisites, editable
+PEP 517 install, wheel build, and `python -m pytest -q` verification command.
+The CLI visualization import is deferred until that feature is requested, so
+the core package and setup/exchange CLI do not make PyVista mandatory.
+
+The pip CI workflow now installs `.[test]`, installs the Linux Fortran
+toolchain, builds a wheel, and runs the same `python -m pytest -q` suite on
+every push and pull request. The cibuildwheel workflow is no longer excluded
+from every branch; it runs for `main` and `HT` pushes and pull requests, with
+wheel smoke tests enabled on the supported Linux toolchain. The native CMake
+workflow remains the cross-platform build check. Cibuildwheel's Linux image
+installs the required Fortran/CMake toolchain before building.
+
+Local verification from the existing environment:
+
+```text
+python -m pytest --collect-only -q       137 tests collected
+python -m pytest -q                      137 passed, 12 warnings
+python -m build --wheel                 passed with isolated build dependencies
+temporary venv wheel import              passed outside the source checkout
+```
+
+The clean-environment commands are documented and wired into CI. The built
+wheel includes the compiled extension and imports successfully outside the
+source checkout; the temporary wheel check used the existing installed runtime
+libraries and did not claim a second dependency installation.

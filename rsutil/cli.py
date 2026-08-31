@@ -47,7 +47,6 @@ import os
 import numpy as np
 import sys
 from pathlib import Path
-from .viz.rs_visualizer import rs_visualizer
 from .exchange.exchange_map import exchange_map
 from .export.uppasd import export_from_files
 from .export.lmto47 import export_ctrl
@@ -2450,6 +2449,15 @@ Examples:
         return _run_setup_cli(args)
     # Run visualizer for lattice or clust file if --lattice or --clust flag is provided
     elif args.lattice or args.clust:
+        try:
+            from .viz.rs_visualizer import rs_visualizer
+        except ImportError:
+            print(
+                "ERROR: visualization requires the optional dependency extra; "
+                "install with `pip install 'rsutil[visualization]'`",
+                file=sys.stderr,
+            )
+            return 1
         rs_visualizer(args.data, clust=args.clust)
     # Create exchange input files if --exchange flag is provided
     elif args.exchange:

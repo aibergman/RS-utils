@@ -2,9 +2,6 @@ name: Build and Test with pip
 
 on:
   push:
-    branches:
-      - main
-      - pip
   pull_request:
 
 jobs:
@@ -18,7 +15,12 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.10"
+          python-version: "3.11"
+
+      - name: Install Fortran build toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gfortran
 
       - name: Install dependencies
         run: |
@@ -27,7 +29,12 @@ jobs:
 
       - name: Build package
         run: |
-          python -m build
+          python -m build --wheel
+
+      - name: Install package and HT test dependencies
+        run: |
+          python -m pip install -e '.[test]'
+          python -m pip check
 
       - name: Upload built package
         uses: actions/upload-artifact@v4
@@ -35,17 +42,9 @@ jobs:
           name: rsutil-package
           path: dist/*
 
-      - name: Install built wheel
-        run: |
-          pip install $(ls dist/*.whl)
-
-      - name: Install test runner
-        run: |
-          python -m pip install pytest
-
       - name: Verify installed package
         run: |
-          unzip -l $(ls dist/*.whl) 
+          unzip -l dist/*.whl
 
       - name: Run tests
         run: |

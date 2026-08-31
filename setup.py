@@ -6,6 +6,26 @@ import setuptools
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 
+
+RUNTIME_REQUIRES = [
+    "numpy>=1.20.0",
+    "pymatgen",
+    "f90nml",
+]
+
+BANDS_REQUIRES = [
+    "matplotlib>=3.5.0",
+    "scipy>=1.7.0",
+    "spglib>=2.0.0",
+    "seekpath>=2.0.0",
+]
+
+TEST_REQUIRES = [
+    "pytest>=7.0.0",
+    "ase>=3.22",
+    *BANDS_REQUIRES,
+]
+
 class CMakeExtension(Extension):
     def __init__(self, name, sourcedir=""):
         super().__init__(name, sources=[])
@@ -55,23 +75,19 @@ setup(
     long_description="Utilities for the RS-LMTO code including lattice processing, visualization, exchange mapping, UppASD export, band structure calculations, and density of states analysis",
     ext_modules=[CMakeExtension("rsutil")],
     cmdclass={"build_ext": CMakeBuild},
-    packages=setuptools.find_packages(),
+    packages=setuptools.find_packages(exclude=["tests", "tests.*"]),
     include_package_data=True,  # ✅ Ensures package_data is included in the wheel
     zip_safe=False,
-    package_data={"rsutil": ["rsutil/rsutil.so", "viz/cpk_colors.json"]},  # ✅ Explicitly include rsutil.so
-    install_requires=[
-        "numpy>=1.20.0",
-        "pyvista",
-        "pymatgen",
-        "f90nml",
-        "matplotlib>=3.5.0",  # NEW - for band/DOS plotting
-        "scipy>=1.7.0",        # NEW - for interpolation and tetrahedron method
-        "spglib>=2.0.0",       # NEW - for symmetry operations
-    ],
+    package_data={"rsutil": ["*.so", "viz/cpk_colors.json"]},
+    python_requires=">=3.9",
+    install_requires=RUNTIME_REQUIRES,
     extras_require={
         "ase": ["ase>=3.22"],
-        "full": ["pymatgen>=2022.0.0"],
-        "dev": ["pytest>=6.0.0", "black", "flake8"],
+        "bands": BANDS_REQUIRES,
+        "visualization": ["pyvista"],
+        "test": TEST_REQUIRES,
+        "full": [*BANDS_REQUIRES, "ase>=3.22", "pyvista"],
+        "dev": [*TEST_REQUIRES, "black", "flake8"],
     },
     entry_points={
         "console_scripts": [

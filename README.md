@@ -32,7 +32,9 @@ RS-utils is a Python + Fortran toolkit for RS-LMTO workflows. It now includes a 
 pip install -e .
 ```
 
-Key runtime dependencies: `numpy`, `scipy`, `matplotlib`, `spglib` (with `pymatgen/seekpath` for k-path workflows).
+Core runtime dependencies are `numpy`, `f90nml`, and `pymatgen`. Install
+`.[bands]` for band/DOS analysis and plotting, `.[visualization]` for the
+PyVista structure viewer, or `.[full]` for all optional runtime features.
 
 ### Fortran build (optional; legacy utilities)
 
@@ -45,12 +47,15 @@ This builds the Fortran library and executable targets (for example `rsutil.x` i
 
 ### Tests
 
-The active regression suite uses the development extra:
+The active HT regression suite uses the test extra:
 
 ```bash
-python -m pip install -e '.[dev]'
-python -m pytest
+python -m pip install -e '.[test]'
+python -m pytest -q
 ```
+
+For a clean-checkout procedure, including the required Linux Fortran
+toolchain, see [HT_TESTING.md](docs/HT_TESTING.md).
 
 ## CLI Usage
 
