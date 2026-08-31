@@ -47,6 +47,16 @@ def _read_namelist(path: Path) -> f90nml.Namelist:
     return f90nml.read(path)
 
 
+def _make_source_derived_unequal_count_fixture(destination: Path) -> None:
+    """Create a worker-valid lattice with an independent source count."""
+
+    _copy_setup_fixture(destination, "FeN")
+    lattice_path = destination / "lattice.nml"
+    lattice_text = lattice_path.read_text(encoding="utf-8")
+    lattice_text = lattice_text.replace("nbas        = 2", "nbas        = 51")
+    lattice_path.write_text(lattice_text, encoding="utf-8")
+
+
 def test_setup_simple_magnetic_metal_and_reports(tmp_path: Path) -> None:
     _copy_setup_fixture(tmp_path)
     original_inputs = {
@@ -149,6 +159,22 @@ def test_seeded_sqs_setup_is_reproducible_in_isolated_runs(tmp_path: Path) -> No
     )
 
 
+def test_legacy_setup_accepts_source_derived_unequal_counts(tmp_path: Path) -> None:
+    _make_source_derived_unequal_count_fixture(tmp_path)
+
+    source = _read_namelist(tmp_path / "lattice.nml")["lattice"]
+    assert source["nbas"] == 51
+    assert source["ntot"] == 2
+
+    result = run_rsutil(tmp_path, "-S", "--validate")
+
+    assert_cli_success(result)
+    generated = _read_namelist(tmp_path / "lattice_new.nml")["lattice"]
+    assert generated["ntot"] == 2
+    assert generated["nbas"] == 2
+    assert _read_namelist(tmp_path / "input_new.nml")["atoms"]["label"] == ["Fe1", "N1"]
+
+
 def _copy_exchange_fixture(destination: Path) -> None:
     copy_example_files(
         destination,
@@ -202,6 +228,47 @@ def test_exchange_unique_soc_interface_is_non_crashing(tmp_path: Path) -> None:
     assert_cli_success(result)
     assert (tmp_path / "Atom_1" / "input.nml").is_file()
     assert (tmp_path / "Atom_2" / "input.nml").is_file()
+
+
+def test_legacy_exchange_explicit_supported_reduction_is_semantic(tmp_path: Path) -> None:
+    full_root = tmp_path / "full"
+    reduced_root = tmp_path / "reduced"
+    full_root.mkdir()
+    reduced_root.mkdir()
+    _copy_exchange_fixture(full_root)
+    _copy_exchange_fixture(reduced_root)
+
+    full_result = run_rsutil(full_root, "-J", "--cutoff", "1.0", "--full-pairs")
+    reduced_result = run_rsutil(
+        reduced_root,
+        "-J",
+        "--cutoff",
+        "1.0",
+        "--unique",
+        "--soc",
+        "--magnetic-reference",
+        "collinear_fm",
+        "--magnetic-axis",
+        "0",
+        "0",
+        "1",
+    )
+
+    assert_cli_success(full_result)
+    assert_cli_success(reduced_result)
+    full_jobs = sorted(full_root.glob("Atom_*/input.nml"))
+    reduced_jobs = sorted(reduced_root.glob("Atom_*/input.nml"))
+    assert reduced_jobs
+    full_pair_count = sum(int(_read_namelist(path)["lattice"]["njij"]) for path in full_jobs)
+    reduced_pair_count = sum(int(_read_namelist(path)["lattice"]["njij"]) for path in reduced_jobs)
+    assert reduced_pair_count < full_pair_count
+    for path in reduced_jobs:
+        generated = _read_namelist(path)
+        assert generated["calculation"]["post_processing"] == "exchange"
+        assert generated["lattice"]["njij"] > 0
+        manifest = json.loads((path.parent / "rsutil_exchange_manifest.json").read_text(encoding="utf-8"))
+        assert manifest["spec"]["magnetic_reference"] == "collinear_fm"
+        assert manifest["spec"]["symmetry_reduction_applied"] is True
 
 
 def test_existing_band_and_export_modules_import() -> None:

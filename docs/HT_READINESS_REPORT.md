@@ -5,7 +5,7 @@
 >
 > The earlier R09 conclusion is superseded/reopened by the post-R09
 > self-review. Its historical evidence is retained below, but it must not be
-> be read as universal RS-LMTO feature coverage. The protected Fortran
+> read as universal RS-LMTO feature coverage. The protected Fortran
 > numerical kernel was not modified.
 
 ## Historical R09 closeout (superseded)
@@ -113,7 +113,11 @@ and `UNSUPPORTED`.
 | Slurm rendering | READY | Shell-safe array script/run-list rendering is tested locally. |
 | Slurm execution evidence | RESTRICTED | Controlled local execution evidence passes; no scheduler or remote cluster execution was available. |
 | Convergence-aware status/collection | READY | Filesystem-only status, parse failures, sidecars, hashes, continuation, stale-report, and execution-state behavior pass; `tests/test_ht17_campaign.py`. |
-| AiiDA/UppASD integration | UNSUPPORTED | Outside the validated R00-R09 foundation boundary. |
+| Collection | READY | Controlled result collection and sidecar/provenance handling are covered; `tests/test_ht17_campaign.py`. |
+| AiiDA integration | UNSUPPORTED | Outside the validated R00-R09 foundation boundary. |
+| UppASD workflow integration | UNSUPPORTED | Outside the validated R00-R09 foundation boundary. |
+| Database backend | UNSUPPORTED | No database backend is implemented or claimed in this foundation. |
+| ML training | UNSUPPORTED | No model-training pipeline is implemented or claimed in this foundation. |
 
 The R09 gate was recorded as satisfied for pilot use, but that conclusion was
 superseded/reopened by the post-R09 self-review. R10-R14 are now closed for
@@ -216,9 +220,17 @@ The exact wheel was
 the `test` extra into an external Python 3.11.16 virtual environment, with
 `PYTHONPATH` removed and tests/examples copied outside the checkout. Both
 `rsutil.__file__` and `rsutil.rsutil` resolved from that environment's
-`site-packages`; `pip check` passed. The external full suite passed **162
+`site-packages`; `pip check` passed. The external full suite passed **164
 tests, 15 warnings**. The source-checkout suite independently passed the same
-162 tests and 15 warnings.
+164 tests and 15 warnings.
+
+The follow-up artifact paths observed in that run were:
+
+```text
+rsutil.__file__: /private/tmp/rsutil-r14-venv.BVRc7L/lib/python3.11/site-packages/rsutil/__init__.py
+native extension: /private/tmp/rsutil-r14-venv.BVRc7L/lib/python3.11/site-packages/rsutil/rsutil.so
+site-packages assertion: PASS
+```
 
 The warnings are the known spglib deprecation/user warnings recorded by the
 focused symmetry tests; no test was skipped or suppressed for this closeout.
@@ -252,10 +264,12 @@ intentional failure outcomes; they are state-machine evidence, not a claim of
 scientific RS-LMTO convergence.
 
 The installed-wheel legacy regression suite passed semantically for `rsutil
--S` and `rsutil -J`, covering ordinary bulk, multisite/multispecies, seeded
-supercell/SQS, exchange generation, and the supported non-crashing unique/SOC
-interface. Compatibility is workflow/semantic compatibility, not byte-for-
-byte output identity.
+-S` and `rsutil -J`, covering ordinary bulk, multisite/multispecies, a
+source-derived unequal-count lattice, seeded supercell/SQS, exchange
+generation, and an explicit supported unique/SOC reduction. The reduction
+assertion compares generated `njij` inventories and manifest context rather
+than job-directory counts. Compatibility is workflow/semantic compatibility,
+not byte-for-byte output identity.
 
 ### Provenance and limitations
 

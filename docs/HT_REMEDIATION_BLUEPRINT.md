@@ -625,11 +625,12 @@ file edit. The fresh-regeneration contract is recorded as
 Focused R11 evidence includes negative controls that modify both a generated
 scientific file and its historical hash record; both are rejected against
 freshly generated expectations. Positive controls cover campaign and exchange
-runtime outputs and seeded stochastic campaign reuse:
+runtime outputs and seeded stochastic campaign reuse. The complete required
+R11 regression set was rerun during the follow-up:
 
 ```text
-python -m pytest -q tests/test_ht10_exchange_jobs.py tests/test_ht16_campaign.py
-21 passed, 1 warning
+python -m pytest -q tests/test_ht10_exchange_jobs.py tests/test_ht16_campaign.py tests/test_ht17_campaign.py tests/test_setup_validation.py
+47 passed, 1 warning
 ```
 
 ### HT-R12 decision and evidence
@@ -663,11 +664,12 @@ Positive controls cover explicit collinear-FM reduction with and without SOC,
 including the restricted axial-axis case. Same-element RS labels remain part
 of site identity and the exact periodic pair-key tests remain unchanged.
 
-Focused R12 evidence:
+Focused R12 evidence, including the legacy CLI boundary and the full source
+contract set, was rerun during the follow-up:
 
 ```text
-python -m pytest -q tests/test_ht12_magnetic_reference.py tests/test_ht08_exchange_service.py tests/test_ht09_exchange_symmetry.py tests/test_ht10_exchange_jobs.py tests/test_legacy_cli.py
-45 passed
+python -m pytest -q tests/test_ht12_magnetic_reference.py tests/test_ht08_exchange_service.py tests/test_ht09_exchange_symmetry.py tests/test_ht10_exchange_jobs.py tests/test_legacy_cli.py tests/test_setup_validation.py tests/test_core_contracts.py
+68 passed, 15 warnings
 ```
 
 ### HT-R13 decision and evidence
@@ -702,12 +704,24 @@ pytest: 162 passed, 15 warnings
 
 ### HT-R14 decision and evidence
 
-HT-R14 is closed. The final falsification pass was evaluated against code
-commit `8840afa6b0ac0ef707e2a414d8d205112faff866`, with the documentation
-closeout committed separately. The source checkout passed 162 tests with 15
-known spglib deprecation/user warnings. The clean external wheel environment
-also passed 162 tests with the same 15 warnings; `pip check` was clean and
-both the Python package and native extension resolved from site-packages.
+HT-R14 is closed, with this small evidence follow-up committed separately
+from the original closeout. The follow-up closes the two audit gaps in the
+legacy matrix: a real worker-executable source-derived unequal-count lattice
+and a semantic assertion for explicit supported exchange reduction. The
+source checkout and clean external wheel lane were rerun after these tests
+were added; their current counts are recorded below.
+
+The focused legacy CLI follow-up passed **10 tests**. The source checkout
+passed **164 tests, 15 warnings**, and the external installed-wheel copy also
+passed **164 tests, 15 warnings**. The artifact provenance assertion passed
+with these observed paths:
+
+```text
+rsutil.__file__: /private/tmp/rsutil-r14-venv.BVRc7L/lib/python3.11/site-packages/rsutil/__init__.py
+native extension: /private/tmp/rsutil-r14-venv.BVRc7L/lib/python3.11/site-packages/rsutil/rsutil.so
+site-packages assertion: PASS
+pip check: No broken requirements found
+```
 
 The mandatory negative controls were exercised by the focused suites and the
 full artifact suite: contradictory known-format units, raw-versus-derived
@@ -725,7 +739,8 @@ hashes, and scientific manifest fields matched for all three entries,
 including the seeded SQS case. The existing HT-17 controlled execution
 fixtures cover converged, non-converged, unknown, malformed, nonzero-exit,
 stale-report, and signaled outcomes. Legacy `rsutil -S` and `rsutil -J`
-regressions passed semantically through the installed-wheel suite.
+regressions passed semantically through the installed-wheel suite, including
+the source-derived unequal-count and explicit-reduction cases above.
 
 No remote CI result was available from this checkout: `origin/HT` remains at
 `54a279b6e00b5a51009626d94a16d1964149fc45`, before the closeout commits. This
