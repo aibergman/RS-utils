@@ -34,13 +34,27 @@ from .models import (
     ParserProvenance,
     SourceFile,
 )
-from .units import Quantity, RYDBERG, scalar, vector
+from .units import MILLI_RYDBERG, Quantity, UNKNOWN_UNIT, Unit, scalar, vector
 
 
 _NUMBER = r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[EeDd][+-]?\d+)?"
 _NUMBER_RE = re.compile(rf"^{_NUMBER}$")
 _MANIFEST_NAME = "rsutil_exchange_manifest.json"
 _SCHEMA = "rsutil-exchange-v1"
+_FABLE_V4_MRY_STEMS = frozenset(
+    {
+        "jij",
+        "jijso",
+        "jijfo",
+        "dij",
+        "dijso",
+        "dijfo",
+        "aij",
+        "aijso",
+        "aijfo",
+    }
+)
+_TENSOR_STEMS = frozenset({"aij", "aijso", "aijfo"})
 
 
 class _RawRow:
@@ -229,6 +243,9 @@ def _input_paths(
             "jijfo.out",
             "dijso.out",
             "dijfo.out",
+            "aij.out",
+            "aijso.out",
+            "aijfo.out",
             "dmi.out",
             "dmi.dat",
             "exchange_tensor.out",
@@ -272,7 +289,7 @@ def _classify(path: Path) -> tuple[str, dict[str, Any], tuple[str, ...]]:
     header_text = " ".join(headers).lower()
     if "dmi" in stem or stem.startswith("dij") or "d_ij" in header_text:
         kind = "dmi"
-    elif "tensor" in stem or "tensor" in header_text or "full exchange" in header_text:
+    elif stem in _TENSOR_STEMS or "tensor" in stem or "tensor" in header_text or "full exchange" in header_text:
         kind = "tensor"
     elif "j_ij" in header_text or stem.startswith("jij"):
         kind = "exchange"
@@ -281,21 +298,35 @@ def _classify(path: Path) -> tuple[str, dict[str, Any], tuple[str, ...]]:
             f"cannot identify supported interaction format from filename/header: {path.name}"
         )
     suffix = None
-    match = re.search(r"(?:jij|dij)(so|fo)$", stem)
+    match = re.search(r"(?:jij|dij|aij)(so|fo)$", stem)
     if match:
         suffix = match.group(1)
+    declared_units = re.findall(r"\b(mry|ry|rydberg|ev|mev|hartree|ha)\b", header_text, re.I)
+    declared_unit_names = {unit.lower() for unit in declared_units}
+    if declared_unit_names and not declared_unit_names.issubset({"ry", "rydberg", "mry"}):
+        raise UnsupportedResultFormatError(
+            f"interaction file declares an energy unit without a supported conversion: {path}"
+        )
+    normalized_declared_units = {"mry" if unit == "mry" else "ry" for unit in declared_unit_names}
+    if len(normalized_declared_units) > 1:
+        raise UnsupportedResultFormatError(f"interaction file declares conflicting energy units: {path}")
+    if normalized_declared_units:
+        energy_unit = MILLI_RYDBERG if "mry" in normalized_declared_units else Unit.RY
+        energy_unit_evidence = "explicit_file_header"
+    elif stem in _FABLE_V4_MRY_STEMS:
+        energy_unit = MILLI_RYDBERG
+        energy_unit_evidence = "fable_v4_exchange_writer_scaling"
+    else:
+        energy_unit = UNKNOWN_UNIT
+        energy_unit_evidence = "unverified_source_unit"
     metadata: dict[str, Any] = {
         "format": kind,
         "channel": suffix,
         "method": None,
         "soc": None,
-        "energy_unit": RYDBERG.value,
+        "energy_unit": energy_unit.value,
+        "energy_unit_evidence": energy_unit_evidence,
     }
-    declared_units = re.findall(r"\b(ry|rydberg|ev|mev|hartree|ha)\b", header_text, re.I)
-    if declared_units and any(unit.lower() not in {"ry", "rydberg"} for unit in declared_units):
-        raise UnsupportedResultFormatError(
-            f"interaction file declares an energy unit without a supported conversion: {path}"
-        )
     for name in ("method", "channel"):
         match = re.search(rf"\b{name}\s*[:=]\s*([A-Za-z0-9_.+-]+)", header_text, re.I)
         if match:
@@ -408,14 +439,14 @@ def _record_from_row(
     if kind == "exchange":
         if len(values) != 7:
             raise MalformedResultError(f"scalar exchange row has unexpected shape at {row.source}:{row.line}")
-        quantities["isotropic_exchange"] = scalar(values[5], RYDBERG)
+        quantities["isotropic_exchange"] = scalar(values[5], metadata["energy_unit"])
     elif kind == "dmi":
-        quantities["dmi_vector"] = vector(values[5:8], RYDBERG)
+        quantities["dmi_vector"] = vector(values[5:8], metadata["energy_unit"])
     else:
         tensor_values = values[5:14]
         quantities["exchange_tensor"] = Quantity(
             tuple(tuple(float(value) for value in tensor_values[offset : offset + 3]) for offset in (0, 3, 6)),
-            RYDBERG,
+            metadata["energy_unit"],
         )
     return InteractionRecord(
         key=key,
@@ -429,6 +460,7 @@ def _record_from_row(
             "format": metadata["format"],
             "coordinate_columns": "cartesian_displacement",
             "energy_unit": metadata["energy_unit"],
+            "energy_unit_evidence": metadata["energy_unit_evidence"],
         },
         **quantities,
     )

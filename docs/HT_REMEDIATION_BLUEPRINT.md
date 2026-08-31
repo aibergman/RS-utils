@@ -65,7 +65,7 @@ pre-remediation implementation.
 ## Task tracking
 
 - [x] **HT-R00** — Reopen readiness and freeze adversarial acceptance criteria
-- [ ] **HT-R01** — Correct exchange/DMI/tensor units and unit evidence
+- [x] **HT-R01** — Correct exchange/DMI/tensor units and unit evidence
 - [ ] **HT-R02** — Restore complete RS-LMTO setup/lattice validation semantics
 - [ ] **HT-R03** — Implement scientific campaign state and execution evidence
 - [ ] **HT-R04** — Harden manifests, pair identity, and reuse integrity
@@ -75,8 +75,8 @@ pre-remediation implementation.
 - [ ] **HT-R08** — Make packaging, test environment, and CI reproducible
 - [ ] **HT-R09** — True adversarial HT closeout and pilot evidence
 
-No task may be marked complete before its acceptance tests pass. R01-R09 are
-intentionally unchecked at the completion of HT-R00.
+No task may be marked complete before its acceptance tests pass. R02-R09 are
+intentionally unchecked at the completion of HT-R01.
 
 ## Frozen adversarial blockers
 
@@ -116,6 +116,30 @@ No production code, parser, validator, CI workflow, or test was changed for
 HT-R00. The remediation start commit is
 `4981cbd952559df6f99fbc933e2091722e95f4db`, and the remediation start date is
 `2026-08-31`.
+
+## HT-R01 decision and evidence
+
+The current [`fable_v4/source/exchange.f90`](https://raw.githubusercontent.com/rslmtoasa/rslmtoasa/fable_v4/source/exchange.f90)
+audit establishes the source unit for the interaction writer paths. It writes
+`jijso.out`/`jijfo.out`,
+`dijso.out`/`dijfo.out`, and `aijso.out`/`aijfo.out` after multiplying their
+calculated scalar, DMI, and full `aij` tensor values by
+`1.0d3/(4.0d0*pi)`. The corresponding unsuffixed `jij.out`, `dij.out`, and
+`aij.out` paths use the same scaling. These source values are mRy; the raw
+numeric values are not rescaled by RS-utils.
+
+RS-utils now exposes `Unit.MILLI_RY`/`MILLI_RYDBERG`, tags audited scalar,
+DMI, and `aij` tensor outputs as `mRy`, and supports explicit Ry↔mRy
+conversion without changing the parsed source quantity. Generic tensor
+files without a source-unit declaration remain `unknown` rather than
+receiving a guessed unit. Existing result schema version `v1` remains
+backward-readable because each quantity already carries its unit; old records
+declared as `Ry` are not silently migrated.
+
+Regression coverage verifies unchanged MnSi source numbers, mRy JSON
+round-tripping, the explicit 1000:1 conversion relation, source-backed tensor
+units, and unknown units for an unverified tensor filename. The focused
+HT-12, HT-11, and HT-14 suites and the full suite pass.
 
 ## Scope and dependency order
 

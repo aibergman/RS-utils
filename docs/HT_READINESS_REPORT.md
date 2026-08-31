@@ -154,9 +154,9 @@ a checked-in stable fixture and tests;
 | Surface | Status | Evidence/limit |
 | --- | --- | --- |
 | SCF report/electronic records | READY | B2Fe and FePt reports parse with units, moments, provenance, and validation; convergence is only taken from explicit log markers |
-| Scalar exchange (`jijso.out`/`jijfo.out`) | READY | Real MnSi fixture; canonical periodic mapping and Ry units |
-| DMI (`dijso.out`/`dijfo.out`) | READY | Real MnSi fixture; vector and SOC channel retained separately |
-| Full exchange tensor | EXPERIMENTAL | Explicit tensor-shaped fixture is supported; no checked-in fable_v4 tensor source/output was available |
+| Scalar exchange (`jijso.out`/`jijfo.out`) | READY | Real MnSi fixture; canonical periodic mapping; audited source unit is mRy |
+| DMI (`dijso.out`/`dijfo.out`) | READY | Real MnSi fixture; vector and SOC channel retained separately; audited source unit is mRy |
+| Full exchange tensor | EXPERIMENTAL | `aij*.out` source scaling is audited as mRy; no checked-in fable_v4 tensor fixture; generic unverified tensors retain unknown units |
 | Legacy `rs2txt.dat` reading | READY | Existing bands reader remains available; conversion to periodic TB is fail-closed when identity is ambiguous |
 | Versioned fable_v4 TB | READY | `rs-tb-meta-v1`/`rs-tb-hoppings-v1` fixture parses and reconstructs complex `H(k)` |
 | TB ML export | READY | Deterministic compressed NPZ/JSON; complex values and identity arrays round-trip |
@@ -201,8 +201,8 @@ The parser portion of the pilot exercised:
 * B2Fe and FePt electronic reports: validation passed, two spin and two
   orbital moment records each;
 * MnSi `jijso.out` + `dijso.out`: 584 merged canonical records, including
-  `PairKey(0,0,(-2,0,0))` with `J=-0.00587 Ry` and
-  `D=(0.000054,-0.000041,0.000138) Ry`;
+  `PairKey(0,0,(-2,0,0))` with `J=-0.00587 mRy` and
+  `D=(0.000054,-0.000041,0.000138) mRy`;
 * the versioned TB fixture: six hoppings, dimension four, eV units, complex
   `H(k)` reconstruction, `control%nsp=2`, SOC enabled, and lossless ML
   round-trip;

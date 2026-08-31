@@ -15,17 +15,26 @@ the checked-in format note `docs/notes/RSLMTO_format.md`.
 
 | File family | Columns, in order | Parsed field | Unit |
 | --- | --- | --- | --- |
-| `jijso.out`, `jijfo.out` | `itype jtype r_ij[3] j_ij |r_ij|` | isotropic exchange `J` | Ry |
-| `dijso.out`, `dijfo.out`, `dmi*.out` | `itype jtype r_ij[3] d_ij[3] |r_ij|` | DMI vector `D` | Ry |
-| explicit tensor file/header | `itype jtype r_ij[3] J_ij[3x3] [|r_ij|]` | full exchange tensor | Ry |
+| `jijso.out`, `jijfo.out`, `jij.out` | `itype jtype r_ij[3] j_ij |r_ij|` | isotropic exchange `J` | mRy |
+| `dijso.out`, `dijfo.out`, `dij.out` | `itype jtype r_ij[3] d_ij[3] |r_ij|` | DMI vector `D` | mRy |
+| `aijso.out`, `aijfo.out`, `aij.out` | `itype jtype r_ij[3] A_ij[3x3] |r_ij|` | full exchange tensor | mRy |
+| generic explicitly identified tensor file | `itype jtype r_ij[3] J_ij[3x3] [|r_ij|]` | full exchange tensor | unknown unless an explicit unit header is present |
 
 The first five fields after the two indices are Cartesian displacement
 coordinates in the same scale as the supplied `RSStructure`; `|r_ij|` is a
-redundant distance check.  The result values are retained in the source
-energy unit established by the RS-LMTO fixture convention (Ry); no conversion
-is performed.  Tensor-shaped rows are accepted only when the filename or
-header explicitly identifies a tensor, so a widened scalar table cannot be
-silently reinterpreted.
+redundant distance check. The current `fable_v4` writer multiplies scalar
+exchange, DMI, and `aij` tensor values by `1.0d3/(4.0d0*pi)` before writing
+the corresponding files, establishing the source output unit as mRy. See
+[`exchange.f90` in `fable_v4`](https://raw.githubusercontent.com/rslmtoasa/rslmtoasa/fable_v4/source/exchange.f90#L941-L1005)
+for the scaling and [`jijso`/`dijso`/`aijso` writers](https://raw.githubusercontent.com/rslmtoasa/rslmtoasa/fable_v4/source/exchange.f90#L1038-L1071)
+for the file mapping. Parsed values retain the numeric source value and
+source unit; no conversion is performed during parsing.
+
+Tensor-shaped rows are accepted only when the filename or header explicitly
+identifies a tensor, so a widened scalar table cannot be silently
+reinterpreted. A generic tensor filename without a source-unit declaration
+is retained with `unknown` units rather than being assigned mRy by shape or
+filename similarity.
 
 The suffix/channel (`so` or `fo`) is retained as metadata.  SOC is retained
 only when a header explicitly states it; it is not inferred from a filename.
@@ -56,9 +65,9 @@ metadata, the canonical pair key, and optional derived geometry.
 
 ## Evidence boundary
 
-This RS-utils checkout does not contain the requested `fable_v4/source/exchange.f90`
-or a fable_v4 tensor fixture.  The supported scalar and DMI schemas above are
-therefore documented from the checked-in real MnSi outputs and format note;
-the tensor grammar is intentionally explicit and fail-closed pending an
-upstream fable_v4 tensor fixture.  No fable_v4 sign convention beyond the
-fixture's Ry-valued columns is inferred here.
+The checked-in real MnSi fixture is headerless, so its source unit is supplied
+by the audited `fable_v4` writer contract above. No raw fixture values were
+changed. The result schema remains `rsutil-exchange-result-v1` because units
+were already serialized explicitly per quantity; old serialized records that
+say `Ry` remain `Ry` when loaded and are not silently migrated. Reparse the
+raw source file to obtain the corrected mRy interpretation.
