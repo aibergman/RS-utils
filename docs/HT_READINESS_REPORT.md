@@ -211,16 +211,20 @@ The parser portion of the pilot exercised:
 
 ## Campaign and Slurm dry-run evidence
 
-The generated four-entry index was rendered with a Python fake executable that
-wrote a minimal `report.out` in the selected run directory. All four array
-indices returned exit code 0. Filesystem status reported four
-`COMPLETED_VALID` entries with `scheduler_state=not_queried`; collection
-produced `campaign_results.json`, CSV, and JSONL outputs with four entries and
-zero collection failures. The rendered script used a stable zero-based TSV
-array map and shell-quoted run paths.
+The historical four-entry index was rendered with a Python fake executable that
+wrote only minimal `report.out` files. That evidence predates HT-R03: it did
+not persist execution records and did not establish explicit SCF convergence.
+Under the repaired state contract those entries are parser-valid at most, with
+execution and scientific convergence unknown; they must not be described as
+scientifically `COMPLETED_VALID`. The historical collection output therefore
+does not constitute four successful scientific results.
 
-This validates generation, render, fake execution, status, and collection
-without claiming that Slurm was submitted or queried.
+The current HT-R03 regression matrix covers zero-exit converged,
+non-converged, unknown, malformed, non-zero/no-output, stale-output, legacy
+missing-record, and wrong-identity cases. The generated wrapper now persists
+`rsutil_execution.json` atomically and collection exposes independent
+execution, output/parser, and scientific axes. This validates the local
+campaign boundary without claiming that Slurm was submitted or queried.
 
 ## Historical full verification
 

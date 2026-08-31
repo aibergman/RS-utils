@@ -67,7 +67,7 @@ pre-remediation implementation.
 - [x] **HT-R00** — Reopen readiness and freeze adversarial acceptance criteria
 - [x] **HT-R01** — Correct exchange/DMI/tensor units and unit evidence
 - [x] **HT-R02** — Restore complete RS-LMTO setup/lattice validation semantics
-- [ ] **HT-R03** — Implement scientific campaign state and execution evidence
+- [x] **HT-R03** — Implement scientific campaign state and execution evidence
 - [ ] **HT-R04** — Harden manifests, pair identity, and reuse integrity
 - [ ] **HT-R05** — Bound and harden exchange symmetry/magnetic-reference semantics
 - [ ] **HT-R06** — Complete transport/damping source audit against `fable_v4`
@@ -75,8 +75,8 @@ pre-remediation implementation.
 - [ ] **HT-R08** — Make packaging, test environment, and CI reproducible
 - [ ] **HT-R09** — True adversarial HT closeout and pilot evidence
 
-No task may be marked complete before its acceptance tests pass. R02-R09 are
-intentionally unchecked at the completion of HT-R01.
+No task may be marked complete before its acceptance tests pass. R04-R09 remain
+intentionally unchecked until their respective repairs are completed.
 
 ## Frozen adversarial blockers
 
@@ -233,6 +233,34 @@ tests/test_setup_service.py          11 passed
 tests/test_legacy_cli.py              8 passed
 tests/test_fortran_setup_runner.py   4 passed
 full feasible suite                  104 passed, 10 warnings
+```
+
+## HT-R03 decision and evidence
+
+Campaign status now retains independent execution, output/parser, and
+scientific-convergence axes. `COMPLETED_VALID` is intentionally narrow: it
+requires an atomically persisted `rsutil-execution-v1` record with zero exit,
+parser-valid output, and explicit SCF convergence. Non-converged and
+convergence-unknown results remain collectable but are not successful
+scientific results. Missing or identity-mismatched execution evidence is
+reported as unknown/legacy evidence, and a current non-zero execution remains
+failed even when a stale `report.out` parses successfully.
+
+The generated Slurm path writes a running record followed by an atomic final
+record containing UTC timestamps, command, working directory, host, campaign
+identity, available Slurm IDs, return code, signal information when observed,
+and success/failure status. The status and collection JSON/CSV outputs carry
+all three axes; collection's successful view contains only explicit converged
+successes.
+
+Regression coverage includes the required converged, non-converged, unknown,
+malformed, non-zero/no-output, stale-output, missing-record, and wrong-identity
+cases. The required focused suites pass:
+
+```text
+tests/test_ht17_campaign.py  12 passed
+tests/test_ht16_campaign.py   4 passed
+tests/test_ht11_results.py    6 passed
 ```
 
 The authoritative evidence is the public `fable_v4` source links recorded in

@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from ..core.hashing import hash_file
-from ..results import parse_exchange_results, parse_run
+from ..results import ConvergenceState, UnsupportedResultFormatError, parse_exchange_results, parse_run
 from .generation import CAMPAIGN_INDEX_FILENAME
 from .models import CampaignIndex, CampaignIndexEntry
 
@@ -30,6 +30,8 @@ CAMPAIGN_RESULTS_SCHEMA_VERSION = "rsutil-campaign-results-v1"
 RUN_LIST_FILENAME = "slurm_run_list.tsv"
 SLURM_SCRIPT_FILENAME = "submit_array.sbatch"
 CAMPAIGN_RESULTS_FILENAME = "campaign_results.json"
+EXECUTION_EVIDENCE_FILENAME = "rsutil_execution.json"
+EXECUTION_SCHEMA_VERSION = "rsutil-execution-v1"
 
 GENERATED = "GENERATED"
 LOCKED = "LOCKED"
@@ -37,6 +39,24 @@ COMPLETED_VALID = "COMPLETED_VALID"
 COMPLETED_INVALID = "COMPLETED_INVALID"
 FAILED = "FAILED"
 UNKNOWN = "UNKNOWN"
+
+# These axes are intentionally independent.  ``status`` below is only a
+# convenience summary and is never used as a substitute for these values.
+EXECUTION_NOT_RUN = "NOT_RUN"
+EXECUTION_RUNNING_OR_UNKNOWN = "RUNNING_OR_UNKNOWN"
+EXECUTION_EXITED_ZERO = "EXITED_ZERO"
+EXECUTION_EXITED_NONZERO = "EXITED_NONZERO"
+EXECUTION_SIGNALED = "SIGNALED"
+OUTPUT_NO_OUTPUT = "NO_OUTPUT"
+OUTPUT_PARSE_VALID = "PARSE_VALID"
+OUTPUT_PARSE_INVALID = "PARSE_INVALID"
+OUTPUT_PARSE_UNSUPPORTED = "PARSE_UNSUPPORTED"
+SCIENTIFIC_CONVERGED = "CONVERGED"
+SCIENTIFIC_NOT_CONVERGED = "NOT_CONVERGED"
+SCIENTIFIC_UNKNOWN = "UNKNOWN"
+SCIENTIFIC_NOT_APPLICABLE = "NOT_APPLICABLE"
+COMPLETED_NOT_CONVERGED = "COMPLETED_NOT_CONVERGED"
+COMPLETED_UNKNOWN = "COMPLETED_UNKNOWN"
 
 _LOCK_NAMES = (".rsutil-running", ".rsutil-running.lock", "run.lock", "RUNNING")
 _FAILURE_NAMES = ("FAILED", "FAILED.json", "run.failed", "rsutil_failed.json")
@@ -250,7 +270,6 @@ def render_slurm_array(
             directives.append(f"#SBATCH --{option}={_safe_directive(value, option)}")
 
     command = launcher_tokens + executable_tokens + argument_tokens
-    quoted_command = " ".join(shlex.quote(token) for token in command)
     root_reference = shlex.quote(root.resolve().as_posix())
     lines = [
         "#!/usr/bin/env bash",
@@ -275,9 +294,81 @@ def render_slurm_array(
             'export RSUTIL_CAMPAIGN_ENTRY_ID="$ENTRY_ID"',
             'export RSUTIL_CAMPAIGN_RUN_DIR="$RUN_DIR"',
             'export RSUTIL_CAMPAIGN_MANIFEST_PATH="$CAMPAIGN_ROOT/$MANIFEST_PATH"',
+            f'export RSUTIL_CAMPAIGN_ID={shlex.quote(index.campaign_id)}',
+            f'export RSUTIL_CAMPAIGN_NAME={shlex.quote(index.campaign_name)}',
+            'export RSUTIL_EXECUTION_PATH="$RUN_DIR/' + EXECUTION_EVIDENCE_FILENAME + '"',
             'cd -- "$RUN_DIR"',
             f"echo \"rsutil campaign entry $ENTRY_ID (array $ARRAY_INDEX) in $RUN_DIR\"",
-            f"exec {quoted_command}",
+            f"COMMAND_JSON={shlex.quote(json.dumps(command, separators=(',', ':')))}",
+            'python - "$COMMAND_JSON" <<\'PY\'',
+            'import json',
+            'import os',
+            'import socket',
+            'import subprocess',
+            'import sys',
+            'import tempfile',
+            'from datetime import datetime, timezone',
+            'from pathlib import Path',
+            '',
+            'execution_path = Path(os.environ["RSUTIL_EXECUTION_PATH"])',
+            'command = json.loads(sys.argv[1])',
+            'started_at = datetime.now(timezone.utc).isoformat()',
+            'identity = {',
+            '    "campaign_id": os.environ.get("RSUTIL_CAMPAIGN_ID"),',
+            '    "campaign_name": os.environ.get("RSUTIL_CAMPAIGN_NAME"),',
+            '    "entry_id": os.environ.get("RSUTIL_CAMPAIGN_ENTRY_ID"),',
+            '    "manifest_hash": None,',
+            '    "run_path": os.environ.get("RSUTIL_CAMPAIGN_RUN_DIR"),',
+            '    "array_index": os.environ.get("RSUTIL_CAMPAIGN_ARRAY_INDEX"),',
+            '}',
+            'manifest_path = Path(os.environ["RSUTIL_CAMPAIGN_MANIFEST_PATH"])',
+            'try:',
+            '    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))',
+            '    identity["manifest_hash"] = manifest.get("campaign", {}).get("manifest_hash")',
+            'except Exception:',
+            '    identity["manifest_hash"] = None',
+            'slurm = {key: value for key, value in {',
+            '    "job_id": os.environ.get("SLURM_JOB_ID"),',
+            '    "array_job_id": os.environ.get("SLURM_ARRAY_JOB_ID"),',
+            '    "array_task_id": os.environ.get("SLURM_ARRAY_TASK_ID"),',
+            '}.items() if value is not None}',
+            'def atomic_record(payload):',
+            '    execution_path.parent.mkdir(parents=True, exist_ok=True)',
+            '    fd, temporary_name = tempfile.mkstemp(prefix="." + execution_path.name + ".", dir=str(execution_path.parent), text=True)',
+            '    temporary = Path(temporary_name)',
+            '    try:',
+            '        with os.fdopen(fd, "w", encoding="utf-8") as stream:',
+            '            json.dump(payload, stream, indent=2, sort_keys=True)',
+            '            stream.write("\\n")',
+            '        os.replace(temporary, execution_path)',
+            '    finally:',
+            '        if temporary.exists():',
+            '            temporary.unlink()',
+            'base = {',
+            '    "schema_version": "' + EXECUTION_SCHEMA_VERSION + '",',
+            '    "identity": identity,',
+            '    "command": command,',
+            '    "cwd": os.getcwd(),',
+            '    "hostname": socket.gethostname(),',
+            '    "slurm": slurm,',
+            '    "started_at": started_at,',
+            '}',
+            'atomic_record({**base, "status": "running", "finished_at": None, "return_code": None, "signal": None})',
+            'try:',
+            '    completed = subprocess.run(command, cwd=os.getcwd(), check=False)',
+            '    return_code = completed.returncode',
+            '    error = None',
+            'except OSError as exc:',
+            '    return_code = 127',
+            '    error = {"type": exc.__class__.__name__, "message": str(exc)}',
+            'finished_at = datetime.now(timezone.utc).isoformat()',
+            'signal = -return_code if return_code < 0 else None',
+            'payload = {**base, "status": "success" if return_code == 0 else "failure", "finished_at": finished_at, "return_code": return_code, "signal": signal}',
+            'if error is not None:',
+            '    payload["error"] = error',
+            'atomic_record(payload)',
+            'raise SystemExit(return_code)',
+            'PY',
             "",
         ]
     )
@@ -300,6 +391,10 @@ class CampaignStatusEntry:
     status: str
     evidence: str
     parser_error: Mapping[str, Any] | None = None
+    execution_status: str = EXECUTION_NOT_RUN
+    output_status: str = OUTPUT_NO_OUTPUT
+    scientific_status: str = SCIENTIFIC_NOT_APPLICABLE
+    execution_evidence: Mapping[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -312,6 +407,10 @@ class CampaignStatusEntry:
             "status": self.status,
             "evidence": self.evidence,
             "parser_error": None if self.parser_error is None else dict(self.parser_error),
+            "execution_status": self.execution_status,
+            "output_status": self.output_status,
+            "scientific_status": self.scientific_status,
+            "execution_evidence": None if self.execution_evidence is None else dict(self.execution_evidence),
         }
 
 
@@ -358,6 +457,68 @@ def _first_marker(run_dir: Path, names: Sequence[str]) -> Path | None:
     return None
 
 
+def _read_execution_evidence(run_dir: Path, entry: CampaignIndexEntry) -> tuple[str, Mapping[str, Any] | None, dict[str, Any] | None]:
+    path = run_dir / EXECUTION_EVIDENCE_FILENAME
+    if not path.is_file():
+        return EXECUTION_NOT_RUN, None, None
+    try:
+        evidence = _read_json(path)
+        if evidence.get("schema_version") != EXECUTION_SCHEMA_VERSION:
+            raise ValueError(f"unsupported execution evidence schema: {evidence.get('schema_version')!r}")
+        identity = evidence.get("identity")
+        if not isinstance(identity, Mapping):
+            raise ValueError("execution evidence identity is missing")
+        if identity.get("entry_id") != entry.entry_id or identity.get("manifest_hash") != entry.manifest_hash:
+            return EXECUTION_RUNNING_OR_UNKNOWN, evidence, {
+                "code": "execution_identity_mismatch",
+                "message": "execution evidence does not match the campaign entry",
+            }
+        status = evidence.get("status")
+        if status == "running":
+            return EXECUTION_RUNNING_OR_UNKNOWN, evidence, None
+        return_code = evidence.get("return_code")
+        if not isinstance(return_code, int):
+            raise ValueError("final execution evidence has no integer return_code")
+        if status == "success" and return_code == 0:
+            return EXECUTION_EXITED_ZERO, evidence, None
+        if status == "failure" and return_code != 0:
+            if isinstance(evidence.get("signal"), int) and evidence["signal"] > 0:
+                return EXECUTION_SIGNALED, evidence, None
+            return EXECUTION_EXITED_NONZERO, evidence, None
+        raise ValueError("execution evidence status and return_code disagree")
+    except Exception as exc:
+        return EXECUTION_RUNNING_OR_UNKNOWN, None, _error_payload(exc)
+
+
+def _scientific_axis(result: Any) -> str:
+    convergence = getattr(result, "convergence", ConvergenceState.UNKNOWN)
+    if convergence is ConvergenceState.CONVERGED or convergence == ConvergenceState.CONVERGED:
+        return SCIENTIFIC_CONVERGED
+    if convergence is ConvergenceState.NOT_CONVERGED or convergence == ConvergenceState.NOT_CONVERGED:
+        return SCIENTIFIC_NOT_CONVERGED
+    return SCIENTIFIC_UNKNOWN
+
+
+def _status_summary(execution_status: str, output_status: str, scientific_status: str, *, manifest_error: bool) -> str:
+    if manifest_error:
+        if output_status == OUTPUT_NO_OUTPUT and execution_status != EXECUTION_EXITED_ZERO:
+            return UNKNOWN
+        return COMPLETED_INVALID
+    if execution_status in (EXECUTION_EXITED_NONZERO, EXECUTION_SIGNALED):
+        return FAILED
+    if output_status in (OUTPUT_PARSE_INVALID, OUTPUT_PARSE_UNSUPPORTED):
+        return COMPLETED_INVALID
+    if output_status == OUTPUT_NO_OUTPUT:
+        return COMPLETED_INVALID if execution_status == EXECUTION_EXITED_ZERO else GENERATED
+    if execution_status != EXECUTION_EXITED_ZERO:
+        return UNKNOWN
+    if scientific_status == SCIENTIFIC_CONVERGED:
+        return COMPLETED_VALID
+    if scientific_status == SCIENTIFIC_NOT_CONVERGED:
+        return COMPLETED_NOT_CONVERGED
+    return COMPLETED_UNKNOWN
+
+
 def _status_entry(root: Path, array_index: int, entry: CampaignIndexEntry) -> CampaignStatusEntry:
     run_dir = _run_dir(root, entry)
     manifest_path = _manifest_path(root, entry)
@@ -373,26 +534,55 @@ def _status_entry(root: Path, array_index: int, entry: CampaignIndexEntry) -> Ca
     else:
         manifest_error = {"code": "campaign_manifest_missing", "message": f"manifest is missing: {manifest_path}"}
 
+    execution_status, execution_evidence, execution_error = _read_execution_evidence(run_dir, entry)
     failure_marker = _first_marker(run_dir, _FAILURE_NAMES) if run_dir.is_dir() else None
     if failure_marker is not None:
-        return CampaignStatusEntry(array_index, entry.entry_id, entry.name, entry.run_path, entry.manifest_path, entry.manifest_hash, FAILED, f"failure marker {failure_marker.name}", manifest_error)
+        return CampaignStatusEntry(array_index, entry.entry_id, entry.name, entry.run_path, entry.manifest_path, entry.manifest_hash, FAILED, f"failure marker {failure_marker.name}", manifest_error, execution_status, OUTPUT_NO_OUTPUT, SCIENTIFIC_NOT_APPLICABLE, execution_evidence)
     lock_marker = _first_marker(run_dir, _LOCK_NAMES) if run_dir.is_dir() else None
     if lock_marker is not None:
-        return CampaignStatusEntry(array_index, entry.entry_id, entry.name, entry.run_path, entry.manifest_path, entry.manifest_hash, LOCKED, f"lock marker {lock_marker.name}", manifest_error)
+        return CampaignStatusEntry(array_index, entry.entry_id, entry.name, entry.run_path, entry.manifest_path, entry.manifest_hash, LOCKED, f"lock marker {lock_marker.name}", manifest_error, EXECUTION_RUNNING_OR_UNKNOWN, OUTPUT_NO_OUTPUT, SCIENTIFIC_NOT_APPLICABLE, execution_evidence)
     report_path = run_dir / "report.out"
+    if report_path.is_file() and execution_status == EXECUTION_NOT_RUN:
+        # A legacy output is evidence that something may have run, but without
+        # the generated record its execution outcome cannot be reconstructed.
+        execution_status = EXECUTION_RUNNING_OR_UNKNOWN
+    output_status = OUTPUT_NO_OUTPUT
+    scientific_status = SCIENTIFIC_NOT_APPLICABLE
+    parser_error: Mapping[str, Any] | None = execution_error
     if report_path.is_file():
-        if manifest_error is not None:
-            return CampaignStatusEntry(array_index, entry.entry_id, entry.name, entry.run_path, entry.manifest_path, entry.manifest_hash, COMPLETED_INVALID, "result exists but campaign manifest is invalid", manifest_error)
         try:
             result = parse_run(run_dir)
-            status = COMPLETED_VALID if result.validation.valid else COMPLETED_INVALID
-            evidence = "report.out parsed and validation passed" if status == COMPLETED_VALID else "report.out parsed with validation errors"
-            return CampaignStatusEntry(array_index, entry.entry_id, entry.name, entry.run_path, entry.manifest_path, entry.manifest_hash, status, evidence)
+            output_status = OUTPUT_PARSE_VALID if result.validation.valid else OUTPUT_PARSE_INVALID
+            scientific_status = _scientific_axis(result) if output_status == OUTPUT_PARSE_VALID else SCIENTIFIC_UNKNOWN
         except Exception as exc:
-            return CampaignStatusEntry(array_index, entry.entry_id, entry.name, entry.run_path, entry.manifest_path, entry.manifest_hash, COMPLETED_INVALID, "report.out is malformed or unsupported", _error_payload(exc))
+            output_status = OUTPUT_PARSE_UNSUPPORTED if isinstance(exc, UnsupportedResultFormatError) else OUTPUT_PARSE_INVALID
+            scientific_status = SCIENTIFIC_UNKNOWN
+            parser_error = _error_payload(exc)
+    status = _status_summary(execution_status, output_status, scientific_status, manifest_error=manifest_error is not None)
     if manifest_error is not None:
-        return CampaignStatusEntry(array_index, entry.entry_id, entry.name, entry.run_path, entry.manifest_path, entry.manifest_hash, UNKNOWN, "campaign manifest missing or invalid", manifest_error)
-    return CampaignStatusEntry(array_index, entry.entry_id, entry.name, entry.run_path, entry.manifest_path, entry.manifest_hash, GENERATED, "owned campaign run generated; no result evidence")
+        evidence = "result evidence exists but campaign manifest is invalid" if report_path.is_file() else "campaign manifest missing or invalid"
+    elif execution_error is not None:
+        evidence = "execution evidence is invalid or has the wrong campaign identity"
+    elif execution_status == EXECUTION_RUNNING_OR_UNKNOWN and report_path.is_file():
+        evidence = "legacy result parsed; execution evidence is missing or unfinished"
+    elif execution_status in (EXECUTION_EXITED_NONZERO, EXECUTION_SIGNALED):
+        evidence = "execution evidence records failure"
+    elif output_status == OUTPUT_PARSE_VALID and scientific_status == SCIENTIFIC_CONVERGED:
+        evidence = "execution exited zero; report parsed and SCF converged"
+    elif output_status == OUTPUT_PARSE_VALID and scientific_status == SCIENTIFIC_NOT_CONVERGED:
+        evidence = "execution exited zero; report parsed but SCF did not converge"
+    elif output_status == OUTPUT_PARSE_VALID:
+        evidence = "execution exited zero; report parsed but convergence is unknown"
+    elif output_status == OUTPUT_NO_OUTPUT and execution_status == EXECUTION_NOT_RUN:
+        evidence = "owned campaign run generated; no execution or result evidence"
+    elif output_status == OUTPUT_NO_OUTPUT:
+        evidence = "execution completed without report.out"
+    else:
+        evidence = "report.out is malformed or unsupported"
+    return CampaignStatusEntry(
+        array_index, entry.entry_id, entry.name, entry.run_path, entry.manifest_path, entry.manifest_hash,
+        status, evidence, parser_error, execution_status, output_status, scientific_status, execution_evidence,
+    )
 
 
 def status_campaign(campaign_index: CampaignIndex | str | Path, *, campaign_root: str | Path | None = None) -> CampaignStatusReport:
@@ -495,7 +685,16 @@ class CampaignCollection:
 
     @property
     def failures(self) -> tuple[Mapping[str, Any], ...]:
-        return tuple(entry for entry in self.entries if entry.get("parse_error") or entry.get("validation", {}).get("valid") is False)
+        return tuple(
+            entry for entry in self.entries
+            if entry.get("status") in (FAILED, COMPLETED_INVALID, COMPLETED_NOT_CONVERGED, COMPLETED_UNKNOWN)
+        )
+
+    @property
+    def successful(self) -> tuple[Mapping[str, Any], ...]:
+        """Entries with zero exit, valid output, and explicit SCF convergence."""
+
+        return tuple(entry for entry in self.entries if entry.get("status") == COMPLETED_VALID)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -547,6 +746,10 @@ def collect_campaign(
             "manifest_content_hash": manifest_content_hash,
             "status": status.status,
             "status_evidence": status.evidence,
+            "execution_status": status.execution_status,
+            "output_status": status.output_status,
+            "scientific_status": status.scientific_status,
+            "execution_evidence": status.execution_evidence,
             "raw_files": _raw_files(root, run_dir, aggregate_exclusions),
             "exchange_subjobs": _exchange_subjobs(root, run_dir, index_entry.entry_id, sidecars),
         }
@@ -579,7 +782,7 @@ def collect_campaign(
 
     csv_path = None if csv_output is None else Path(csv_output).expanduser().resolve()
     if csv_path is not None:
-        fields = ["array_index", "entry_id", "name", "run_path", "status", "convergence", "fermi_energy", "total_energy", "band_energy", "validation_valid", "result_sidecar", "parse_error"]
+        fields = ["array_index", "entry_id", "name", "run_path", "status", "execution_status", "output_status", "scientific_status", "convergence", "fermi_energy", "total_energy", "band_energy", "validation_valid", "result_sidecar", "parse_error"]
         csv_path.parent.mkdir(parents=True, exist_ok=True)
         with tempfile.NamedTemporaryFile("w", encoding="utf-8", newline="", prefix=f".{csv_path.name}.", dir=str(csv_path.parent), delete=False) as stream:
             temporary_csv = Path(stream.name)
@@ -589,6 +792,7 @@ def collect_campaign(
                 summary = entry.get("summary", {})
                 writer.writerow({
                     "array_index": entry["array_index"], "entry_id": entry["entry_id"], "name": entry["name"], "run_path": entry["run_path"], "status": entry["status"],
+                    "execution_status": entry["execution_status"], "output_status": entry["output_status"], "scientific_status": entry["scientific_status"],
                     "convergence": summary.get("convergence"),
                     "fermi_energy": json.dumps(summary.get("fermi_energy"), sort_keys=True),
                     "total_energy": json.dumps(summary.get("total_energy"), sort_keys=True),
@@ -610,14 +814,31 @@ __all__ = [
     "CAMPAIGN_RESULTS_FILENAME",
     "CAMPAIGN_RESULTS_SCHEMA_VERSION",
     "COMPLETED_INVALID",
+    "COMPLETED_NOT_CONVERGED",
+    "COMPLETED_UNKNOWN",
     "COMPLETED_VALID",
+    "EXECUTION_EVIDENCE_FILENAME",
+    "EXECUTION_EXITED_NONZERO",
+    "EXECUTION_EXITED_ZERO",
+    "EXECUTION_NOT_RUN",
+    "EXECUTION_RUNNING_OR_UNKNOWN",
+    "EXECUTION_SCHEMA_VERSION",
+    "EXECUTION_SIGNALED",
     "CampaignCollection",
     "CampaignStatusEntry",
     "CampaignStatusReport",
     "FAILED",
     "GENERATED",
     "LOCKED",
+    "OUTPUT_NO_OUTPUT",
+    "OUTPUT_PARSE_INVALID",
+    "OUTPUT_PARSE_UNSUPPORTED",
+    "OUTPUT_PARSE_VALID",
     "RUN_LIST_FILENAME",
+    "SCIENTIFIC_CONVERGED",
+    "SCIENTIFIC_NOT_APPLICABLE",
+    "SCIENTIFIC_NOT_CONVERGED",
+    "SCIENTIFIC_UNKNOWN",
     "SLURM_SCHEMA_VERSION",
     "SLURM_SCRIPT_FILENAME",
     "SlurmRenderResult",

@@ -75,8 +75,11 @@ metadata.
 HT-17 consumes the generated index and writes two transparent artifacts. The
 run list is a stable tab-separated table with zero-based array index, entry
 ID, run path, and manifest path. The script uses that table, quotes paths, and
-executes one user-selected command in the selected run directory. It does not
-submit the job or select a site-specific module/MPI stack:
+runs one user-selected command in the selected run directory. The wrapper
+writes `rsutil_execution.json` atomically, first recording a running record and
+then the final return code, timestamps, command, working directory, host,
+campaign identity, and available Slurm IDs. It does not submit the job or
+select a site-specific module/MPI stack:
 
 ```bash
 rsutil campaign render-slurm pilot-runs/campaign_index.json \
@@ -90,16 +93,30 @@ This writes `slurm_run_list.tsv` and `submit_array.sbatch` in the campaign
 root by default. Run the rendered script through Slurm, for example with
 `sbatch submit_array.sbatch`, when the site configuration is ready.
 
-Filesystem status is intentionally conservative and does not query Slurm:
+Filesystem status is intentionally conservative and does not query Slurm. It
+retains three independent axes for each entry:
+
+| Axis | Values | Meaning |
+| --- | --- | --- |
+| Execution | `NOT_RUN`, `RUNNING_OR_UNKNOWN`, `EXITED_ZERO`, `EXITED_NONZERO`, `SIGNALED` | What the generated execution record proves about the process. |
+| Output/parser | `NO_OUTPUT`, `PARSE_VALID`, `PARSE_INVALID`, `PARSE_UNSUPPORTED` | Whether the expected result output exists and is supported/valid. |
+| Scientific | `CONVERGED`, `NOT_CONVERGED`, `UNKNOWN`, `NOT_APPLICABLE` | What the parsed SCF evidence establishes about scientific convergence. |
+
+The convenience `status` is `COMPLETED_VALID` only when execution exited zero,
+the output is parser-valid, and SCF convergence is explicit. A parseable
+non-converged or convergence-unknown result is collected as data but is not a
+successful scientific result. A report without execution evidence is legacy
+or unknown and is never promoted to success. A stale parseable report cannot
+override a current non-zero execution record.
 
 ```bash
 rsutil campaign status pilot-runs
 ```
 
-It recognizes explicit failure markers, explicit lock markers, valid or
-malformed `report.out` parser evidence, and otherwise reports a generated or
-unknown state. A scheduler live state is never inferred from directory age or
-the presence of a setup manifest.
+It recognizes explicit failure markers, explicit lock markers, execution
+evidence, and valid or malformed `report.out` parser evidence. A scheduler
+live state is never inferred from directory age or the presence of a setup
+manifest.
 
 Collection parses each entry independently and writes the versioned
 `campaign_results.json` aggregate. Full SCF and exchange models remain in
@@ -111,8 +128,11 @@ rsutil campaign collect pilot-runs --csv pilot-runs/results.csv --jsonl pilot-ru
 ```
 
 Parser and validation errors are recorded on their entry and do not prevent
-other entries from being collected. Raw file references and SHA-256 hashes,
-campaign entry IDs, and both index and manifest-content hashes are retained.
+other entries from being collected. Collection preserves the three status
+axes and exposes `successful` only for explicit converged successes; the
+`failures` view includes failed, invalid, non-converged, and convergence-
+unknown completed entries. Raw file references and SHA-256 hashes, campaign
+entry IDs, and both index and manifest-content hashes are retained.
 Exchange sub-job manifests, when present, are collected by their canonical
 pair lists and parent campaign entry ID. Retries, restarts, dependency graphs,
 and scheduler daemons remain outside this layer and belong at a future
