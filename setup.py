@@ -61,6 +61,13 @@ class CMakeBuild(build_ext):
             "-DPYTHON_BINDINGS=ON",
         ]
 
+        debug_flags = os.environ.get("RSUTIL_DEBUG_FORTRAN_FLAGS")
+        if debug_flags:
+            cmake_args.append(f"-DCMAKE_Fortran_FLAGS={debug_flags}")
+
+        if os.environ.get("RSUTIL_DEBUG_CMAKE_VERBOSE"):
+            cmake_args.append("-DCMAKE_VERBOSE_MAKEFILE=ON")
+
         build_args = ["--config", "Release"]
 
         build_temp = Path(self.build_temp)
