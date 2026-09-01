@@ -429,7 +429,7 @@ full feasible suite                  136 passed, 12 warnings
 
 HT-R08 separates PEP 517 build requirements from package runtime and optional
 feature dependencies. The build system now contains only setuptools, wheel,
-CMake, f90wrap, and NumPy needed to build the extension. Core runtime
+CMake, and NumPy needed to build the extension. Core runtime
 requirements remain NumPy, f90nml, and pymatgen; ASE, band/DOS dependencies,
 and PyVista are exposed through named extras. The `test` extra includes every
 dependency imported by the complete checked-in suite, including ASE and the
