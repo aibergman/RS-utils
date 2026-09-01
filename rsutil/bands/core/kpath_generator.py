@@ -56,9 +56,6 @@ def setup_kpath(
     tuple
         (kpoints, klabels, kdistances)
         
-    Author
-    ------
-    Ramon Cardias
     """
     # Import here to avoid circular imports
     from ..analysis.structure_analysis import StructureAnalyzer
@@ -110,9 +107,6 @@ def setup_kpath_seekpath(
     -----
     Requires: pip install seekpath
     
-    Author
-    ------
-    Ramon Cardias
     """
     if not HAS_SEEKPATH:
         raise ImportError("seekpath required. Install with: pip install seekpath")

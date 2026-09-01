@@ -130,6 +130,27 @@ def _source_hashes(lattice: Path, input_nml: Path) -> dict[str, Any]:
     }
 
 
+def _logical_source_input_provenance(
+    lattice: Path,
+    input_nml: Path,
+    base_dir: Path,
+) -> dict[str, Any]:
+    """Record the exact source files used to create a campaign run."""
+
+    result: dict[str, Any] = {}
+    for name, path in (("lattice.nml", lattice), ("input.nml", input_nml)):
+        try:
+            logical_path = path.relative_to(base_dir).as_posix()
+        except ValueError:
+            logical_path = path.name
+        result[name] = {
+            "path": logical_path,
+            "sha256": hash_file(path),
+            "size": path.stat().st_size,
+        }
+    return result
+
+
 def _effective_setup(entry: CampaignEntry) -> Any:
     return entry.setup_spec
 
@@ -255,6 +276,7 @@ def _build_campaign_run_manifest(
         "manifest_hash": manifest_hash,
         "materialized_inputs": dict(run_manifest.get("output_hashes", {})),
         "source": _logical_source(campaign, entry, base_dir),
+        "source_inputs": _logical_source_input_provenance(lattice, input_nml, base_dir),
         "calculation": dict(campaign.calculation_template) | dict(entry.calculation),
         "exchange": None if entry.exchange is None else dict(entry.exchange),
         "reuse_contract": "fresh_regeneration_v1",
@@ -311,7 +333,7 @@ def _validate_reusable_run(
             f"MANIFEST_MISMATCH: run manifest has no compatible materialized-input contract: {run_dir}"
         )
     for name in (
-        "campaign_name", "entry_name", "entry_id", "manifest_hash", "source",
+        "campaign_name", "entry_name", "entry_id", "manifest_hash", "source", "source_inputs",
         "calculation", "exchange", "reuse_contract",
     ):
         if campaign_data.get(name) != expected_campaign.get(name):

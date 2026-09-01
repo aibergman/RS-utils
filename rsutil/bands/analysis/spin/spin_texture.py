@@ -32,10 +32,8 @@ class SpinTextureCalculator:
     - First 9 orbitals: spin-up components
     - Last 9 orbitals: spin-down components
     
-    The spin expectation values are computed as:
-        ⟨σx⟩ = ⟨ψ↑|ψ↓⟩ + ⟨ψ↓|ψ↑⟩
-        ⟨σy⟩ = -i(⟨ψ↑|ψ↓⟩ - ⟨ψ↓|ψ↑⟩)
-        ⟨σz⟩ = ⟨ψ↑|ψ↑⟩ - ⟨ψ↓|ψ↓⟩
+    The spin expectation values are computed from the Pauli x, y, and z
+    operators applied to the spin-up and spin-down components.
     
     Parameters
     ----------
@@ -54,9 +52,9 @@ class SpinTextureCalculator:
     Attributes
     ----------
     spin_texture : np.ndarray
-        Spin expectation values (nk × nbands × 3) for [⟨σx⟩, ⟨σy⟩, ⟨σz⟩]
+        Spin expectation values (nk × nbands × 3) for the x, y, and z axes
     spin_polarization : np.ndarray
-        Magnitude of spin polarization |⟨σ⟩| (nk × nbands)
+        Magnitude of spin polarization (nk × nbands)
     """
     
     def __init__(self, band_energies: np.ndarray, eigenvectors: np.ndarray,
@@ -81,17 +79,18 @@ class SpinTextureCalculator:
     
     def calculate_spin_texture(self) -> np.ndarray:
         """
-        Calculate spin expectation values ⟨σ⟩ for all bands at all k-points.
+        Calculate the spin expectation vector for all bands at all k-points.
         
         Returns
         -------
         spin_texture : np.ndarray
-            Spin vectors (nk × nbands × 3) where last axis is [⟨σx⟩, ⟨σy⟩, ⟨σz⟩]
+            Spin vectors (nk × nbands × 3), with the last axis storing x, y, and z
         
         Notes
         -----
         For each band n at k-point ik, we compute:
-            |ψn(k)⟩ = [ψ↑₁, ψ↑₂, ..., ψ↑₉, ψ↓₁, ψ↓₂, ..., ψ↓₉]ᵀ
+            The nth spinor at k is formed by concatenating its spin-up and
+            spin-down orbital components.
         
         The spin components are extracted and used to calculate Pauli matrix
         expectation values.

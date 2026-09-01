@@ -57,9 +57,6 @@ def plot_brillouin_zone(
     Requires pymatgen for BZ facet generation. Install with:
         pip install pymatgen
     
-    Author
-    ------
-    Ramon Cardias
     """
     try:
         from pymatgen.core.lattice import Lattice
@@ -196,9 +193,6 @@ def plot_bands_with_projections(
     tuple
         (figure, axes)
         
-    Author
-    ------
-    Ramon Cardias
     """
     fig = plt.figure(figsize=(10, 6))
     ax = fig.add_subplot(111)
@@ -283,9 +277,6 @@ def export_kpath(
     -----
     Output format: Plain text with columns [x, kx, ky, kz] and optional label comments
     
-    Author
-    ------
-    Ramon Cardias
     """
     if len(kpath_x) != len(kpoints_abs):
         raise ValueError("kpath_x and kpoints_abs must have same length")

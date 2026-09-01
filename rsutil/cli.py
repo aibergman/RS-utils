@@ -1078,6 +1078,47 @@ def run_campaign_create(args):
     return 0
 
 
+def run_campaign_scaffold(args):
+    """Discover RS-LMTO source bundles and write a campaign specification."""
+
+    from .campaign import scaffold_campaign
+
+    try:
+        result = scaffold_campaign(
+            args.source_root,
+            name=args.name,
+            output=args.output,
+            include=tuple(args.include or ()),
+            exclude=tuple(args.exclude or ()),
+            dry_run=args.dry_run,
+        )
+    except Exception as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+
+    without_source_cif = result.complete - result.with_source_cif
+    print(f"Scaffolded campaign: {result.campaign.name}")
+    print()
+    print(f"Source root: {args.source_root}")
+    print(f"Discovered source bundles:  {result.discovered}")
+    print(f"Valid source bundles:       {result.complete}")
+    print(f"With source.cif:             {result.with_source_cif}")
+    print(f"Without source.cif:          {without_source_cif}")
+    if result.ambiguous_cif:
+        print("Ambiguous CIF files (not recorded):")
+        for relative, files in result.ambiguous_cif:
+            print(f"  {relative}/: {', '.join(files)}")
+    print()
+    action = "would be written" if args.dry_run else "written"
+    print(f"Campaign entries {action}: {len(result.campaign.entries)}")
+    print(f"Output{' (dry-run)' if args.dry_run else ''}: {args.output}")
+    print()
+    print("Validation: PASS")
+    if args.dry_run:
+        print("Dry run: no campaign JSON was written.")
+    return 0
+
+
 def _campaign_resources(values):
     resources = {}
     for value in values or ():
@@ -1189,6 +1230,31 @@ def create_campaign_parser(subparsers):
         help="Existing identical runs are reused; incompatible runs always fail",
     )
     create.set_defaults(func=run_campaign_create)
+
+    scaffold = commands.add_parser("scaffold", help="Build a campaign specification from RS-LMTO source bundles")
+    scaffold.add_argument("source_root", help="Root directory to search recursively for input.nml/lattice.nml pairs")
+    scaffold.add_argument("--name", required=True, help="Campaign name")
+    scaffold.add_argument("--output", required=True, help="Campaign JSON output path")
+    scaffold.add_argument(
+        "--include",
+        action="append",
+        default=[],
+        metavar="GLOB",
+        help="Only include source aliases/relative paths matching GLOB (repeatable)",
+    )
+    scaffold.add_argument(
+        "--exclude",
+        action="append",
+        default=[],
+        metavar="GLOB",
+        help="Exclude source aliases/relative paths matching GLOB (repeatable)",
+    )
+    scaffold.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Discover and validate without writing the campaign JSON",
+    )
+    scaffold.set_defaults(func=run_campaign_scaffold)
 
     render = commands.add_parser("render-slurm", aliases=["render"], help="Render a Slurm array script and stable run list")
     render.add_argument("index", help="Campaign directory or campaign_index.json")

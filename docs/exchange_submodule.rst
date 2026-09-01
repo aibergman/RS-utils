@@ -18,7 +18,41 @@ If you need implementation-level API details, see :ref:`exchange_map_module`.
 
 **Main Functions:**
 
-.. automodule:: rsutil.exchange
+HT exchange service and contracts
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The current HT-facing API separates reference interpretation, canonical pair
+mapping, symmetry reduction, job generation, manifests, and execution plans.
+The identity of a periodic pair is ``PairKey(i, j, R)``; source site identity
+and RS type identity are retained separately.  See :doc:`HT_EXCHANGE_JOBS`,
+:doc:`HT_EXCHANGE_RESULTS`, and :doc:`HT_EXCHANGE_SYMMETRY` for the file and
+qualification contracts.
+
+.. automodule:: rsutil.exchange.pairs
+   :members:
+   :exclude-members: ExchangePair, PairKey
+   :show-inheritance:
+
+.. automodule:: rsutil.exchange.reference
+   :members:
+   :show-inheritance:
+
+.. automodule:: rsutil.exchange.symmetry
+   :members:
+   :show-inheritance:
+
+.. automodule:: rsutil.exchange.jobs
+   :members:
+   :show-inheritance:
+
+.. automodule:: rsutil.exchange.service
+   :members:
+   :show-inheritance:
+
+.. automodule:: rsutil.exchange.neighbors
+   :members:
+
+.. automodule:: rsutil.exchange.fermi
    :members:
 
 **Usage:**

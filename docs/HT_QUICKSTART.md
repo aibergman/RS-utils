@@ -65,6 +65,34 @@ campaign specification -> validate -> create -> render scheduler script
     -> submit -> status -> collect
 ```
 
+### Scaffold a prepared source collection
+
+For a collection of prepared RS-LMTO source bundles, use an external
+converter workflow:
+
+1. Generate `input.nml` and `lattice.nml` using `cif2cell` or another trusted
+   tool.
+2. Keep `source.cif` alongside the source bundle when possible.
+3. Run `rsutil campaign scaffold`.
+4. Inspect the discovery and validation summary.
+5. Run `rsutil campaign validate`.
+6. Run `rsutil campaign create`.
+
+```bash
+rsutil campaign scaffold examples/campaigns/scaffold_sources \
+    --name scaffolded-pilot \
+    --output examples/campaigns/scaffolded_pilot.json
+rsutil campaign validate examples/campaigns/scaffolded_pilot.json
+rsutil campaign create examples/campaigns/scaffolded_pilot.json \
+    --destination scaffolded-pilot-runs
+```
+
+RS-utils does not require `cif2cell` and does not call it during scaffolding.
+Scaffolding discovers existing prepared bundles only. In the campaign model,
+`structures` is the source/material catalog, while `entries` is the
+calculation matrix. Later, one structure can therefore be expanded into
+multiple lattice scans or calculation recipes.
+
 Validate and create a representative campaign from the checked-in example:
 
 ```bash

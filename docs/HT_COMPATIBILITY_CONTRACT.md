@@ -2,8 +2,8 @@
 
 This contract defines the external behavior protected during the
 high-throughput refactor. It is subordinate to the governing foundation
-blueprint and is based on the checked-out baseline documented in
-[`HT_BASELINE_INVENTORY.md`](HT_BASELINE_INVENTORY.md).
+blueprint and is based on the checked-out baseline documented in the
+repository's HT baseline inventory.
 
 ## Preserved interfaces
 

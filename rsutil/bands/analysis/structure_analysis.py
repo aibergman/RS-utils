@@ -701,8 +701,8 @@ def analyze_structure(lattice_file: str = "lattice.nml",
     """
     Analyze crystal structure and generate appropriate k-path.
     
-    Parameters:
-    -----------
+    Parameters
+    ----------
     lattice_file : str
         Path to lattice.nml file
     plot : bool
@@ -710,8 +710,8 @@ def analyze_structure(lattice_file: str = "lattice.nml",
     save_path : str
         Path to save the analysis plot
         
-    Returns:
-    --------
+    Returns
+    -------
     StructureAnalyzer
         The analyzer object with structure information
     """

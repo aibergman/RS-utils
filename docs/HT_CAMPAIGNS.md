@@ -40,6 +40,46 @@ contain `lattice.nml` and `input.nml`; an explicit source mapping can provide
 `setup_template`. `exchange` is retained as optional metadata for later
 post-SCF job generation and is not executed by HT-16.
 
+For source trees that already contain prepared RS-LMTO bundles, scaffold a
+conservative SCF campaign without converting CIF files or generating new
+namelists:
+
+```bash
+rsutil campaign scaffold sources/ \
+  --name initial-materials \
+  --output campaign.json
+```
+
+The command recursively finds directories containing both `input.nml` and
+`lattice.nml`, uses relative source paths, and validates the in-memory
+campaign with the same validator used by `campaign validate`. `source.cif` is
+optional; when present, its SHA-256 is recorded in the entry's generic
+`metadata.structure_source` field (`file` is relative to the referenced
+structure directory). Incomplete candidates are reported and
+fail scaffolding so a production campaign cannot silently omit a source
+bundle. If a bundle contains multiple `.cif` files but no canonical
+`source.cif`, none is selected and the ambiguity is reported.
+
+Use repeatable shell-style filters when a larger source repository contains
+unrelated bundles. Patterns match a bundle's POSIX relative path or generated
+alias; excludes take precedence:
+
+```bash
+rsutil campaign scaffold sources/ --name iron-compounds \
+  --include '*Fe*' --exclude '*test*' --output iron.json
+```
+
+Add `--dry-run` to discover and validate without creating the requested JSON.
+The generated JSON is deterministic: source traversal, entry ordering, and
+formatting are stable, and no timestamps are embedded in the specification.
+
+`source.cif` provenance establishes which crystallographic source file
+accompanied the prepared RS-LMTO input. It does not prove that the RS-LMTO
+input can be regenerated from that CIF unless the external conversion workflow
+separately records its own provenance. RS-utils does not infer converter options,
+versions, symmetry tolerances, or chemical agreement between the CIF and
+namelists.
+
 When distortion or SQS is requested, the campaign requires the corresponding
 seed (`seed` for lattice/basis distortion and `sqs_seed` for SQS). This keeps
 campaign generation reproducible.
@@ -79,7 +119,9 @@ The generated top-level `campaign_index.json` is
 `rsutil-campaign-index-v1`; each `run_manifest.json` retains the existing
 `rsutil-run-v1` setup manifest and adds a versioned
 `rsutil-campaign-run-v2` campaign identity, materialized-input hashes, and
-external-run metadata. Its integrity hash covers the campaign identity and
+external-run metadata. The campaign identity also records the logical source
+`input.nml` and `lattice.nml` paths with their source hashes, so manifests can
+be traced back to the exact prepared bundle. Its integrity hash covers the campaign identity and
 setup scientific identity fields, but it is only a tamper-evident record of
 history—not the root of trust for reuse. Reuse uses the explicit
 `fresh_regeneration_v1` contract described above. Older campaign manifests
