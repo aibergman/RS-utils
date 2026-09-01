@@ -47,7 +47,7 @@ target_include_directories(rsutil.x PRIVATE ${CMAKE_Fortran_MODULE_DIRECTORY})
 
 # Python bindings (if enabled)
 if(PYTHON_BINDINGS)
-    find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
+    find_package(Python3 COMPONENTS Interpreter REQUIRED)
 
     # Define the correct output filename from f90wrap
     set(F90WRAP_OUTPUT ${CMAKE_BINARY_DIR}/f90wrap_rsutil_lib.f90)

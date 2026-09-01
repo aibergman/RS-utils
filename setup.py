@@ -58,7 +58,6 @@ class CMakeBuild(build_ext):
         cmake_args = [
             f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={extdir}",
             f"-DPython3_EXECUTABLE={sys.executable}",
-            f"-DPython3_ROOT_DIR={sys.prefix}",
             "-DPYTHON_BINDINGS=ON",
         ]
 
