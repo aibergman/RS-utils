@@ -500,6 +500,43 @@ The ``--lmx`` option has two contexts:
 Current RS-LMTO backend support in this repository is ``0 <= lmax <= 3``.
 
 
+High-throughput campaigns
+-------------------------
+
+The ``campaign`` command group prepares deterministic, setup-owned run trees
+for review and external execution.  It is independent of the legacy ``-S``
+and ``-J`` flags and does not submit jobs or query Slurm.
+
+.. code-block:: bash
+
+    # Validate without touching the destination
+    rsutil campaign validate examples/campaigns/ht18_pilot.json
+
+    # Materialize isolated setup runs and manifests
+    rsutil campaign create examples/campaigns/ht18_pilot.json \
+        --destination ht18-runs
+
+    # Render, but do not submit, a site-specific array helper
+    rsutil campaign render-slurm ht18-runs/campaign_index.json \
+        --executable /opt/rs-lmto/bin/rs-lmto \
+        --launcher 'srun --exclusive' \
+        --partition compute --account project --time 02:00:00 \
+        --resource cpus_per_task=8 --env-preamble 'module load gcc'
+
+    # Inspect local evidence and collect structured results
+    rsutil campaign status ht18-runs
+    rsutil campaign collect ht18-runs \
+        --csv ht18-runs/results.csv --jsonl ht18-runs/results.jsonl
+
+The generated ``campaign_index.json``, ``run_manifest.json``,
+``slurm_run_list.tsv``, ``submit_array.sbatch``, ``rsutil_execution.json``,
+and ``campaign_results.json`` artifacts are versioned and relocatable.  Status
+keeps execution, parser/output validity, and scientific convergence separate;
+``COMPLETED_VALID`` requires all three success conditions.  Collection keeps
+full parsed models in JSON sidecars and records per-entry errors without
+stopping the campaign.
+
+
 Quick Reference
 ----------------
 

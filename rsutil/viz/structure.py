@@ -68,14 +68,6 @@ class Structure:
     conventional_cell : np.ndarray
         Lattice vectors for the conventional cell.
 
-    Methods
-    -------
-    get_atom_spin_objects(conventional=False)
-        Returns a list of tuples (Atom, Spin).
-    get_bond_objects(conventional=False)
-        Returns a list of Bond objects.
-    compute_conventional_cell(tol=0.01)
-        Compute the conventional cell using SpacegroupAnalyzer.
     """
 
     def __init__(

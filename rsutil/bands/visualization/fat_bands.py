@@ -54,7 +54,8 @@ class FatBandsPlotter:
         Calculate projection weights for specified orbitals.
         
         For each band n at k-point k:
-            P^α_n(k) = ∑_{i∈α} |⟨i|ψ_n(k)⟩|²
+            P_alpha_n(k) is the sum of squared amplitudes on the selected
+            orbitals.
         
         Parameters
         ----------

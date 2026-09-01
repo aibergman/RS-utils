@@ -416,9 +416,6 @@ def stabilize_degenerate_projections(
     - "block_average": average within degenerate manifolds
     - "pair_cancel": zero near-opposite pairs to reduce noise
 
-    Author
-    ------
-    Ramon Cardias
     """
     mode = mode.lower().strip()
     

@@ -30,8 +30,8 @@ class DOSMomentsCalculator:
         """
         Initialize DOS moments calculator
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         energies : array
             Energy grid (eV)
         total_dos : array
@@ -72,15 +72,15 @@ class DOSMomentsCalculator:
         """
         Find Fermi level for given number of electrons
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         target_electrons : float
             Target number of electrons
         energy_range : tuple, optional
             Search range for Fermi level (emin, emax)
 
-        Returns:
-        --------
+        Returns
+        -------
         float
             Fermi level in eV
         """
@@ -136,13 +136,13 @@ class DOSMomentsCalculator:
         """
         Calculate DOS moments for total and projected DOS
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         fermi_level : float, optional
             Fermi level. If None, use stored value
 
-        Returns:
-        --------
+        Returns
+        -------
         dict
             Dictionary containing moments for each DOS component
         """
@@ -303,8 +303,8 @@ def analyze_dos_moments(
     """
     Convenience function to analyze DOS moments
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     energies : array
         Energy grid
     total_dos : array
@@ -318,8 +318,8 @@ def analyze_dos_moments(
     output_prefix : str
         Prefix for output files
 
-    Returns:
-    --------
+    Returns
+    -------
     DOSMomentsCalculator
         Calculator with computed moments
     """

@@ -664,6 +664,65 @@ Programmatic Examples
 
     # Other researchers can now use this exact k-path
 
+Complete public API
+~~~~~~~~~~~~~~~~~~~
+
+The sections above focus on the most common workflows.  The following module
+references expose the remaining public reader, numerical, path, projection,
+spin-texture, and fat-band helpers for users building their own workflows.
+
+.. automodule:: rsutil.bands.readers
+   :members:
+   :noindex:
+
+.. automodule:: rsutil.bands.core.band_calculations
+   :members:
+   :noindex:
+
+.. automodule:: rsutil.bands.core.hamiltonian
+   :members:
+   :noindex:
+
+.. automodule:: rsutil.bands.core.kpath_generator
+   :members:
+   :noindex:
+
+.. automodule:: rsutil.bands.dos.integration
+   :members:
+   :noindex:
+
+.. automodule:: rsutil.bands.analysis.structure_analysis
+   :members:
+   :noindex:
+
+.. automodule:: rsutil.bands.analysis.spin.spin_texture
+   :members:
+   :noindex:
+
+.. automodule:: rsutil.bands.visualization.fat_bands
+   :members:
+   :noindex:
+
+.. automodule:: rsutil.bands.paths.coordinates
+   :members:
+   :noindex:
+
+.. automodule:: rsutil.bands.paths.custom_paths
+   :members:
+   :noindex:
+
+.. automodule:: rsutil.bands.paths.labels
+   :members:
+   :noindex:
+
+.. automodule:: rsutil.bands.paths.point_allocation
+   :members:
+   :noindex:
+
+.. automodule:: rsutil.bands.projections.projection_utils
+   :members:
+   :noindex:
+
 Configuration & Spin Projection Modes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

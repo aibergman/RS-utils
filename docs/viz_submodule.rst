@@ -15,9 +15,6 @@ Key Features
 - RS-LMTO input support: ``lattice.nml``, ``input.nml``, and ``clust`` files
 - CPK color schemes for element visualization
 
-.. automodule:: rsutil.viz
-   :members:
-
 Core Classes
 ~~~~~~~~~~~~
 

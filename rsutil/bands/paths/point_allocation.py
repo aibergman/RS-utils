@@ -21,7 +21,7 @@ def allocate_points_per_segment(total_points: int, segment_lengths: np.ndarray) 
     total_points : int
         Total number of unique k-points requested
     segment_lengths : np.ndarray
-        Length of each k-path segment in |k| units
+        Length of each k-path segment in reciprocal-space units
         
     Returns
     -------

@@ -86,6 +86,7 @@ Getting Started
    HT_ASE
    HT_TRANSPORT_DAMPING_FORMATS
    HT_TESTING
+   HT_COMPATIBILITY_CONTRACT
    HT_READINESS_REPORT
 
 .. toctree::
@@ -99,6 +100,11 @@ Getting Started
    :caption: Modules:
 
    rsutil_module
+   core_submodule
+   setup_submodule
+   campaign_submodule
+   results_submodule
+   ase_module
    bands_submodule
    viz_submodule
    exchange_map_module
