@@ -1078,6 +1078,41 @@ def run_campaign_create(args):
     return 0
 
 
+def run_campaign_scaffold(args):
+    """Discover RS-LMTO source bundles and write a campaign specification."""
+
+    from .campaign import scaffold_campaign
+
+    try:
+        result = scaffold_campaign(
+            args.source_root,
+            name=args.name,
+            output=args.output,
+        )
+    except Exception as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+
+    without_source_cif = result.complete - result.with_source_cif
+    print(f"Scaffolded campaign: {result.campaign.name}")
+    print()
+    print(f"Source root: {args.source_root}")
+    print(f"Discovered source bundles:  {result.discovered}")
+    print(f"Valid source bundles:       {result.complete}")
+    print(f"With source.cif:             {result.with_source_cif}")
+    print(f"Without source.cif:          {without_source_cif}")
+    if result.ambiguous_cif:
+        print("Ambiguous CIF files (not recorded):")
+        for relative, files in result.ambiguous_cif:
+            print(f"  {relative}/: {', '.join(files)}")
+    print()
+    print(f"Campaign entries written:   {len(result.campaign.entries)}")
+    print(f"Output: {args.output}")
+    print()
+    print("Validation: PASS")
+    return 0
+
+
 def _campaign_resources(values):
     resources = {}
     for value in values or ():
@@ -1189,6 +1224,12 @@ def create_campaign_parser(subparsers):
         help="Existing identical runs are reused; incompatible runs always fail",
     )
     create.set_defaults(func=run_campaign_create)
+
+    scaffold = commands.add_parser("scaffold", help="Build a campaign specification from RS-LMTO source bundles")
+    scaffold.add_argument("source_root", help="Root directory to search recursively for input.nml/lattice.nml pairs")
+    scaffold.add_argument("--name", required=True, help="Campaign name")
+    scaffold.add_argument("--output", required=True, help="Campaign JSON output path")
+    scaffold.set_defaults(func=run_campaign_scaffold)
 
     render = commands.add_parser("render-slurm", aliases=["render"], help="Render a Slurm array script and stable run list")
     render.add_argument("index", help="Campaign directory or campaign_index.json")

@@ -23,6 +23,13 @@ from .models import (
     CampaignIndex,
     CampaignIndexEntry,
 )
+from .scaffold import (
+    CampaignScaffoldError,
+    CampaignScaffoldResult,
+    SourceBundle,
+    discover_source_bundles,
+    scaffold_campaign,
+)
 from .ht17 import (
     CAMPAIGN_RESULTS_FILENAME,
     CAMPAIGN_RESULTS_SCHEMA_VERSION,
@@ -78,6 +85,9 @@ __all__ = [
     "CampaignIndex",
     "CampaignIndexEntry",
     "CampaignValidation",
+    "CampaignScaffoldError",
+    "CampaignScaffoldResult",
+    "SourceBundle",
     "CAMPAIGN_RESULTS_FILENAME",
     "CAMPAIGN_RESULTS_SCHEMA_VERSION",
     "COMPLETED_INVALID",
@@ -113,11 +123,13 @@ __all__ = [
     "campaign_collect",
     "campaign_status",
     "collect_campaign",
+    "discover_source_bundles",
     "generate_campaign",
     "load_campaign",
     "load_campaign_index",
     "render_slurm",
     "render_slurm_array",
     "status_campaign",
+    "scaffold_campaign",
     "validate_campaign",
 ]
