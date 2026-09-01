@@ -25,7 +25,9 @@ class CampaignEntry:
     ``input.nml``, a named structure key, or a mapping with explicit
     ``lattice`` and ``input`` files.  ``setup_spec`` is the normalized
     scientific setup contract; ``setup`` is accepted as a JSON spelling for
-    convenient construction and is normalized into the same field.
+    convenient construction and is normalized into the same field.  Entry
+    ``metadata`` is intentionally part of scientific identity; campaign-wide
+    provenance belongs on ``Campaign.metadata``.
     """
 
     name: str
@@ -105,7 +107,12 @@ class CampaignEntry:
         setup_template: Mapping[str, Any] | None = None,
         calculation_template: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Return fields participating in the stable scientific entry ID."""
+        """Return fields participating in the stable scientific entry ID.
+
+        Entry metadata remains identity-bearing by design.  Non-scientific
+        scaffold provenance, such as a historical CIF snapshot, must be
+        stored in campaign-level metadata instead.
+        """
 
         setup = dict(setup_template or {})
         setup.update(self.setup_spec.to_dict())
@@ -130,7 +137,12 @@ class CampaignEntry:
 
 @dataclass
 class Campaign:
-    """Versioned campaign specification."""
+    """Versioned campaign specification.
+
+    ``metadata`` is campaign-level metadata and is included in the campaign
+    hash.  Scaffolded CIF snapshots live here under ``structure_sources``;
+    they do not participate in any entry's scientific identity.
+    """
 
     name: str
     entries: tuple[CampaignEntry, ...]

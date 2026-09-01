@@ -53,9 +53,11 @@ rsutil campaign scaffold sources/ \
 The command recursively finds directories containing both `input.nml` and
 `lattice.nml`, uses relative source paths, and validates the in-memory
 campaign with the same validator used by `campaign validate`. `source.cif` is
-optional; when present, its SHA-256 is recorded in the entry's generic
-`metadata.structure_source` field (`file` is relative to the referenced
-structure directory). Incomplete candidates are reported and
+optional; when present, its SHA-256 is recorded in campaign-level
+`metadata.structure_sources`, keyed by structure alias (`file` is relative to
+the referenced structure directory). This is a scaffold-time snapshot of the
+crystallographic source, not a claim that RS-utils converted the CIF into the
+prepared namelists. Incomplete candidates are reported and
 fail scaffolding so a production campaign cannot silently omit a source
 bundle. If a bundle contains multiple `.cif` files but no canonical
 `source.cif`, none is selected and the ambiguity is reported.
@@ -74,11 +76,12 @@ The generated JSON is deterministic: source traversal, entry ordering, and
 formatting are stable, and no timestamps are embedded in the specification.
 
 `source.cif` provenance establishes which crystallographic source file
-accompanied the prepared RS-LMTO input. It does not prove that the RS-LMTO
-input can be regenerated from that CIF unless the external conversion workflow
-separately records its own provenance. RS-utils does not infer converter options,
-versions, symmetry tolerances, or chemical agreement between the CIF and
-namelists.
+accompanied the prepared RS-LMTO input. The prepared `input.nml` and
+`lattice.nml` are the authoritative campaign inputs. The stored CIF hash is a
+snapshot from scaffold time; `campaign validate` and `campaign create` do not
+revalidate or require the CIF to remain present or unchanged. RS-utils does
+not infer converter options, versions, symmetry tolerances, or chemical
+agreement between the CIF and namelists.
 
 When distortion or SQS is requested, the campaign requires the corresponding
 seed (`seed` for lattice/basis distortion and `sqs_seed` for SQS). This keeps
@@ -87,8 +90,9 @@ campaign generation reproducible.
 ## IDs, paths, and collisions
 
 An entry ID is the SHA-256 scientific hash of its source file contents,
-normalized setup, calculation metadata, and exchange settings. It is
-independent of entry order and human name. The default run path is
+normalized setup, calculation metadata, exchange settings, and entry metadata.
+Campaign-level metadata, including scaffold CIF provenance, does not affect an
+entry ID. It is independent of entry order and human name. The default run path is
 `runs/{name}--{entry_id}`. The run manifest and campaign index store only
 relative/logical paths, so the complete tree can be relocated.
 

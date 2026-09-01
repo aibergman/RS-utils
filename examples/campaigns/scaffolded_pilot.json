@@ -38,13 +38,7 @@
       "calculation": {
         "mode": "scf"
       },
-      "metadata": {
-        "structure_source": {
-          "file": "source.cif",
-          "kind": "cif",
-          "sha256": "a146b97bb7ee4b2311ce80ad8876d44d5c2a77e98900d8687644955bec55b775"
-        }
-      },
+      "metadata": {},
       "name": "FeN",
       "setup": {
         "alat_scale": 1.0,
@@ -105,7 +99,15 @@
       "structure": "bcc_Fe"
     }
   ],
-  "metadata": {},
+  "metadata": {
+    "structure_sources": {
+      "FeN": {
+        "file": "source.cif",
+        "kind": "cif",
+        "sha256": "a146b97bb7ee4b2311ce80ad8876d44d5c2a77e98900d8687644955bec55b775"
+      }
+    }
+  },
   "name": "scaffolded-pilot",
   "schema_version": "rsutil-campaign-v1",
   "setup_template": {},

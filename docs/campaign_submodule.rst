@@ -54,10 +54,20 @@ Identity, paths, and reuse
 
 An entry ID is a SHA-256 scientific hash of the source file hashes, normalized
 setup, calculation metadata, exchange metadata, and entry metadata.  It is
-independent of entry order and human-readable names.  The generated index is
+independent of entry order and human-readable names.  Campaign-level metadata
+is not included in entry IDs.  The generated index is
 ``campaign_index.json`` (schema ``rsutil-campaign-index-v1``); every run keeps
 the setup ``run_manifest.json`` plus a campaign identity and materialized-input
 hashes.
+
+Scaffolding records an optional ``source.cif`` snapshot in campaign metadata,
+under ``metadata.structure_sources`` keyed by structure alias.  This records
+the crystallographic source file present when scaffolding ran; it is
+historical/source provenance only and does not assert that the CIF
+deterministically generated ``input.nml`` or ``lattice.nml``.  The prepared
+RS-LMTO files remain the authoritative campaign inputs.  ``campaign validate``
+and ``campaign create`` do not revalidate or require ``source.cif`` after
+scaffolding.
 
 Generation is preflighted and committed atomically.  Existing runs are reused
 only when current source/setup output is regenerated in isolation and the

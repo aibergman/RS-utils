@@ -89,6 +89,23 @@ def test_only_changed_scientific_entry_identity_changes(tmp_path: Path) -> None:
     assert original_validation.entry_ids["second"] != changed_validation.entry_ids["second"]
 
 
+def test_entry_metadata_remains_identity_bearing(tmp_path: Path) -> None:
+    _source(tmp_path, "bccFe", "bcc")
+    first = Campaign.from_dict({
+        "name": "metadata-identity",
+        "entries": [{"name": "case", "source": "bcc", "metadata": {"recipe": "A"}}],
+    })
+    second = Campaign.from_dict({
+        "name": "metadata-identity",
+        "entries": [{"name": "case", "source": "bcc", "metadata": {"recipe": "B"}}],
+    })
+
+    first_id = CampaignGenerator().validate(first, base_dir=tmp_path).entry_ids["case"]
+    second_id = CampaignGenerator().validate(second, base_dir=tmp_path).entry_ids["case"]
+
+    assert first_id != second_id
+
+
 def test_invalid_entry_fails_before_destination_mutation(tmp_path: Path) -> None:
     _source(tmp_path, "bccFe", "bcc")
     campaign = Campaign.from_dict({

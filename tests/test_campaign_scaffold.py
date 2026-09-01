@@ -70,36 +70,40 @@ def test_scaffold_writes_current_campaign_schema_with_relative_sources(tmp_path:
     assert all(not Path(path).is_absolute() for path in payload["structures"].values())
     assert all(entry["calculation"] == {"mode": "scf"} for entry in payload["entries"])
     assert all(entry["structure"] in payload["structures"] for entry in payload["entries"])
-    fe_entry = next(entry for entry in payload["entries"] if entry["name"] == "mp-13--Fe")
-    assert fe_entry["metadata"]["structure_source"] == {
-        "kind": "cif",
-        "file": "source.cif",
-        "sha256": hash_file(source_root / "mp-13--Fe" / "source.cif"),
+    assert all(entry["metadata"] == {} for entry in payload["entries"])
+    assert payload["metadata"]["structure_sources"] == {
+        "mp-13--Fe": {
+            "kind": "cif",
+            "file": "source.cif",
+            "sha256": hash_file(source_root / "mp-13--Fe" / "source.cif"),
+        }
     }
 
     loaded = load_campaign(output)
     assert loaded.name == "initial-materials"
     assert len(loaded.entries) == 2
-    assert loaded.entries[0].metadata == payload["entries"][0]["metadata"]
+    assert loaded.metadata == payload["metadata"]
+    assert loaded.entries[0].metadata == {}
 
 
-def test_scaffold_cif_hash_changes_campaign_entry_identity(tmp_path: Path) -> None:
+def test_scaffold_cif_snapshot_changes_campaign_provenance_not_entry_identity(tmp_path: Path) -> None:
     source_root = tmp_path / "sources"
     bundle = _make_bundle(source_root, "Fe", source_cif=True)
-    output = tmp_path / "campaign.json"
+    first_output = tmp_path / "campaign-first.json"
+    second_output = tmp_path / "campaign-second.json"
 
-    first = scaffold_campaign(source_root, name="materials", output=output)
-    first_metadata = first.campaign.entries[0].metadata
+    first = scaffold_campaign(source_root, name="materials", output=first_output)
+    first_metadata = first.campaign.metadata
     first_id = next(iter(first.validation.entry_ids.values()))
 
     (bundle / "source.cif").write_text("data-changed\n", encoding="utf-8")
-    second = scaffold_campaign(source_root, name="materials", output=output)
-    second_metadata = second.campaign.entries[0].metadata
+    second = scaffold_campaign(source_root, name="materials", output=second_output)
+    second_metadata = second.campaign.metadata
     second_id = next(iter(second.validation.entry_ids.values()))
 
-    assert first_metadata["structure_source"]["sha256"] != second_metadata["structure_source"]["sha256"]
-    assert first_id != second_id
-    assert second_metadata["structure_source"]["sha256"] == hash_file(bundle / "source.cif")
+    assert first_metadata["structure_sources"]["Fe"]["sha256"] != second_metadata["structure_sources"]["Fe"]["sha256"]
+    assert first_id == second_id
+    assert second_metadata["structure_sources"]["Fe"]["sha256"] == hash_file(bundle / "source.cif")
 
 
 def test_scaffold_without_cif_has_no_source_metadata_and_relocates(tmp_path: Path) -> None:
@@ -110,6 +114,7 @@ def test_scaffold_without_cif_has_no_source_metadata_and_relocates(tmp_path: Pat
     scaffold_campaign(source_root, name="materials", output=output)
     payload = json.loads(output.read_text(encoding="utf-8"))
     assert payload["entries"][0]["metadata"] == {}
+    assert payload["metadata"] == {"structure_sources": {}}
     assert payload["structures"]["Fe"] == "sources/Fe"
 
     relocated = tmp_path.parent / f"{tmp_path.name}-relocated"
@@ -126,6 +131,30 @@ def test_scaffold_does_not_guess_among_ambiguous_cifs(tmp_path: Path) -> None:
 
     assert result.ambiguous_cif == (("Fe", ("a.cif", "b.cif")),)
     assert result.campaign.entries[0].metadata == {}
+    assert result.campaign.metadata == {"structure_sources": {}}
+
+
+@pytest.mark.parametrize(
+    ("filename", "old", "new"),
+    [
+        ("lattice.nml", "ct(1) = 3.3", "ct(1) = 3.4"),
+        ("input.nml", "alat = 2.66000", "alat = 2.76000"),
+    ],
+)
+def test_scaffold_scientific_source_changes_entry_identity(
+    tmp_path: Path, filename: str, old: str, new: str
+) -> None:
+    source_root = tmp_path / "sources"
+    bundle = _make_bundle(source_root, "Fe")
+    first = scaffold_campaign(source_root, name="materials", output=tmp_path / "first.json")
+    first_id = next(iter(first.validation.entry_ids.values()))
+
+    path = bundle / filename
+    path.write_text(path.read_text(encoding="utf-8").replace(old, new), encoding="utf-8")
+    second = scaffold_campaign(source_root, name="materials", output=tmp_path / "second.json")
+    second_id = next(iter(second.validation.entry_ids.values()))
+
+    assert first_id != second_id
 
 
 def test_scaffold_cli_reports_summary(tmp_path: Path) -> None:
@@ -261,6 +290,22 @@ def test_scaffold_validate_create_lifecycle_preserves_sources_and_records_inputs
         assert source_inputs["input.nml"]["sha256"] == hash_file(source_root / source / "input.nml")
         assert source_inputs["lattice.nml"]["sha256"] == hash_file(source_root / source / "lattice.nml")
     assert _source_tree_hashes(source_root) == before
+
+
+def test_scaffold_cif_is_optional_after_snapshot_for_validate_and_create(tmp_path: Path) -> None:
+    source_root = tmp_path / "sources"
+    bundle = _make_bundle(source_root, "Fe", source_cif=True)
+    spec_path = tmp_path / "campaign.json"
+
+    scaffold_campaign(source_root, name="materials", output=spec_path)
+    bundle.joinpath("source.cif").unlink()
+    campaign = load_campaign(spec_path)
+
+    assert validate_campaign(campaign, base_dir=tmp_path).valid
+    index = CampaignGenerator(setup_service=SetupService(runner=_FakeRunner())).generate(
+        campaign, tmp_path / "runs", base_dir=tmp_path
+    )
+    assert len(index.entries) == 1
 
 
 def test_scaffold_handles_large_source_collection_deterministically(tmp_path: Path) -> None:

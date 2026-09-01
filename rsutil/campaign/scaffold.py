@@ -193,7 +193,7 @@ def scaffold_campaign(
     structures: dict[str, str] = {}
     aliases: dict[str, str] = {}
     ambiguous_cif: list[tuple[str, tuple[str, ...]]] = []
-    source_metadata: dict[str, dict[str, Any]] = {}
+    structure_sources: dict[str, dict[str, Any]] = {}
     for candidate in candidates:
         alias = _bundle_alias(candidate)
         previous = aliases.get(alias)
@@ -206,7 +206,7 @@ def scaffold_campaign(
         if candidate.has_source_cif:
             source_cif = candidate.directory / "source.cif"
             try:
-                source_metadata[alias] = {
+                structure_sources[alias] = {
                     "kind": "cif",
                     "file": "source.cif",
                     "sha256": hash_file(source_cif),
@@ -220,16 +220,12 @@ def scaffold_campaign(
         "schema_version": CAMPAIGN_SCHEMA_VERSION,
         "name": name,
         "structures": structures,
+        "metadata": {"structure_sources": structure_sources},
         "entries": [
             {
                 "name": alias,
                 "structure": alias,
                 "calculation": {"mode": "scf"},
-                **(
-                    {"metadata": {"structure_source": source_metadata[alias]}}
-                    if alias in source_metadata
-                    else {}
-                ),
             }
             for alias in structures
         ],
