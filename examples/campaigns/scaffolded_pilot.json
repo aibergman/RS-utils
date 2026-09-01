@@ -1,0 +1,117 @@
+{
+  "calculation_template": {},
+  "destination_naming": "runs/{name}--{entry_id}",
+  "entries": [
+    {
+      "calculation": {
+        "mode": "scf"
+      },
+      "metadata": {},
+      "name": "FeCo",
+      "setup": {
+        "alat_scale": 1.0,
+        "basis_dist": 0.0,
+        "cluster_type": "periodic",
+        "empty_spheres": false,
+        "lattice_dist": 0.0,
+        "lmx": 2,
+        "max_empty_radius": 2.5,
+        "min_empty_radius": 1.2,
+        "mode_2d": false,
+        "rec_method": "block",
+        "rec_steps": 20,
+        "seed": null,
+        "sqs": null,
+        "sqs_seed": null,
+        "sqs_shells": 3,
+        "sqs_steps": 5000,
+        "supercell": [
+          1,
+          1,
+          1
+        ],
+        "z_iso_factor": null
+      },
+      "structure": "FeCo"
+    },
+    {
+      "calculation": {
+        "mode": "scf"
+      },
+      "metadata": {
+        "structure_source": {
+          "file": "source.cif",
+          "kind": "cif",
+          "sha256": "a146b97bb7ee4b2311ce80ad8876d44d5c2a77e98900d8687644955bec55b775"
+        }
+      },
+      "name": "FeN",
+      "setup": {
+        "alat_scale": 1.0,
+        "basis_dist": 0.0,
+        "cluster_type": "periodic",
+        "empty_spheres": false,
+        "lattice_dist": 0.0,
+        "lmx": 2,
+        "max_empty_radius": 2.5,
+        "min_empty_radius": 1.2,
+        "mode_2d": false,
+        "rec_method": "block",
+        "rec_steps": 20,
+        "seed": null,
+        "sqs": null,
+        "sqs_seed": null,
+        "sqs_shells": 3,
+        "sqs_steps": 5000,
+        "supercell": [
+          1,
+          1,
+          1
+        ],
+        "z_iso_factor": null
+      },
+      "structure": "FeN"
+    },
+    {
+      "calculation": {
+        "mode": "scf"
+      },
+      "metadata": {},
+      "name": "bcc_Fe",
+      "setup": {
+        "alat_scale": 1.0,
+        "basis_dist": 0.0,
+        "cluster_type": "periodic",
+        "empty_spheres": false,
+        "lattice_dist": 0.0,
+        "lmx": 2,
+        "max_empty_radius": 2.5,
+        "min_empty_radius": 1.2,
+        "mode_2d": false,
+        "rec_method": "block",
+        "rec_steps": 20,
+        "seed": null,
+        "sqs": null,
+        "sqs_seed": null,
+        "sqs_shells": 3,
+        "sqs_steps": 5000,
+        "supercell": [
+          1,
+          1,
+          1
+        ],
+        "z_iso_factor": null
+      },
+      "structure": "bcc_Fe"
+    }
+  ],
+  "metadata": {},
+  "name": "scaffolded-pilot",
+  "schema_version": "rsutil-campaign-v1",
+  "setup_template": {},
+  "structures": {
+    "FeCo": "scaffold_sources/FeCo",
+    "FeN": "scaffold_sources/FeN",
+    "bcc_Fe": "scaffold_sources/bcc_Fe"
+  }
+}

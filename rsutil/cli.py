@@ -1088,6 +1088,9 @@ def run_campaign_scaffold(args):
             args.source_root,
             name=args.name,
             output=args.output,
+            include=tuple(args.include or ()),
+            exclude=tuple(args.exclude or ()),
+            dry_run=args.dry_run,
         )
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
@@ -1106,10 +1109,13 @@ def run_campaign_scaffold(args):
         for relative, files in result.ambiguous_cif:
             print(f"  {relative}/: {', '.join(files)}")
     print()
-    print(f"Campaign entries written:   {len(result.campaign.entries)}")
-    print(f"Output: {args.output}")
+    action = "would be written" if args.dry_run else "written"
+    print(f"Campaign entries {action}: {len(result.campaign.entries)}")
+    print(f"Output{' (dry-run)' if args.dry_run else ''}: {args.output}")
     print()
     print("Validation: PASS")
+    if args.dry_run:
+        print("Dry run: no campaign JSON was written.")
     return 0
 
 
@@ -1229,6 +1235,25 @@ def create_campaign_parser(subparsers):
     scaffold.add_argument("source_root", help="Root directory to search recursively for input.nml/lattice.nml pairs")
     scaffold.add_argument("--name", required=True, help="Campaign name")
     scaffold.add_argument("--output", required=True, help="Campaign JSON output path")
+    scaffold.add_argument(
+        "--include",
+        action="append",
+        default=[],
+        metavar="GLOB",
+        help="Only include source aliases/relative paths matching GLOB (repeatable)",
+    )
+    scaffold.add_argument(
+        "--exclude",
+        action="append",
+        default=[],
+        metavar="GLOB",
+        help="Exclude source aliases/relative paths matching GLOB (repeatable)",
+    )
+    scaffold.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Discover and validate without writing the campaign JSON",
+    )
     scaffold.set_defaults(func=run_campaign_scaffold)
 
     render = commands.add_parser("render-slurm", aliases=["render"], help="Render a Slurm array script and stable run list")

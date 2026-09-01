@@ -60,6 +60,19 @@ fail scaffolding so a production campaign cannot silently omit a source
 bundle. If a bundle contains multiple `.cif` files but no canonical
 `source.cif`, none is selected and the ambiguity is reported.
 
+Use repeatable shell-style filters when a larger source repository contains
+unrelated bundles. Patterns match a bundle's POSIX relative path or generated
+alias; excludes take precedence:
+
+```bash
+rsutil campaign scaffold sources/ --name iron-compounds \
+  --include '*Fe*' --exclude '*test*' --output iron.json
+```
+
+Add `--dry-run` to discover and validate without creating the requested JSON.
+The generated JSON is deterministic: source traversal, entry ordering, and
+formatting are stable, and no timestamps are embedded in the specification.
+
 `source.cif` provenance establishes which crystallographic source file
 accompanied the prepared RS-LMTO input. It does not prove that the RS-LMTO
 input can be regenerated from that CIF unless the external conversion workflow
@@ -106,7 +119,9 @@ The generated top-level `campaign_index.json` is
 `rsutil-campaign-index-v1`; each `run_manifest.json` retains the existing
 `rsutil-run-v1` setup manifest and adds a versioned
 `rsutil-campaign-run-v2` campaign identity, materialized-input hashes, and
-external-run metadata. Its integrity hash covers the campaign identity and
+external-run metadata. The campaign identity also records the logical source
+`input.nml` and `lattice.nml` paths with their source hashes, so manifests can
+be traced back to the exact prepared bundle. Its integrity hash covers the campaign identity and
 setup scientific identity fields, but it is only a tamper-evident record of
 history—not the root of trust for reuse. Reuse uses the explicit
 `fresh_regeneration_v1` contract described above. Older campaign manifests

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import fnmatch
 import hashlib
 import os
 import re
@@ -47,7 +48,7 @@ class SourceBundle:
 
 @dataclass(frozen=True)
 class CampaignScaffoldResult:
-    """Details of a successfully written scaffold."""
+    """Details of a successfully discovered and validated scaffold."""
 
     campaign: Campaign
     output: Path
@@ -83,11 +84,31 @@ def _bundle_alias(bundle: SourceBundle) -> str:
     return "--".join((*components, digest))
 
 
-def discover_source_bundles(source_root: str | Path) -> tuple[SourceBundle, ...]:
+def _matches_filter(bundle: SourceBundle, patterns: tuple[str, ...]) -> bool:
+    """Match a bundle against aliases and POSIX relative paths."""
+
+    if not patterns:
+        return False
+    alias = _bundle_alias(bundle)
+    return any(
+        fnmatch.fnmatchcase(candidate, pattern)
+        for pattern in patterns
+        for candidate in (bundle.relative_path, alias)
+    )
+
+
+def discover_source_bundles(
+    source_root: str | Path,
+    *,
+    include: tuple[str, ...] = (),
+    exclude: tuple[str, ...] = (),
+) -> tuple[SourceBundle, ...]:
     """Recursively discover complete and incomplete RS-LMTO candidates.
 
     A candidate is any directory containing at least one of ``input.nml`` and
     ``lattice.nml``.  Directories containing neither file are ignored.
+    ``include`` and ``exclude`` use case-sensitive shell-style glob matching
+    against both the POSIX relative path and the generated source alias.
     Results are sorted by relative path for reproducible campaign ordering.
     """
 
@@ -110,16 +131,19 @@ def discover_source_bundles(source_root: str | Path) -> tuple[SourceBundle, ...]
         if not has_input and not has_lattice:
             continue
         relative = directory.relative_to(root).as_posix()
-        candidates.append(
-            SourceBundle(
-                directory=directory,
-                relative_path=relative,
-                has_input=has_input,
-                has_lattice=has_lattice,
-                has_source_cif=(directory / "source.cif").is_file(),
-                cif_files=tuple(sorted(path.name for path in directory.glob("*.cif") if path.is_file())),
-            )
+        candidate = SourceBundle(
+            directory=directory,
+            relative_path=relative,
+            has_input=has_input,
+            has_lattice=has_lattice,
+            has_source_cif=(directory / "source.cif").is_file(),
+            cif_files=tuple(sorted(path.name for path in directory.glob("*.cif") if path.is_file())),
         )
+        if include and not _matches_filter(candidate, include):
+            continue
+        if exclude and _matches_filter(candidate, exclude):
+            continue
+        candidates.append(candidate)
     return tuple(candidates)
 
 
@@ -142,12 +166,16 @@ def scaffold_campaign(
     *,
     name: str,
     output: str | Path,
+    include: tuple[str, ...] = (),
+    exclude: tuple[str, ...] = (),
+    dry_run: bool = False,
 ) -> CampaignScaffoldResult:
     """Create and validate a campaign specification from source bundles.
 
     The campaign JSON is written only after the existing campaign validator
-    accepts the in-memory specification.  Source paths are relative to the
-    generated JSON, keeping a moved campaign and source tree relocatable.
+    accepts the in-memory specification, unless ``dry_run`` is true. Source
+    paths are relative to the generated JSON, keeping a moved campaign and
+    source tree relocatable.
     """
 
     if not isinstance(name, str) or not name.strip():
@@ -155,7 +183,7 @@ def scaffold_campaign(
 
     root = Path(source_root).resolve()
     output_path = Path(output).resolve()
-    candidates = discover_source_bundles(root)
+    candidates = discover_source_bundles(root, include=include, exclude=exclude)
     incomplete = tuple(candidate for candidate in candidates if not candidate.complete)
     if incomplete:
         raise CampaignScaffoldError(_incomplete_message(incomplete))
@@ -220,10 +248,11 @@ def scaffold_campaign(
         )
         raise CampaignScaffoldError(f"campaign validation failed: {details}")
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
     if output_path.exists() and output_path.is_dir():
         raise CampaignScaffoldError(f"output path is a directory: {output_path}")
-    _atomic_json(output_path, campaign.to_dict())
+    if not dry_run:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        _atomic_json(output_path, campaign.to_dict())
     with_source_cif = sum(1 for candidate in candidates if candidate.has_source_cif)
     return CampaignScaffoldResult(
         campaign=campaign,
