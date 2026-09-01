@@ -720,6 +720,6 @@ Installation Requirements
 See Also
 ~~~~~~~~~
 
-- :doc:`band_structure_guide` – Comprehensive workflows and advanced features
-- **USAGE_GUIDE_NEW_FEATURES** – Detailed usage examples
-- **FUNCTIONALITY_INVENTORY** – Feature comparison table
+See the command examples in this page for band/DOS workflows. High-throughput
+deployment and support boundaries are covered in :doc:`HT_QUICKSTART` and
+:doc:`HT_READINESS_REPORT`.

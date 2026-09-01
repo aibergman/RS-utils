@@ -71,7 +71,28 @@ Getting Started
    :caption: Command-Line Interface:
 
    cli_section
-   band_structure_guide
+
+.. toctree::
+   :maxdepth: 1
+   :caption: High-throughput workflows:
+
+   HT_QUICKSTART
+   HT_SETUP
+   HT_CAMPAIGNS
+   HT_EXCHANGE_JOBS
+   HT_EXCHANGE_RESULTS
+   HT_EXCHANGE_SYMMETRY
+   HT_TIGHT_BINDING
+   HT_ASE
+   HT_TRANSPORT_DAMPING_FORMATS
+   HT_TESTING
+   HT_READINESS_REPORT
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Release:
+
+   RELEASE_CHECKLIST
 
 .. toctree::
    :maxdepth: 2
@@ -80,6 +101,7 @@ Getting Started
    rsutil_module
    bands_submodule
    viz_submodule
+   exchange_map_module
    exchange_submodule
    export_submodule
 

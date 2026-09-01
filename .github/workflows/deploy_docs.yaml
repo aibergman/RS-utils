@@ -40,7 +40,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip wheel --no-deps --wheel-dir wheelhouse .
           python -m pip install --no-deps wheelhouse/*.whl
-          pip install sphinx sphinx-rtd-theme sphinx-autodoc-typehints
+          pip install sphinx myst-parser sphinx-rtd-theme sphinx-autodoc-typehints
 
       - name: Build documentation
         run: |

@@ -387,9 +387,10 @@ The ``--exchange`` flag creates exchange interaction input files (J_ij) for spin
 
 - ``--exchange, -J``: Create exchange input files.
 - ``--cutoff``: Cutoff distance for exchange interactions in lattice units (default: 1.0).
-- ``--unique``: Find only unique neighbors per shell (one representative per unique species-vector combination).
-- ``--shell-width``: Width of shells for grouping neighbors when using ``--unique`` (default: 0.1).
-- ``--soc``: Account for spin-orbit coupling in symmetry considerations.
+- ``--unique``: Find one representative per exact periodic pair orbit.
+- ``--shell-width``: Retained for compatibility; it does not define pair equivalence (default: 0.1).
+- ``--soc``: Use conservative symmetry for the legacy collinear +z magnetic reference.
+- ``--full-pairs``: Disable symmetry reduction and generate the complete pair set.
 - ``--data``: Directory for input files (default: current directory).
 - ``--rij-out``: Path to write R_ij neighbor mappings (optional). Use with ``--exchange``.
 - ``--rij-format``: Format for R_ij output; supported values: ``json`` (machine readable) and
@@ -413,6 +414,9 @@ The ``--exchange`` flag creates exchange interaction input files (J_ij) for spin
 
     # Write human-readable fixed-width R_ij table
     rsutil --exchange --cutoff 3.0 --rij-out rij_map.txt --rij-format txt --unique
+
+    # Disable reduction for validation
+    rsutil --exchange --cutoff 3.0 --unique --full-pairs
 
 
 Export to UppASD

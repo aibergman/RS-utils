@@ -45,3 +45,10 @@ Columns itype, jtype, r_ij, d_ij , |r_ij|
        1       1     -1.000000   -1.000000   -1.000000     -0.000031   -0.000027    0.000114     1.732051
        1       1     -1.000000   -1.000000    0.000000      0.000190    0.000118   -0.000145     1.414214
 
+The current `fable_v4` exchange writer emits `jij`, `dij`, and `aij` values
+in mRy after multiplying the internal values by `1e3/(4*pi)`. The nine
+`aij` values are a raw anisotropic `A` tensor, not the complete exchange
+tensor. Because the writer outputs the whole Fortran array, the values are in
+column-major order: flat values `a1..a9` reconstruct as
+`A(row,column) = a[ row + 3*column ]`. The complete tensor is derived as
+`J*I + [[0,Dz,-Dy],[-Dz,0,Dx],[Dy,-Dx,0]] + A`.

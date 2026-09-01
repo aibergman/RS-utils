@@ -1,6 +1,6 @@
 module rsutil_c_interface
   ! This module provides the C interface for process_lattice.
-  ! It is NOT wrapped by f90wrap, only called directly from ctypes.
+  ! It is called directly from ctypes.
   use iso_c_binding
   use rsutil_config
   use rsutil_lib, only: process_lattice_impl

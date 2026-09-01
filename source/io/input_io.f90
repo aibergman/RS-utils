@@ -77,12 +77,14 @@ contains
         rewind(unit)
 
         ! Read the &lattice namelist.
+        allocate(ct(0))
         read(unit, nml=lattice,  iostat=read_status)
         ! If reading files, allocate ct array with ntype elements.
         if (read_status /= 0) then
 
            ! Allocate ct if needed
-           if (.not. allocated(ct)) allocate(ct(ntype))
+           deallocate(ct)
+           allocate(ct(ntype))
 
            ! Re-read the namelist after allocating arrays
            rewind(unit)  ! Rewind the file for a fresh read
@@ -90,7 +92,8 @@ contains
         end if
 
         ! Catch if ct was not defined in input.nml
-        if (.not. allocated(ct)) then
+            if (size(ct) /= ntype) then
+                  deallocate(ct)
             allocate(ct(ntype))
             if(allocated(lat_lat%ct)) then
                ct = lat_lat%ct

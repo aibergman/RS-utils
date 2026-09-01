@@ -42,16 +42,21 @@ Flags (existing functionality)
     Directory for data files to be visualized (default: current directory).
 """
 
+from __future__ import annotations
+
 import argparse
 import os
 import numpy as np
 import sys
 from pathlib import Path
-from . import process_lattice
-from .viz.rs_visualizer import rs_visualizer
 from .exchange.exchange_map import exchange_map
 from .export.uppasd import export_from_files
 from .export.lmto47 import export_ctrl
+from .core.contracts import Diagnostic, DiagnosticSeverity, ErrorCode, OperationStatus, SetupResult, SetupSpec
+from .setup_service import SetupService
+from .setup_service import validate_setup_inputs as service_validate_setup_inputs
+from .setup_service import validate_setup_parameters as service_validate_setup_parameters
+from .setup_validation import write_setup_report
 
 
 def _make_common_parser():
@@ -1022,6 +1027,204 @@ def create_dos_parser(subparsers):
     return parser
 
 
+def _print_campaign_diagnostics(diagnostics) -> None:
+    for diagnostic in diagnostics:
+        stream = sys.stderr if diagnostic.severity is DiagnosticSeverity.ERROR else sys.stdout
+        location = f" [{diagnostic.path}]" if diagnostic.path else ""
+        print(f"{diagnostic.severity.value.upper()}: {diagnostic.message}{location}", file=stream)
+
+
+def run_campaign_validate(args):
+    """Validate every campaign entry without touching its destination."""
+
+    from .campaign import load_campaign, validate_campaign
+
+    try:
+        spec_path = Path(args.spec).resolve()
+        campaign = load_campaign(spec_path)
+        validation = validate_campaign(campaign, base_dir=spec_path.parent)
+    except Exception as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    _print_campaign_diagnostics(validation.diagnostics)
+    if validation.valid:
+        print(f"Campaign '{campaign.name}' is valid ({len(campaign.entries)} entries).")
+        return 0
+    print(f"Campaign '{campaign.name}' is invalid.", file=sys.stderr)
+    return 1
+
+
+def run_campaign_create(args):
+    """Generate deterministic setup-owned run directories, without job execution."""
+
+    from .campaign import CampaignGenerator, load_campaign
+
+    try:
+        spec_path = Path(args.spec).resolve()
+        campaign = load_campaign(spec_path)
+        destination = None if args.destination is None else Path(args.destination).resolve()
+        index = CampaignGenerator().generate(
+            campaign,
+            destination,
+            base_dir=spec_path.parent,
+            collision_policy=args.collision_policy,
+        )
+    except Exception as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    target_root = (destination or (spec_path.parent / (campaign.destination or f"{campaign.name}-campaign"))).resolve()
+    print(f"Campaign '{campaign.name}' generated: {target_root / 'campaign_index.json'}")
+    print(f"Entries: {len(index.entries)}")
+    return 0
+
+
+def _campaign_resources(values):
+    resources = {}
+    for value in values or ():
+        if "=" not in value:
+            raise ValueError(f"resource must use KEY=VALUE syntax: {value!r}")
+        key, resource = value.split("=", 1)
+        if not key.strip() or not resource.strip():
+            raise ValueError(f"resource must use KEY=VALUE syntax: {value!r}")
+        resources[key.strip()] = resource.strip()
+    return resources
+
+
+def run_campaign_render_slurm(args):
+    """Render transparent Slurm array artifacts; do not submit them."""
+
+    from .campaign import render_slurm_array
+
+    try:
+        resources = _campaign_resources(args.resource)
+        for key in ("cpus_per_task", "mem", "gpus", "nodes", "ntasks"):
+            value = getattr(args, key, None)
+            if value is not None:
+                resources[key] = value
+        result = render_slurm_array(
+            Path(args.index).resolve(),
+            executable=args.executable,
+            launcher=args.launcher,
+            arguments=args.arguments or (),
+            output_dir=None if args.output_dir is None else Path(args.output_dir).resolve(),
+            job_name=args.job_name,
+            partition=args.partition,
+            account=args.account,
+            time_limit=args.time_limit,
+            resources=resources,
+            environment_preamble=args.env_preamble or (),
+        )
+    except Exception as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    print(f"Run list: {result.run_list_path}")
+    print(f"Slurm script: {result.script_path}")
+    print(f"Array size: {result.array_size}")
+    return 0
+
+
+def run_campaign_status(args):
+    """Inspect campaign filesystem evidence without querying a scheduler."""
+
+    from .campaign import status_campaign
+
+    try:
+        report = status_campaign(Path(args.index).resolve())
+    except Exception as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    import json
+
+    if args.output is not None:
+        Path(args.output).resolve().write_text(json.dumps(report.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    if args.json:
+        print(json.dumps(report.to_dict(), indent=2, sort_keys=True))
+    elif args.output is None:
+        print(f"Campaign '{report.campaign_name}' ({report.scheduler_state}; scheduler not queried)")
+        print("INDEX\tENTRY_ID\tSTATUS\tRUN_PATH\tEVIDENCE")
+        for entry in report.entries:
+            print(f"{entry.array_index}\t{entry.entry_id}\t{entry.status}\t{entry.run_path}\t{entry.evidence}")
+    return 0
+
+
+def run_campaign_collect(args):
+    """Collect parsed results, retaining failures per campaign entry."""
+
+    from .campaign import collect_campaign
+
+    try:
+        result = collect_campaign(
+            Path(args.index).resolve(),
+            output=None if args.output is None else Path(args.output).resolve(),
+            csv_output=None if args.csv is None else Path(args.csv).resolve(),
+            jsonl_output=None if args.jsonl is None else Path(args.jsonl).resolve(),
+            sidecar_dir=None if args.sidecar_dir is None else Path(args.sidecar_dir).resolve(),
+        )
+    except Exception as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    print(f"Aggregate: {result.aggregate_path}")
+    print(f"Entries: {len(result.entries)}")
+    print(f"Entry failures: {len(result.failures)}")
+    return 0
+
+
+def create_campaign_parser(subparsers):
+    """Create the lightweight campaign command surface."""
+
+    parser = subparsers.add_parser("campaign", help="Validate or generate deterministic HT campaigns")
+    commands = parser.add_subparsers(dest="campaign_command", required=True)
+
+    validate = commands.add_parser("validate", help="Validate a campaign specification")
+    validate.add_argument("spec", help="Campaign JSON (YAML when PyYAML is installed)")
+    validate.set_defaults(func=run_campaign_validate)
+
+    create = commands.add_parser("create", help="Generate setup run directories and a campaign index")
+    create.add_argument("spec", help="Campaign JSON (jobs are not executed)")
+    create.add_argument("--destination", help="Campaign output directory (default: spec destination or <name>-campaign)")
+    create.add_argument(
+        "--collision-policy",
+        choices=["reuse_if_identical", "error"],
+        default="reuse_if_identical",
+        help="Existing identical runs are reused; incompatible runs always fail",
+    )
+    create.set_defaults(func=run_campaign_create)
+
+    render = commands.add_parser("render-slurm", aliases=["render"], help="Render a Slurm array script and stable run list")
+    render.add_argument("index", help="Campaign directory or campaign_index.json")
+    render.add_argument("--executable", required=True, help="Calculation executable or shell-word command")
+    render.add_argument("--launcher", help="Optional launcher command, for example 'srun --exclusive'")
+    render.add_argument("--argument", dest="arguments", action="append", default=[], help="Static argument passed to the executable (repeatable)")
+    render.add_argument("--output-dir", help="Directory for the rendered artifacts (default: campaign root)")
+    render.add_argument("--job-name", help="Slurm job name (default: campaign name)")
+    render.add_argument("--partition")
+    render.add_argument("--account")
+    render.add_argument("--time", dest="time_limit")
+    render.add_argument("--resource", action="append", default=[], metavar="KEY=VALUE", help="Additional #SBATCH resource (repeatable)")
+    render.add_argument("--cpus-per-task", dest="cpus_per_task", type=int, help="SBATCH CPU count")
+    render.add_argument("--mem", help="SBATCH memory request")
+    render.add_argument("--gpus", help="SBATCH GPU request")
+    render.add_argument("--nodes", type=int, help="SBATCH node count")
+    render.add_argument("--ntasks", type=int, help="SBATCH task count")
+    render.add_argument("--env-preamble", "--environment-preamble", dest="env_preamble", action="append", default=[], help="User-supplied shell environment line (repeatable)")
+    render.set_defaults(func=run_campaign_render_slurm)
+
+    status = commands.add_parser("status", help="Classify campaign entries from local filesystem evidence")
+    status.add_argument("index", help="Campaign directory or campaign_index.json")
+    status.add_argument("--json", action="store_true", help="Print the machine-readable status report")
+    status.add_argument("--output", help="Also write the machine-readable status report to this path")
+    status.set_defaults(func=run_campaign_status)
+
+    collect = commands.add_parser("collect", help="Parse and aggregate campaign results")
+    collect.add_argument("index", help="Campaign directory or campaign_index.json")
+    collect.add_argument("--output", help="Aggregate JSON path (default: campaign_results.json in campaign root)")
+    collect.add_argument("--sidecar-dir", help="Structured result sidecar directory (default: collected)")
+    collect.add_argument("--csv", help="Optional scalar summary CSV path")
+    collect.add_argument("--jsonl", help="Optional per-entry JSONL summary path")
+    collect.set_defaults(func=run_campaign_collect)
+    return parser
+
+
 def validate_setup_inputs():
     """
     Validate that required input files exist for --setup workflow.
@@ -1774,47 +1977,182 @@ def print_summary_diff():
     """Print a summary of changes between old and new files."""
     print("\nSummary of Changes:")
     print("=" * 70)
-    
-    # Compare lattice files
+
     old_lattice = Path('lattice.nml')
     new_lattice = Path('lattice_new.nml')
-    
     if old_lattice.exists() and new_lattice.exists():
-        old_size = old_lattice.stat().st_size
-        new_size = new_lattice.stat().st_size
         print(f"\nlattice.nml:")
-        print(f"  Old size: {old_size} bytes")
-        print(f"  New size: {new_size} bytes")
-        print(f"  Change:   {new_size - old_size:+d} bytes")
-    
-    # Compare input files  
+        print(f"  Old size: {old_lattice.stat().st_size} bytes")
+        print(f"  New size: {new_lattice.stat().st_size} bytes")
+        print(f"  Change:   {new_lattice.stat().st_size - old_lattice.stat().st_size:+d} bytes")
     old_input = Path('input.nml')
     new_input = Path('input_new.nml')
-    
     if old_input.exists() and new_input.exists():
-        old_size = old_input.stat().st_size
-        new_size = new_input.stat().st_size
         print(f"\ninput.nml:")
-        print(f"  Old size: {old_size} bytes")
-        print(f"  New size: {new_size} bytes")
-        print(f"  Change:   {new_size - old_size:+d} bytes")
-        
-        # Try to extract some key info
-        try:
-            with open(new_input, 'r') as f:
-                content = f.read()
-                if 'nbas' in content:
-                    # Try to find nbas value
-                    for line in content.split('\n'):
-                        if 'nbas' in line.lower() and '=' in line:
-                            print(f"  {line.strip()}")
-                            break
-        except Exception:
-            pass
-    
+        print(f"  Old size: {old_input.stat().st_size} bytes")
+        print(f"  New size: {new_input.stat().st_size} bytes")
+        print(f"  Change:   {new_input.stat().st_size - old_input.stat().st_size:+d} bytes")
     print("=" * 70)
 
 
+def _run_setup_cli(args):
+    """Translate legacy ``-S`` arguments, present results, and call the service."""
+    print("=" * 70)
+    print("RS-utils Lattice Setup")
+    print("=" * 70)
+    rec_steps = args.rec_steps
+    if rec_steps is None:
+        rec_steps = 200 if args.rec_method == "chebyshev" else 21
+    try:
+        spec = SetupSpec(
+            cluster_type=args.cluster,
+            empty_spheres=args.empty_spheres,
+            min_empty_radius=args.min_empty_radius,
+            max_empty_radius=args.max_empty_radius,
+            lmx=args.lmx,
+            rec_method=args.rec_method,
+            rec_steps=rec_steps,
+            lattice_dist=args.lattice_dist,
+            basis_dist=args.basis_dist,
+            alat_scale=args.alat_scale,
+            seed=args.seed,
+            mode_2d=args.mode_2d,
+            z_iso_factor=args.z_iso_factor,
+            supercell=tuple(args.supercell or (1, 1, 1)),
+            sqs=args.sqs,
+            sqs_shells=args.sqs_shells,
+            sqs_steps=args.sqs_steps,
+            sqs_seed=args.sqs_seed,
+        )
+        service_validate_setup_parameters(spec)
+        service_validate_setup_inputs(Path.cwd())
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        if args.json_report:
+            try:
+                failed_result = SetupResult(
+                    status=OperationStatus.FAILED,
+                    diagnostics=(
+                        Diagnostic(
+                            DiagnosticSeverity.ERROR,
+                            ErrorCode.MISSING_INPUT if isinstance(exc, FileNotFoundError) else ErrorCode.SETUP_SPEC_INVALID,
+                            str(exc),
+                        ),
+                    ),
+                )
+                write_setup_report(failed_result, args.json_report)
+            except OSError as report_exc:
+                print(f"ERROR: could not write JSON setup report: {report_exc}", file=sys.stderr)
+        return 1
+
+    print("\nConfiguration:")
+    print(f"  Cluster type:      {spec.cluster_type}")
+    print(f"  Empty spheres:     {'enabled' if spec.empty_spheres else 'disabled'}")
+    if spec.empty_spheres:
+        print(f"  Min radius:        {spec.min_empty_radius}")
+        print(f"  Max radius:        {spec.max_empty_radius}")
+    print(f"  LMAX override:     {spec.lmx}")
+    print(f"  Rec method:        {spec.rec_method}")
+    print(f"  Rec steps:         {spec.rec_steps}")
+    print(f"  Lattice dist:      {spec.lattice_dist} alat")
+    print(f"  Basis dist:        {spec.basis_dist} alat")
+    print(f"  Alat scale:        {spec.alat_scale}")
+    print(f"  2D mode:           {'enabled' if spec.mode_2d else 'disabled'}")
+    if spec.mode_2d:
+        rule = "(zmax-zmin) + 1.0*alat" if spec.z_iso_factor is None else f"isotropic (factor={spec.z_iso_factor})"
+        print(f"  2D z rule:         {rule}")
+    if spec.seed is not None:
+        print(f"  Seed:              {spec.seed}")
+    if spec.sqs is not None:
+        print(f"  SQS spec:          {spec.sqs}")
+        print(f"  SQS shells:        {spec.sqs_shells}")
+        print(f"  SQS steps:         {spec.sqs_steps}")
+        if spec.sqs_seed is not None:
+            print(f"  SQS seed:          {spec.sqs_seed}")
+    if args.supercell:
+        print(f"  Supercell:         {'×'.join(str(value) for value in spec.supercell)}")
+    for label, enabled in (("Verbose mode", args.verbose), ("Validation", args.validate), ("Summary", args.summary), ("Backup", args.backup), ("In-place update", args.in_place)):
+        if enabled:
+            print(f"  {label}:           enabled")
+    print()
+    if args.backup or args.in_place:
+        print("Creating backup files...\n")
+    result = SetupService().run(
+        Path.cwd(),
+        Path.cwd(),
+        spec,
+        in_place=args.in_place,
+        backup=args.backup or args.in_place,
+        # Preserve the established interactive behavior for owned cwd output
+        # names while the library API defaults to collision-safe ``error``.
+        collision_policy="replace",
+    )
+    if args.json_report:
+        try:
+            write_setup_report(result, args.json_report)
+        except OSError as exc:
+            print(f"ERROR: could not write JSON setup report: {exc}", file=sys.stderr)
+            return 1
+    if not result.success:
+        for diagnostic in result.diagnostics:
+            returncode = diagnostic.details.get("returncode")
+            suffix = f" (returncode={returncode})" if returncode is not None else ""
+            print(
+                f"{diagnostic.severity.value.upper()}: {diagnostic.message}{suffix}",
+                file=sys.stderr,
+            )
+        if result.stdout:
+            print("--- Fortran worker stdout ---", file=sys.stderr)
+            print(result.stdout, file=sys.stderr, end="" if result.stdout.endswith("\n") else "\n")
+        if result.stderr:
+            print("--- Fortran worker stderr ---", file=sys.stderr)
+            print(result.stderr, file=sys.stderr, end="" if result.stderr.endswith("\n") else "\n")
+        for diagnostic in result.diagnostics:
+            for detail_name, label in (
+                ("spheres_log_tail", "spheres.log tail"),
+                ("radii_out_tail", "radii.out tail"),
+            ):
+                tail = diagnostic.details.get(detail_name)
+                if tail:
+                    print(f"--- {label} ---", file=sys.stderr)
+                    print(tail, file=sys.stderr, end="" if tail.endswith("\n") else "\n")
+        return 1
+    if result.stdout:
+        print(result.stdout, end="" if result.stdout.endswith("\n") else "\n")
+    if args.verbose:
+        print("Starting lattice processing...")
+        print("Lattice processing completed.")
+    print("\n" + "=" * 70)
+    print("SUCCESS: Lattice processing completed")
+    print("=" * 70)
+    print("\nGenerated files:")
+    for filename in result.candidate_files:
+        path = Path(filename)
+        if path.is_file():
+            print(f"  ✓ {filename} ({path.stat().st_size} bytes)")
+    if args.validate:
+        print_validation_report(validate_output_files())
+    if args.summary:
+        print_summary_diff()
+    if args.in_place:
+        print("\nApplying in-place updates...")
+        print("\nUpdated 2 file(s) in place.")
+        print("Original files backed up with .bak extension.")
+    else:
+        print("\nNext steps:")
+        print("  1. Review the generated files")
+        if not args.validate:
+            print("     (run with --validate to check file integrity)")
+        if not args.summary:
+            print("     (run with --summary to see detailed changes)")
+        print("  2. Rename them to replace original files:")
+        print("     mv lattice_new.nml lattice.nml")
+        print("     mv input_new.nml input.nml")
+        print("     (or use --in-place flag to do this automatically)")
+        print("  3. Continue with exchange calculations:")
+        print("     rsutil --exchange --cutoff 2.5")
+    return 0
+    
 def main():
     """
     Command-line interface for rsutil.
@@ -1863,6 +2201,7 @@ Examples:
     # Add band/DOS subcommands
     create_bands_parser(subparsers)
     create_dos_parser(subparsers)
+    create_campaign_parser(subparsers)
 
     # Existing flags for backward compatibility
     parser.add_argument(
@@ -1911,13 +2250,58 @@ Examples:
         "--shell-width",
         type=float,
         default=0.1,
-        help="Width of shells for grouping neighbors when using --unique (default: 0.1)",
+        help="Legacy shell metadata parameter; does not define equivalence (default: 0.1)",
     )
     parser.add_argument(
         "--soc",
         action="store_true",
         default=False,
-        help="Account for spin-orbit coupling in symmetry considerations",
+        help="Request SOC; must agree with the reference input's control.nsp",
+    )
+    parser.add_argument(
+        "--magnetic-reference",
+        choices=[
+            "unknown",
+            "collinear_fm",
+            "afm",
+            "ferrimagnetic",
+            "noncollinear",
+            "magnetic_space_group",
+        ],
+        default=None,
+        help="Explicit magnetic order assertion required for symmetry reduction",
+    )
+    parser.add_argument(
+        "--magnetic-axis",
+        nargs=3,
+        type=float,
+        metavar=("X", "Y", "Z"),
+        default=None,
+        help="Global magnetization axis for explicit collinear-FM SOC reduction",
+    )
+    parser.add_argument(
+        "--full-pairs",
+        action="store_true",
+        default=False,
+        help="Disable symmetry reduction and generate the complete pair set",
+    )
+    parser.add_argument(
+        "--rij-out",
+        type=str,
+        default=None,
+        help="Write the legacy R_ij neighbor mapping to this file",
+    )
+    parser.add_argument(
+        "--rij-format",
+        choices=["json", "txt"],
+        default="json",
+        help="Format for --rij-out (default: json)",
+    )
+    parser.add_argument(
+        "--force-legacy-collision",
+        action="store_true",
+        default=False,
+        help="Allow explicit replacement of an unmarked legacy Atom_* directory",
     )
     parser.add_argument(
         "--export",
@@ -1973,7 +2357,7 @@ Examples:
         "--rec-steps",
         type=int,
         default=None,
-        help="Recursion steps for &control lld in setup output (default: 20, or 200 for chebyshev)",
+        help="Recursion steps for &control lld in setup output (default: 21, or 200 for chebyshev)",
     )
     parser.add_argument(
         "--lattice-dist",
@@ -2074,6 +2458,10 @@ Examples:
         help='Validate output files after generation'
     )
     parser.add_argument(
+        '--json-report', type=str, default=None, metavar='PATH',
+        help='Write a versioned machine-readable setup report to PATH'
+    )
+    parser.add_argument(
         '--backup', action='store_true', default=False,
         help='Create backup files before any operations'
     )
@@ -2099,256 +2487,41 @@ Examples:
     # Handle existing flag-based functionality (backward compatibility)
     # Process lattice if --setup flag is provided
     if args.setup:
-        print("=" * 70)
-        print("RS-utils Lattice Setup")
-        print("=" * 70)
-        
-        rec_steps = args.rec_steps
-        if rec_steps is None:
-            rec_steps = 200 if args.rec_method == "chebyshev" else 20
-
-        # Validate input files exist
-        if not validate_setup_inputs():
-            sys.exit(1)
-        
-        # Validate parameter ranges
-        if not validate_setup_parameters(
-            args.min_empty_radius,
-            args.max_empty_radius,
-            args.lmx,
-            args.lattice_dist,
-            args.basis_dist,
-            args.alat_scale,
-            args.mode_2d,
-            args.z_iso_factor,
-            rec_steps,
-        ):
-            sys.exit(1)
-        if not validate_sqs_parameters(args.sqs, args.sqs_shells, args.sqs_steps):
-            sys.exit(1)
-        if args.sqs is not None and args.supercell is None:
-            print("ERROR: --sqs currently requires --supercell", file=sys.stderr)
-            sys.exit(1)
-        
-        # Display configuration
-        print(f"\nConfiguration:")
-        print(f"  Cluster type:      {args.cluster}")
-        print(f"  Empty spheres:     {'enabled' if args.empty_spheres else 'disabled'}")
-        if args.empty_spheres:
-            print(f"  Min radius:        {args.min_empty_radius}")
-            print(f"  Max radius:        {args.max_empty_radius}")
-        print(f"  LMAX override:     {args.lmx}")
-        print(f"  Rec method:        {args.rec_method}")
-        print(f"  Rec steps:         {rec_steps}")
-        print(f"  Lattice dist:      {args.lattice_dist} alat")
-        print(f"  Basis dist:        {args.basis_dist} alat")
-        print(f"  Alat scale:        {args.alat_scale}")
-        print(f"  2D mode:           {'enabled' if args.mode_2d else 'disabled'}")
-        if args.mode_2d:
-            if args.z_iso_factor is None:
-                print("  2D z rule:         (zmax-zmin) + 1.0*alat")
-            else:
-                print(f"  2D z rule:         isotropic (factor={args.z_iso_factor})")
-        if args.seed is not None:
-            print(f"  Seed:              {args.seed}")
-        if args.sqs is not None:
-            print(f"  SQS spec:          {args.sqs}")
-            print(f"  SQS shells:        {args.sqs_shells}")
-            print(f"  SQS steps:         {args.sqs_steps}")
-            if args.sqs_seed is not None:
-                print(f"  SQS seed:          {args.sqs_seed}")
-        if args.supercell:
-            nx, ny, nz = args.supercell
-            print(f"  Supercell:         {nx}×{ny}×{nz}")
-        if args.verbose:
-            print(f"  Verbose mode:      enabled")
-        if args.validate:
-            print(f"  Validation:        enabled")
-        if args.summary:
-            print(f"  Summary:           enabled")
-        if args.backup:
-            print(f"  Backup:            enabled")
-        if args.in_place:
-            print(f"  In-place update:   enabled")
-        print()
-        
-        # Create backups if requested
-        if args.backup or args.in_place:
-            print("Creating backup files...")
-            create_backup_files()
-            print()
-        
-        # Create supercell if requested (do this BEFORE processing)
-        staged_supercell = False
-        staged_lattice = ".rsutil_supercell_lattice.nml"
-        staged_input = ".rsutil_supercell_input.nml"
-        if args.supercell:
-            nx, ny, nz = args.supercell
-            if nx < 1 or ny < 1 or nz < 1:
-                print("ERROR: Supercell dimensions must be positive integers", file=sys.stderr)
-                sys.exit(1)
-
-            if args.in_place:
-                ok_sc = create_supercell(
-                    nx, ny, nz, in_place=True,
-                    sqs_spec=args.sqs, sqs_shells=args.sqs_shells,
-                    sqs_steps=args.sqs_steps, sqs_seed=args.sqs_seed,
-                )
-            else:
-                ok_sc = create_supercell(
-                    nx, ny, nz,
-                    lattice_path="lattice.nml",
-                    input_path="input.nml",
-                    output_lattice_path=staged_lattice,
-                    output_input_path=staged_input,
-                    in_place=False,
-                    sqs_spec=args.sqs, sqs_shells=args.sqs_shells,
-                    sqs_steps=args.sqs_steps, sqs_seed=args.sqs_seed,
-                )
-                staged_supercell = ok_sc
-
-            if not ok_sc:
-                print("ERROR: Failed to create supercell", file=sys.stderr)
-                sys.exit(1)
-            print()
-        
-        # Process lattice with error handling
-        try:
-            if args.verbose:
-                print("Starting lattice processing...")
-            
-            if staged_supercell:
-                import shutil
-                orig_lat_tmp = ".rsutil_original_lattice.nml"
-                orig_inp_tmp = ".rsutil_original_input.nml"
-                shutil.move("lattice.nml", orig_lat_tmp)
-                shutil.move("input.nml", orig_inp_tmp)
-                shutil.copy2(staged_lattice, "lattice.nml")
-                shutil.copy2(staged_input, "input.nml")
-                try:
-                    process_lattice(
-                        cluster_type=args.cluster,
-                        empty_spheres=args.empty_spheres,
-                        min_empty_radius=args.min_empty_radius,
-                        max_empty_radius=args.max_empty_radius,
-                        lmx=args.lmx,
-                        lattice_dist=args.lattice_dist,
-                        basis_dist=args.basis_dist,
-                        alat_scale=args.alat_scale,
-                        seed=args.seed,
-                        mode_2d=args.mode_2d,
-                        z_iso_factor=args.z_iso_factor,
-                        rec_steps=rec_steps,
-                        rec_method=args.rec_method,
-                    )
-                finally:
-                    shutil.move(orig_lat_tmp, "lattice.nml")
-                    shutil.move(orig_inp_tmp, "input.nml")
-                    if Path(staged_lattice).exists():
-                        Path(staged_lattice).unlink()
-                    if Path(staged_input).exists():
-                        Path(staged_input).unlink()
-            else:
-                process_lattice(
-                    cluster_type=args.cluster,
-                    empty_spheres=args.empty_spheres,
-                    min_empty_radius=args.min_empty_radius,
-                    max_empty_radius=args.max_empty_radius,
-                    lmx=args.lmx,
-                    lattice_dist=args.lattice_dist,
-                    basis_dist=args.basis_dist,
-                    alat_scale=args.alat_scale,
-                    seed=args.seed,
-                    mode_2d=args.mode_2d,
-                    z_iso_factor=args.z_iso_factor,
-                    rec_steps=rec_steps,
-                    rec_method=args.rec_method,
-                )
-            
-            if args.verbose:
-                print("Lattice processing completed.")
-            
-            # Check if output files were created
-            output_files = ['lattice_new.nml', 'input_new.nml']
-            created_files = [f for f in output_files if Path(f).exists()]
-            
-            if created_files:
-                print("\n" + "=" * 70)
-                print("SUCCESS: Lattice processing completed")
-                print("=" * 70)
-                print("\nGenerated files:")
-                for filename in created_files:
-                    file_size = Path(filename).stat().st_size
-                    print(f"  ✓ {filename} ({file_size} bytes)")
-                
-                # Run validation if requested
-                if args.validate:
-                    validation_results = validate_output_files()
-                    print_validation_report(validation_results)
-                
-                # Print summary if requested
-                if args.summary:
-                    print_summary_diff()
-                
-                # Apply in-place updates if requested
-                if args.in_place:
-                    print("\nApplying in-place updates...")
-                    updated = apply_in_place_updates()
-                    if updated:
-                        print(f"\nUpdated {len(updated)} file(s) in place.")
-                        print("Original files backed up with .bak extension.")
-                        print("\nNext steps:")
-                        print("  Continue with exchange calculations:")
-                        print("     rsutil --exchange --cutoff 2.5")
-                    else:
-                        print("No files were updated.", file=sys.stderr)
-                else:
-                    # Standard workflow message
-                    print("\nNext steps:")
-                    print("  1. Review the generated files")
-                    if not args.validate:
-                        print("     (run with --validate to check file integrity)")
-                    if not args.summary:
-                        print("     (run with --summary to see detailed changes)")
-                    print("  2. Rename them to replace original files:")
-                    print("     mv lattice_new.nml lattice.nml")
-                    print("     mv input_new.nml input.nml")
-                    print("     (or use --in-place flag to do this automatically)")
-                    print("  3. Continue with exchange calculations:")
-                    print("     rsutil --exchange --cutoff 2.5")
-            else:
-                print("\nWARNING: Processing completed but expected output files were not found.", file=sys.stderr)
-                print("Check for error messages above.", file=sys.stderr)
-                
-        except FileNotFoundError as e:
-            print(f"\nERROR: File not found during processing: {e}", file=sys.stderr)
-            print("This may indicate missing data files or incorrect file paths.", file=sys.stderr)
-            sys.exit(1)
-        except ValueError as e:
-            print(f"\nERROR: Invalid parameter or data: {e}", file=sys.stderr)
-            sys.exit(1)
-        except RuntimeError as e:
-            print(f"\nERROR: Processing failed: {e}", file=sys.stderr)
-            sys.exit(1)
-        except Exception as e:
-            print(f"\nERROR: Unexpected error during lattice processing:", file=sys.stderr)
-            print(f"  {type(e).__name__}: {e}", file=sys.stderr)
-            print("\nPlease check your input files and try again.", file=sys.stderr)
-            print("If the problem persists, please report this error.", file=sys.stderr)
-            sys.exit(1)
+        return _run_setup_cli(args)
     # Run visualizer for lattice or clust file if --lattice or --clust flag is provided
     elif args.lattice or args.clust:
+        try:
+            from .viz.rs_visualizer import rs_visualizer
+        except ImportError:
+            print(
+                "ERROR: visualization requires the optional dependency extra; "
+                "install with `pip install 'rsutil[visualization]'`",
+                file=sys.stderr,
+            )
+            return 1
         rs_visualizer(args.data, clust=args.clust)
     # Create exchange input files if --exchange flag is provided
     elif args.exchange:
-        exchange_map(
-            cutoff=args.cutoff,
-            unique=args.unique,
-            shell_width=args.shell_width,
-            soc=args.soc,
-            rij_out=args.rij_out,
-            rij_fmt=args.rij_format,
-        )
+        try:
+            exchange_map(
+                cutoff=args.cutoff,
+                unique=args.unique,
+                shell_width=args.shell_width,
+                soc=True if args.soc else None,
+                magnetic_reference=args.magnetic_reference,
+                magnetic_axis=(
+                    None if args.magnetic_axis is None else tuple(args.magnetic_axis)
+                ),
+                full_pairs=args.full_pairs,
+                rij_out=args.rij_out,
+                rij_fmt=args.rij_format,
+                source_dir=args.data,
+                collision_policy="replace_generated",
+                force_legacy_collision=args.force_legacy_collision,
+            )
+        except Exception as exc:
+            print(f"ERROR: Exchange generation failed: {exc}", file=sys.stderr)
+            sys.exit(1)
     # Export to LMTO47 CTRL if requested
     elif args.lmto47:
         if args.lmx < 0 or args.lmx > 3:
@@ -2454,4 +2627,4 @@ Examples:
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

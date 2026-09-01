@@ -1,11 +1,18 @@
 [build-system]
-requires = ["setuptools", "wheel", "cmake", "f90wrap>0.2.10", "numpy>=1.20", "pyvista", "pymatgen", "f90nml", "matplotlib>=3.5.0", "scipy>=1.7.0", "spglib>=2.0.0"]
+requires = ["setuptools>=61", "wheel", "cmake>=3.10", "numpy>=1.20"]
 
 [tool.cibuildwheel]
-skip = "pp* *-musllinux* cp36* cp37* cp38*"  # Skip PyPy and musl Linux builds
-before-build = "python -m pip install --upgrade numpy>1.19 ninja f90wrap scipy"
-# test-requires = ["pytest"]
-# test-command = "pytest {package}/tests"
+skip = "pp* *-musllinux* cp36* cp37* cp38* cp314t-*"  # Skip PyPy, musl Linux, and unsupported free-threaded Python builds
+before-build = "python -m pip install --upgrade 'numpy>1.19' ninja scipy"
+test-requires = ["pytest>=7", "ase>=3.22", "matplotlib>=3.5", "scipy>=1.7", "spglib>=2.0"]
+test-sources = ["tests", "examples"]
+test-command = [
+    "python tests/python39_import_smoke.py",
+    "python -m pytest -q tests",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [tool.cibuildwheel.linux]
-before-all = "yum clean packages && yum install -y python3-devel ninja-build"
+before-all = "yum clean packages && yum install -y gcc-gfortran cmake ninja-build"

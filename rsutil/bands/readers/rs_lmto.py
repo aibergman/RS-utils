@@ -130,3 +130,17 @@ class HamiltonianReader(BaseHamiltonianReader):
                 j = 0
                 i += 1
             matrix_idx[(ntype, neighbor)] = [i, j]
+
+    def to_tight_binding_model(self, lattice_reader):
+        """Convert to the typed TB model when periodic identity is provable.
+
+        ``rs2txt.dat`` stores Cartesian displacements and legacy block
+        identifiers.  The conversion therefore requires a lattice reader so
+        that each block can be mapped unambiguously to a target basis site and
+        integer lattice translation.  Existing band/DOS callers continue to
+        use this reader unchanged.
+        """
+
+        from rsutil.results.tight_binding import tight_binding_from_legacy_reader
+
+        return tight_binding_from_legacy_reader(self, lattice_reader)

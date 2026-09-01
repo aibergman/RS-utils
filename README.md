@@ -2,6 +2,11 @@
 
 RS-utils is a Python + Fortran toolkit for RS-LMTO workflows. It now includes a pure-Python band structure and DOS analysis module alongside the existing Fortran utilities for lattice setup and exchange/export workflows.
 
+> **HT pilot release:** RS-utils `0.11.0rc1` is ready for controlled
+> high-throughput RS-LMTO use within the documented support matrix. Start with
+> the [HT quick start](docs/HT_QUICKSTART.md) and review the [HT readiness
+> report](docs/HT_READINESS_REPORT.md).
+
 ## Components
 
 - **Band/DOS analysis (Python):**
@@ -26,13 +31,26 @@ RS-utils is a Python + Fortran toolkit for RS-LMTO workflows. It now includes a 
 
 ## Build and Installation
 
-### Python package (recommended)
+### Release wheel (recommended for users)
+
+Install the `0.11.0rc1` release wheel in a dedicated virtual environment;
+see the [HT quick start](docs/HT_QUICKSTART.md) for the cluster deployment
+model.
+
+### Developer checkout
 
 ```bash
-pip install -e .
+pip install -e '.[test]'
 ```
 
-Key runtime dependencies: `numpy`, `scipy`, `matplotlib`, `spglib` (with `pymatgen/seekpath` for k-path workflows).
+The editable install builds and exposes the native Fortran library in the
+rsutil/ package automatically. No manual shared-library copying or
+build_ext --inplace step is required. For the complete clean-checkout
+procedure, see [HT_TESTING.md](docs/HT_TESTING.md).
+
+Core runtime dependencies are `numpy`, `f90nml`, and `pymatgen`. Install
+`.[bands]` for band/DOS analysis and plotting, `.[visualization]` for the
+PyVista structure viewer, or `.[full]` for all optional runtime features.
 
 ### Fortran build (optional; legacy utilities)
 
@@ -42,6 +60,20 @@ cmake --build build
 ```
 
 This builds the Fortran library and executable targets (for example `rsutil.x` in the build tree).
+
+### Tests
+
+The active HT regression suite uses the test extra:
+
+```bash
+python -m pip install -e '.[test]'
+python -m pytest -q
+```
+
+Release wheels contain the ABI-qualified native library under rsutil/ and
+load it from that installed package directory. For a clean-checkout
+procedure, including the required Linux Fortran toolchain, see
+[HT_TESTING.md](docs/HT_TESTING.md).
 
 ## CLI Usage
 
@@ -94,6 +126,11 @@ rsutil --lmto47 --nspin 2 --lmx 3 --out lmto47_out
 rsutil --lmto47 --supercell 2 2 2 --out lmto47_out
 ```
 
+Existing UppASD export functionality remains available, but automated UppASD
+integration is not currently part of the validated `0.11.0rc1` HT campaign
+workflow. RS-utils does not claim an automatic `SCF -> exchange -> UppASD`
+pipeline.
+
 ### Visualization workflows (`--lattice`, `--clust`)
 
 ```bash
@@ -110,6 +147,32 @@ rsutil --clust --data .
 # Exchange map with readable R_ij output
 rsutil --exchange --cutoff 3.0 --unique --rij-out rij_map.txt --rij-format txt
 ```
+
+### Recommended high-throughput workflow
+
+The established `-S` and `-J` flags remain supported for individual legacy
+runs. For reproducible batch preparation, validate and generate a versioned
+campaign first, then render a site-specific Slurm array for review:
+
+```bash
+rsutil -S --validate --summary                 # non-destructive legacy setup
+rsutil -J --cutoff 3.0 --unique                # legacy exchange jobs
+
+rsutil campaign validate examples/campaigns/ht18_pilot.json
+rsutil campaign create examples/campaigns/ht18_pilot.json --destination ht18-runs
+rsutil campaign render-slurm ht18-runs/campaign_index.json \
+    --executable /path/to/rs-lmto --launcher 'srun --exclusive' \
+    --time 02:00:00 --resource cpus_per_task=8
+rsutil campaign status ht18-runs
+rsutil campaign collect ht18-runs --csv ht18-runs/results.csv
+```
+
+Campaign generation is setup-only and does not submit jobs. Inspect the
+rendered script and supply the executable, launcher, modules, and resources
+for the target site. `status` and `collect` use filesystem evidence only;
+they do not query Slurm or retry jobs. See [HT_CAMPAIGNS.md](docs/HT_CAMPAIGNS.md)
+and [HT_READINESS_REPORT.md](docs/HT_READINESS_REPORT.md) for the support
+matrix and closeout evidence.
 
 ### Bands and DOS workflows (pure Python)
 
