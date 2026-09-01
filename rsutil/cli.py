@@ -2095,9 +2095,27 @@ def _run_setup_cli(args):
             return 1
     if not result.success:
         for diagnostic in result.diagnostics:
-            print(f"{diagnostic.severity.value.upper()}: {diagnostic.message}", file=sys.stderr)
+            returncode = diagnostic.details.get("returncode")
+            suffix = f" (returncode={returncode})" if returncode is not None else ""
+            print(
+                f"{diagnostic.severity.value.upper()}: {diagnostic.message}{suffix}",
+                file=sys.stderr,
+            )
+        if result.stdout:
+            print("--- Fortran worker stdout ---", file=sys.stderr)
+            print(result.stdout, file=sys.stderr, end="" if result.stdout.endswith("\n") else "\n")
         if result.stderr:
+            print("--- Fortran worker stderr ---", file=sys.stderr)
             print(result.stderr, file=sys.stderr, end="" if result.stderr.endswith("\n") else "\n")
+        for diagnostic in result.diagnostics:
+            for detail_name, label in (
+                ("spheres_log_tail", "spheres.log tail"),
+                ("radii_out_tail", "radii.out tail"),
+            ):
+                tail = diagnostic.details.get(detail_name)
+                if tail:
+                    print(f"--- {label} ---", file=sys.stderr)
+                    print(tail, file=sys.stderr, end="" if tail.endswith("\n") else "\n")
         return 1
     if result.stdout:
         print(result.stdout, end="" if result.stdout.endswith("\n") else "\n")

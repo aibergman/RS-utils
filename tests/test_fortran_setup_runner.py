@@ -73,6 +73,42 @@ def test_malformed_input_does_not_modify_source_directory(tmp_path: Path) -> Non
     assert not (tmp_path / "input_new.nml").exists()
 
 
+def test_worker_failure_keeps_diagnostics_before_owned_workspace_cleanup(
+    tmp_path: Path, monkeypatch
+) -> None:
+    lattice = tmp_path / "lattice.nml"
+    input_nml = tmp_path / "input.nml"
+    lattice.write_text("lattice\n", encoding="utf-8")
+    input_nml.write_text("input\n", encoding="utf-8")
+
+    def fake_run(command, *, cwd, **kwargs):
+        workspace = Path(cwd)
+        (workspace / "spheres.log").write_text(
+            "sphere line 1\nsphere line 2\n", encoding="utf-8"
+        )
+        (workspace / "radii.out").write_text(
+            "radii line 1\nradii line 2\n", encoding="utf-8"
+        )
+        return subprocess.CompletedProcess(
+            command,
+            17,
+            stdout="worker stdout\n",
+            stderr="worker stderr\n",
+        )
+
+    monkeypatch.setattr("rsutil.setup_runner.subprocess.run", fake_run)
+    result = FortranSetupRunner().run(lattice, input_nml)
+
+    assert not result.success
+    diagnostic = result.diagnostics[0]
+    assert diagnostic.details["returncode"] == 17
+    assert diagnostic.details["spheres_log_tail"] == "sphere line 1\nsphere line 2\n"
+    assert diagnostic.details["radii_out_tail"] == "radii line 1\nradii line 2\n"
+    assert result.stdout == "worker stdout\n"
+    assert result.stderr == "worker stderr\n"
+    assert not Path(result.provenance["workspace"]).exists()
+
+
 def test_fatal_worker_exit_is_returned_without_killing_parent(tmp_path: Path) -> None:
     _fixture(tmp_path)
     input_path = tmp_path / "input.nml"

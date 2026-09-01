@@ -7,6 +7,7 @@ import os
 import subprocess
 import sys
 import time
+from collections import deque
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -40,6 +41,7 @@ _WORKER_PARAMETERS = (
 )
 _REQUIRED_OUTPUTS = ("lattice_new.nml", "input_new.nml", "radii.out")
 _SPHERE_OUTPUTS = ("radii.out", "spheres.log")
+_DIAGNOSTIC_TAIL_LINES = 100
 
 
 def _parameters(spec: SetupSpec) -> dict[str, Any]:
@@ -207,9 +209,10 @@ class FortranSetupRunner:
         except subprocess.TimeoutExpired as exc:
             stdout = self._text(exc.stdout)
             stderr = self._text(exc.stderr)
+            details = {"timeout": timeout, **self._diagnostic_file_tails(workspace)}
             return self._result(
                 status=OperationStatus.FAILED,
-                diagnostics=(_diagnostic(ErrorCode.WORKER_FAILED, "Fortran setup worker timed out", timeout=timeout),),
+                diagnostics=(_diagnostic(ErrorCode.WORKER_FAILED, "Fortran setup worker timed out", **details),),
                 workspace=workspace,
                 stdout=stdout,
                 stderr=stderr,
@@ -221,11 +224,15 @@ class FortranSetupRunner:
             name: name for name in _SPHERE_OUTPUTS if (workspace / name).is_file()
         }
         if returncode != 0:
+            details = {
+                "returncode": returncode,
+                "candidate_files": list(candidate_files),
+                **self._diagnostic_file_tails(workspace),
+            }
             diagnostic = _diagnostic(
                 ErrorCode.WORKER_FAILED,
                 "Fortran setup worker failed",
-                returncode=returncode,
-                candidate_files=list(candidate_files),
+                **details,
             )
             return self._result(
                 status=OperationStatus.FAILED,
@@ -301,6 +308,28 @@ class FortranSetupRunner:
         if value is None:
             return ""
         return value.decode(errors="replace") if isinstance(value, bytes) else value
+
+    @staticmethod
+    def _diagnostic_file_tails(workspace: Path) -> dict[str, str]:
+        """Capture useful legacy diagnostics before an owned workspace is removed."""
+
+        tails: dict[str, str] = {}
+        for filename, detail_name in (
+            ("spheres.log", "spheres_log_tail"),
+            ("radii.out", "radii_out_tail"),
+        ):
+            path = workspace / filename
+            if path.is_file():
+                tails[detail_name] = FortranSetupRunner._tail_file(path)
+        return tails
+
+    @staticmethod
+    def _tail_file(path: Path) -> str:
+        try:
+            with path.open("r", encoding="utf-8", errors="replace") as stream:
+                return "".join(deque(stream, maxlen=_DIAGNOSTIC_TAIL_LINES))
+        except OSError as exc:
+            return f"<could not read {path.name}: {exc}>"
 
     @staticmethod
     def _result(
