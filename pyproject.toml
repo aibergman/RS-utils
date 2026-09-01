@@ -2,7 +2,7 @@
 requires = ["setuptools>=61", "wheel", "cmake>=3.10", "numpy>=1.20"]
 
 [tool.cibuildwheel]
-skip = "pp* *-musllinux* cp36* cp37* cp38*"  # Skip PyPy and musl Linux builds
+skip = "pp* *-musllinux* cp36* cp37* cp38* cp314t-*"  # Skip PyPy, musl Linux, and unsupported free-threaded Python builds
 before-build = "python -m pip install --upgrade 'numpy>1.19' ninja scipy"
 test-requires = ["pytest>=7", "ase>=3.22", "matplotlib>=3.5", "scipy>=1.7", "spglib>=2.0"]
 test-sources = ["tests", "examples"]
