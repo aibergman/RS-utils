@@ -42,6 +42,8 @@ Flags (existing functionality)
     Directory for data files to be visualized (default: current directory).
 """
 
+from __future__ import annotations
+
 import argparse
 import os
 import numpy as np

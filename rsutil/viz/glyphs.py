@@ -6,6 +6,9 @@ Classes:
     Bond: Bond as a cylinder with start and end positions.
     Spin: Magnetic moment as an arrow with direction and magnitude.
 """
+
+from __future__ import annotations
+
 import numpy as np
 from .helpers import get_element_color, get_atomic_radius, load_cpk_colors
 

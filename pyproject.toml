@@ -6,7 +6,10 @@ skip = "pp* *-musllinux* cp36* cp37* cp38*"  # Skip PyPy and musl Linux builds
 before-build = "python -m pip install --upgrade 'numpy>1.19' ninja f90wrap scipy"
 test-requires = ["pytest>=7", "ase>=3.22", "matplotlib>=3.5", "scipy>=1.7", "spglib>=2.0"]
 test-sources = ["tests", "examples"]
-test-command = "python -m pytest -q tests"
+test-command = [
+    "python tests/python39_import_smoke.py",
+    "python -m pytest -q tests",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
