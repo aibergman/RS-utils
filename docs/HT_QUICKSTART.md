@@ -61,9 +61,15 @@ scientific operations; they do not replace the legacy entry points.
 The intended lifecycle is:
 
 ```text
-campaign specification -> validate -> create -> render scheduler script
-    -> submit -> status -> collect
+prepared RS source -> SCF campaign -> converged canonical result
+    -> explicit exchange stage -> canonical exchange result
 ```
+
+Scientific identity, operational resources, source provenance, and exchange
+stage provenance are separate: setup/source content determines the scientific
+entry identity, scheduler allocation is operational metadata, CIF hashes are
+campaign-level source evidence, and an exchange stage records the parent
+result and policy used to prepare its jobs.
 
 ### Scaffold a prepared source collection
 
@@ -85,6 +91,15 @@ rsutil campaign scaffold examples/campaigns/scaffold_sources \
 rsutil campaign validate examples/campaigns/scaffolded_pilot.json
 rsutil campaign create examples/campaigns/scaffolded_pilot.json \
     --destination scaffolded-pilot-runs
+```
+
+An existing scaffold output is rejected by default. Use `--overwrite` only
+for a deliberate replacement:
+
+```bash
+rsutil campaign scaffold examples/campaigns/scaffold_sources \
+    --name scaffolded-pilot \
+    --output examples/campaigns/scaffolded_pilot.json --overwrite
 ```
 
 RS-utils does not require `cif2cell` and does not call it during scaffolding.
@@ -153,12 +168,58 @@ scientific results. See the [campaign state table](HT_CAMPAIGNS).
 
 ## 6. Exchange workflow
 
-The supported exchange sequence is:
+Exchange is an explicit second campaign stage. The supported sequence is:
 
 ```text
-converged SCF/reference -> -J exchange-job generation
-    -> Atom_* calculations -> exchange-result parsing
+SCF campaign
+    ↓
+inspect convergence
+    ↓
+explicit exchange prepare
+    ↓
+render Slurm array
+    ↓
+execute Atom_* jobs
+    ↓
+exchange status
+    ↓
+exchange collect
 ```
+
+By default, only successfully executed, parse-valid, explicitly converged
+parent calculations are eligible for exchange preparation. Full pairs are
+the conservative starting point; symmetry reduction requires an explicitly
+supported magnetic context.
+
+```bash
+rsutil campaign exchange prepare pilot-runs/campaign_index.json \
+    --destination pilot-runs/exchange-stage \
+    --cutoff 3.0 --full-pairs
+
+# Use the parent directory of the manifest path printed by prepare.
+rsutil campaign exchange render-slurm \
+    pilot-runs/exchange-stage/<stage-id> \
+    --executable /path/to/rs-lmto-exchange \
+    --launcher 'srun --exclusive' \
+    --partition compute --account project --time 02:00:00 \
+    --resource cpus_per_task=8
+
+cd pilot-runs/exchange-stage/<stage-id>
+sbatch exchange_submit_array.sbatch
+cd ../../..
+
+rsutil campaign exchange status pilot-runs/exchange-stage/<stage-id>
+rsutil campaign exchange collect pilot-runs/exchange-stage/<stage-id>
+```
+
+Each stage is stored under its own `<stage-id>/exchange_stage_manifest.json`,
+with its own jobs and artifacts. A changed parent result or exchange policy
+therefore creates a new persistent stage; identical preparation reuses valid
+exchange-job directories using the canonical exchange-job checks.
+
+Use `--unique` only with an explicitly supported magnetic context, for
+example `--magnetic-reference collinear_fm` and any required axis. RS-utils
+does not yet implement a generic automatic SCF→exchange DAG or retry engine.
 
 RS-utils preserves the canonical periodic identity `PairKey(i,j,R)`, source
 site identity, and RS type identity. Chemically identical atoms can remain

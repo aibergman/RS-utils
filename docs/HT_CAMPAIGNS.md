@@ -2,6 +2,21 @@
 
 HT-16 adds a small JSON campaign layer. It generates setup inputs and
 provenance directories; it does not execute RS-LMTO or act as a scheduler.
+The intended architecture is:
+
+```text
+prepared RS source -> SCF campaign -> converged canonical result
+    -> explicit exchange stage -> canonical exchange result
+```
+
+Keep these concepts distinct:
+
+| Concept | Meaning |
+| --- | --- |
+| Scientific identity | Prepared source contents, setup, calculation, exchange settings, and identity-bearing entry metadata. |
+| Operational resources | Scheduler allocation such as `ntasks`, `nodes`, `cpus_per_task`, memory, and time; never part of `entry_id`. |
+| Source provenance | Campaign-level evidence such as a scaffold-time CIF hash accompanying prepared RS inputs; it does not change an entry ID. |
+| Exchange-stage provenance | The parent scientific entry, the authoritative exchange source-run identity from the converged result, and the exchange policy. |
 
 ## Specification
 
@@ -90,6 +105,8 @@ rsutil campaign scaffold sources/ --name iron-compounds \
 Add `--dry-run` to discover and validate without creating the requested JSON.
 The generated JSON is deterministic: source traversal, entry ordering, and
 formatting are stable, and no timestamps are embedded in the specification.
+An existing output is rejected unless `--overwrite` is supplied, protecting
+campaign files edited after scaffolding.
 
 `source.cif` provenance establishes which crystallographic source file
 accompanied the prepared RS-LMTO input. The prepared `input.nml` and
@@ -252,3 +269,59 @@ Exchange sub-job manifests, when present, are collected by their canonical
 pair lists and parent campaign entry ID. Retries, restarts, dependency graphs,
 and scheduler daemons remain outside this layer and belong at a future
 AiiDA/workflow-engine boundary.
+
+## Explicit exchange stage
+
+Exchange is an explicit second campaign stage. By default it is prepared only
+from successfully executed, parse-valid, explicitly converged parent SCF
+runs. The supported workflow is:
+
+```text
+SCF campaign
+    ↓
+inspect convergence
+    ↓
+explicit exchange prepare
+    ↓
+render Slurm array
+    ↓
+execute Atom_* jobs
+    ↓
+exchange status
+    ↓
+exchange collect
+```
+
+```bash
+rsutil campaign exchange prepare pilot-runs/campaign_index.json \
+  --destination pilot-runs/exchange-stage --cutoff 3.0 --full-pairs
+
+rsutil campaign exchange render-slurm \
+  pilot-runs/exchange-stage/<stage-id> \
+  --executable /opt/rs-lmto/bin/rs-lmto-exchange \
+  --launcher 'srun --exclusive' \
+  --partition compute --account project --time 02:00:00 \
+  --resource cpus_per_task=8
+
+cd pilot-runs/exchange-stage/<stage-id>
+sbatch exchange_submit_array.sbatch
+cd ../../..
+
+rsutil campaign exchange status pilot-runs/exchange-stage/<stage-id>
+rsutil campaign exchange collect pilot-runs/exchange-stage/<stage-id>
+```
+
+`prepare` prints the persistent stage manifest path. Each stage has its own
+`<stage-id>/exchange_stage_manifest.json`, jobs, and artifacts. The stage ID
+uses the parent entry ID, the authoritative source-run identity already
+computed by `ExchangeJobSpec` (including current parent output evidence), and
+the exchange policy. A changed parent result or cutoff/pair/magnetic policy
+therefore creates a different stage, while identical preparation can reuse
+valid jobs.
+
+Full pairs are the conservative starting point. Symmetry reduction must be
+requested with `--unique` and an explicitly supported magnetic context, such
+as `--magnetic-reference collinear_fm`; it is not inferred generically.
+
+Exchange is an explicit second campaign stage. RS-utils does not yet
+implement a generic automatic SCF→exchange DAG or retry engine.

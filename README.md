@@ -167,6 +167,27 @@ rsutil campaign status ht18-runs
 rsutil campaign collect ht18-runs --csv ht18-runs/results.csv
 ```
 
+Exchange is a separate, explicit second campaign stage. Inspect convergence
+first; by default only successfully executed, parse-valid, explicitly
+converged parents are eligible, and full pairs are the conservative starting
+policy:
+
+```bash
+rsutil campaign exchange prepare ht18-runs/campaign_index.json \
+    --destination ht18-runs/exchange-stage --cutoff 3.0 --full-pairs
+rsutil campaign exchange render-slurm ht18-runs/exchange-stage/<stage-id> \
+    --executable /path/to/rs-lmto-exchange \
+    --launcher 'srun --exclusive' --time 02:00:00 \
+    --resource cpus_per_task=8
+cd ht18-runs/exchange-stage/<stage-id> && sbatch exchange_submit_array.sbatch && cd ../../..
+rsutil campaign exchange status ht18-runs/exchange-stage/<stage-id>
+rsutil campaign exchange collect ht18-runs/exchange-stage/<stage-id>
+```
+
+Each stage has its own persistent manifest and artifacts. Use `--unique` only
+with an explicitly supported magnetic context. RS-utils does not yet
+implement a generic automatic SCF→exchange DAG or retry engine.
+
 Campaign generation is setup-only and does not submit jobs. Inspect the
 rendered script and supply the executable, launcher, modules, and resources
 for the target site. `status` and `collect` use filesystem evidence only;

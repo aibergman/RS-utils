@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from rsutil.campaign import CampaignGenerator, CampaignScaffoldError, load_campaign, scaffold_campaign, validate_campaign
+from rsutil.campaign import Campaign, CampaignGenerator, CampaignScaffoldError, load_campaign, scaffold_campaign, validate_campaign
 from rsutil.core import OperationStatus, SetupResult, ValidationResult
 from rsutil.core.hashing import hash_file
 from rsutil.setup import SetupService
@@ -106,6 +106,35 @@ def test_scaffold_cif_snapshot_changes_campaign_provenance_not_entry_identity(tm
     assert second_metadata["structure_sources"]["Fe"]["sha256"] == hash_file(bundle / "source.cif")
 
 
+def test_campaign_provenance_is_orthogonal_to_entry_metadata_identity(tmp_path: Path) -> None:
+    source_root = tmp_path / "sources"
+    _make_bundle(source_root, "Fe")
+    common = {
+        "name": "materials",
+        "structures": {"Fe": "sources/Fe"},
+        "entries": [{"name": "case", "structure": "Fe", "metadata": {"recipe": "A"}}],
+    }
+    first = Campaign.from_dict(
+        {**common, "metadata": {"structure_sources": {"Fe": {"sha256": "old"}}}}
+    )
+    changed_provenance = Campaign.from_dict(
+        {**common, "metadata": {"structure_sources": {"Fe": {"sha256": "new"}}}}
+    )
+    changed_entry_metadata = Campaign.from_dict(
+        {
+            **common,
+            "entries": [{"name": "case", "structure": "Fe", "metadata": {"recipe": "B"}}],
+            "metadata": {"structure_sources": {"Fe": {"sha256": "new"}}},
+        }
+    )
+
+    first_id = validate_campaign(first, base_dir=tmp_path).entry_ids["case"]
+    provenance_id = validate_campaign(changed_provenance, base_dir=tmp_path).entry_ids["case"]
+    metadata_id = validate_campaign(changed_entry_metadata, base_dir=tmp_path).entry_ids["case"]
+    assert first_id == provenance_id
+    assert metadata_id != provenance_id
+
+
 def test_scaffold_without_cif_has_no_source_metadata_and_relocates(tmp_path: Path) -> None:
     source_root = tmp_path / "sources"
     _make_bundle(source_root, "Fe")
@@ -180,6 +209,58 @@ def test_scaffold_cli_reports_summary(tmp_path: Path) -> None:
     assert output.is_file()
 
 
+def test_scaffold_existing_output_requires_explicit_overwrite(tmp_path: Path) -> None:
+    source_root = tmp_path / "sources"
+    _make_bundle(source_root, "Fe")
+    output = tmp_path / "campaign.json"
+    scaffold_campaign(source_root, name="materials", output=output)
+    original = output.read_bytes()
+    output.write_bytes(b"user-edited campaign\n")
+    edited = output.read_bytes()
+
+    with pytest.raises(CampaignScaffoldError, match="pass overwrite=True"):
+        scaffold_campaign(source_root, name="materials", output=output)
+    assert output.read_bytes() == edited
+
+    overwritten = scaffold_campaign(
+        source_root, name="materials", output=output, overwrite=True
+    )
+    assert output.read_bytes() != edited
+    assert output.read_bytes() == json.dumps(
+        overwritten.campaign.to_dict(), indent=2, sort_keys=True
+    ).encode() + b"\n"
+    assert output.read_bytes() == original
+
+    output.write_bytes(b"edited through CLI\n")
+    rejected = run_rsutil(
+        tmp_path,
+        "campaign",
+        "scaffold",
+        "sources",
+        "--name",
+        "materials",
+        "--output",
+        "campaign.json",
+    )
+    assert rejected.returncode == 1
+    assert "output already exists" in rejected.stderr
+    assert output.read_bytes() == b"edited through CLI\n"
+
+    permitted = run_rsutil(
+        tmp_path,
+        "campaign",
+        "scaffold",
+        "sources",
+        "--name",
+        "materials",
+        "--output",
+        "campaign.json",
+        "--overwrite",
+    )
+    assert permitted.returncode == 0, permitted.stderr
+    assert output.read_bytes() == original
+
+
 def test_scaffold_fails_closed_on_incomplete_candidate(tmp_path: Path) -> None:
     source_root = tmp_path / "sources"
     _make_bundle(source_root, "good")
@@ -232,6 +313,7 @@ def test_scaffold_filters_are_deterministic_and_dry_run_is_non_mutating(tmp_path
         output=output,
         include=("*Fe*",),
         exclude=("*test*",),
+        overwrite=True,
     )
 
     assert first_bytes == output.read_bytes()

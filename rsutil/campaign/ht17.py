@@ -24,7 +24,7 @@ from ..core.hashing import hash_file
 from ..exchange.jobs import read_exchange_manifest
 from ..results import ConvergenceState, UnsupportedResultFormatError, parse_exchange_results, parse_run
 from .generation import CAMPAIGN_INDEX_FILENAME
-from .models import CampaignIndex, CampaignIndexEntry
+from .models import CampaignIndex, CampaignIndexEntry, _validate_resource_values
 
 
 SLURM_SCHEMA_VERSION = "rsutil-slurm-array-v1"
@@ -438,6 +438,7 @@ def _canonical_resources(value: Mapping[str, Any] | None) -> dict[str, Any]:
         key = _canonical_resource_key(raw_key)
         _safe_directive(raw_value, key)
         result[key] = raw_value
+    _validate_resource_values(result)
     return result
 
 

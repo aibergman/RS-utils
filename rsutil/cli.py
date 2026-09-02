@@ -1124,6 +1124,7 @@ def run_campaign_scaffold(args):
             include=tuple(args.include or ()),
             exclude=tuple(args.exclude or ()),
             dry_run=args.dry_run,
+            overwrite=args.overwrite,
         )
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
@@ -1427,6 +1428,11 @@ def create_campaign_parser(subparsers):
         "--dry-run",
         action="store_true",
         help="Discover and validate without writing the campaign JSON",
+    )
+    scaffold.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Replace an existing campaign JSON explicitly",
     )
     scaffold.set_defaults(func=run_campaign_scaffold)
 

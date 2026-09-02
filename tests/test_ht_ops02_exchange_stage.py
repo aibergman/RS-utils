@@ -128,6 +128,34 @@ def test_prepare_selects_only_converged_successful_parents_and_reuses_jobs(tmp_p
     assert changed.jobs[0]["canonical_exchange_job_identity"] != first.jobs[0]["canonical_exchange_job_identity"]
 
 
+def test_exchange_stage_identity_tracks_parent_output_and_persists_each_stage(tmp_path: Path) -> None:
+    entry = _write_parent(tmp_path, entry_id="a" * 64, name="valid")
+    _write_campaign(tmp_path, (entry,))
+
+    first = prepare_exchange_stage(tmp_path, tmp_path / "exchange-stage", cutoff=1.0)
+    first_manifest = first.manifest_path.read_bytes()
+
+    # The parent entry and setup manifest are unchanged, but the converged
+    # exchange source evidence is different.
+    (tmp_path / entry.run_path / "report.out").write_text(
+        "Fermi energy: -0.250\n", encoding="utf-8"
+    )
+    changed_parent = prepare_exchange_stage(
+        tmp_path, tmp_path / "exchange-stage", cutoff=1.0
+    )
+    assert changed_parent.stage_id != first.stage_id
+    assert first.manifest_path.is_file()
+    assert first.manifest_path.read_bytes() == first_manifest
+    assert changed_parent.manifest_path.is_file()
+
+    changed_policy = prepare_exchange_stage(
+        tmp_path, tmp_path / "exchange-stage", cutoff=0.5
+    )
+    assert changed_policy.stage_id != changed_parent.stage_id
+    assert changed_policy.manifest_path.is_file()
+    assert len(list((tmp_path / "exchange-stage").glob("*/exchange_stage_manifest.json"))) == 3
+
+
 def test_unique_reduction_requires_explicit_supported_magnetic_context(tmp_path: Path) -> None:
     entry = _write_parent(tmp_path, entry_id="a" * 64, name="valid")
     _write_campaign(tmp_path, (entry,))

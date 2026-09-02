@@ -8,6 +8,8 @@ import shlex
 import subprocess
 from pathlib import Path
 
+import pytest
+
 from rsutil.campaign import CampaignEntry, CampaignIndex, CampaignIndexEntry, render_slurm_array
 
 
@@ -48,6 +50,33 @@ def test_resource_settings_are_not_scientific_identity(tmp_path: Path) -> None:
     assert first.identity_hash(source_hashes={"input.nml": "same"}) == second.identity_hash(
         source_hashes={"input.nml": "same"}
     )
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (
+        ("ntasks", 0),
+        ("ntasks", -1),
+        ("nodes", 0),
+        ("cpus_per_task", 0),
+        ("cpus_per_task", -1),
+    ),
+)
+def test_nonpositive_scheduler_counts_are_rejected(field: str, value: int) -> None:
+    with pytest.raises(ValueError, match=f"resource {field} must be a positive integer"):
+        CampaignEntry("case", source="source", resources={field: value})
+
+
+def test_nonpositive_scheduler_counts_are_rejected_from_index() -> None:
+    with pytest.raises(ValueError, match="resource nodes must be a positive integer"):
+        CampaignIndexEntry(
+            "a" * 64,
+            "case",
+            "runs/case",
+            "runs/case/run_manifest.json",
+            "manifest",
+            resources={"nodes": "0"},
+        )
 
 
 def test_heterogeneous_rendering_groups_deterministically_and_inherits_defaults(tmp_path: Path) -> None:
@@ -126,4 +155,3 @@ def test_resource_aware_homogeneous_campaign_keeps_one_class_and_quotes_paths(tm
     completed = subprocess.run(["bash", str(rendered.script_path)], env=environment, capture_output=True, text=True)
     assert completed.returncode == 0, completed.stderr
     assert record.read_text(encoding="utf-8").startswith("0|" + "b" * 64 + "|")
-

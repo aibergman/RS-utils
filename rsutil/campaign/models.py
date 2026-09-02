@@ -17,6 +17,50 @@ def _mapping(value: Mapping[str, Any] | None) -> dict[str, Any]:
     return dict(value or {})
 
 
+_POSITIVE_INTEGER_RESOURCE_KEYS = frozenset(
+    {"ntasks", "nodes", "cpus_per_task", "ntasks_per_node"}
+)
+
+
+def _canonical_resource_key(value: Any) -> str:
+    return str(value).strip().lower().replace("-", "_")
+
+
+def _validate_resource_values(resources: Mapping[str, Any]) -> None:
+    """Validate resource quantities with an established integer contract.
+
+    Resource mappings intentionally remain open-ended because sites may use
+    scheduler-specific keys and values.  The standard count-like fields are
+    different: accepting zero or a negative value produces an invalid
+    scheduler request, so those fields must be positive integers.  Numeric
+    strings remain supported for JSON/CLI resource compatibility; arbitrary
+    scheduler strings are not otherwise interpreted here.
+    """
+
+    for raw_key, value in resources.items():
+        key = _canonical_resource_key(raw_key)
+        if value is None:
+            continue
+        # ``gpus`` also commonly denotes a positive count, but Slurm accepts
+        # site-specific GRES spellings such as ``gpu:a100:2``.  Validate
+        # numeric GPU counts while leaving those scheduler strings untouched.
+        if key not in _POSITIVE_INTEGER_RESOURCE_KEYS and key != "gpus":
+            continue
+        if isinstance(value, bool):
+            raise ValueError(f"resource {key} must be a positive integer")
+        if isinstance(value, int):
+            valid = value >= 1
+        elif isinstance(value, str):
+            text = value.strip()
+            if key == "gpus" and not text.isdigit():
+                continue
+            valid = bool(text) and text.isdigit() and int(text) >= 1
+        else:
+            valid = False
+        if not valid:
+            raise ValueError(f"resource {key} must be a positive integer")
+
+
 @dataclass
 class CampaignEntry:
     """One independently generated setup run.
@@ -65,6 +109,7 @@ class CampaignEntry:
         # campaign entry for rendering, but is intentionally excluded from
         # ``identity_payload`` below.
         self.resources = _mapping(self.resources)
+        _validate_resource_values(self.resources)
         if self.destination is not None:
             if not isinstance(self.destination, str) or not self.destination.strip():
                 raise ValueError("entry destination must be a non-empty string")
@@ -237,6 +282,7 @@ class CampaignIndexEntry:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "resources", _mapping(self.resources))
+        _validate_resource_values(self.resources)
 
     def to_dict(self) -> dict[str, Any]:
         result = {

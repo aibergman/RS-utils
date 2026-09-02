@@ -169,6 +169,7 @@ def scaffold_campaign(
     include: tuple[str, ...] = (),
     exclude: tuple[str, ...] = (),
     dry_run: bool = False,
+    overwrite: bool = False,
 ) -> CampaignScaffoldResult:
     """Create and validate a campaign specification from source bundles.
 
@@ -183,6 +184,12 @@ def scaffold_campaign(
 
     root = Path(source_root).resolve()
     output_path = Path(output).resolve()
+    if output_path.exists() and output_path.is_dir():
+        raise CampaignScaffoldError(f"output path is a directory: {output_path}")
+    if output_path.exists() and not dry_run and not overwrite:
+        raise CampaignScaffoldError(
+            f"output already exists: {output_path}; pass overwrite=True or use --overwrite"
+        )
     candidates = discover_source_bundles(root, include=include, exclude=exclude)
     incomplete = tuple(candidate for candidate in candidates if not candidate.complete)
     if incomplete:
@@ -244,8 +251,6 @@ def scaffold_campaign(
         )
         raise CampaignScaffoldError(f"campaign validation failed: {details}")
 
-    if output_path.exists() and output_path.is_dir():
-        raise CampaignScaffoldError(f"output path is a directory: {output_path}")
     if not dry_run:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         _atomic_json(output_path, campaign.to_dict())

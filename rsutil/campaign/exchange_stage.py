@@ -62,6 +62,7 @@ from .ht17 import (
     _safe_directive,
     status_campaign,
 )
+from .models import _validate_resource_values
 
 
 EXCHANGE_STAGE_MANIFEST_FILENAME = "exchange_stage_manifest.json"
@@ -241,6 +242,82 @@ def _stage_root(value: str | Path, parent_root: Path) -> Path:
     return root
 
 
+def _stage_directory(destination: str | Path, parent_root: Path, stage_id: str) -> tuple[Path, Path]:
+    """Resolve a persistent directory for one stage without orphaning others.
+
+    New stages live below ``destination/<stage_id>``.  A legacy stage whose
+    manifest is directly in ``destination`` remains readable, and the first
+    new nested stage gets a compatibility manifest at the destination root.
+    The compatibility file is never replaced once it exists.
+    """
+
+    base = _stage_root(destination, parent_root)
+    nested = base / stage_id
+    nested_manifest = nested / EXCHANGE_STAGE_MANIFEST_FILENAME
+
+    if nested_manifest.is_file():
+        try:
+            existing = json.loads(nested_manifest.read_text(encoding="utf-8"))
+        except Exception as exc:
+            raise ExchangeStageError(
+                f"could not read existing exchange stage manifest {nested_manifest}: {exc}"
+            ) from exc
+        if not isinstance(existing, Mapping) or existing.get("stage_id") != stage_id:
+            raise ExchangeStageError(
+                f"exchange stage directory {nested} belongs to a different stage_id"
+            )
+        return nested, base
+    if nested.exists():
+        if not nested.is_dir():
+            raise ExchangeStageError(f"exchange stage path is not a directory: {nested}")
+        if any(nested.iterdir()):
+            raise ExchangeStageError(
+                f"exchange stage directory has no valid manifest; refusing to use it: {nested}"
+            )
+        return nested, base
+
+    root_manifest = base / EXCHANGE_STAGE_MANIFEST_FILENAME
+    if root_manifest.is_file():
+        try:
+            existing = json.loads(root_manifest.read_text(encoding="utf-8"))
+        except Exception:
+            existing = None
+        if isinstance(existing, Mapping) and existing.get("stage_id") == stage_id:
+            return base, base
+    return nested, base
+
+
+def _write_stage_manifest_alias(base: Path, stage_root: Path) -> None:
+    """Keep the historical destination-root entry point without overwriting it."""
+
+    if stage_root == base:
+        return
+    alias = base / EXCHANGE_STAGE_MANIFEST_FILENAME
+    if alias.exists() or alias.is_symlink():
+        return
+    alias.parent.mkdir(parents=True, exist_ok=True)
+    os.symlink(os.path.relpath(stage_root / EXCHANGE_STAGE_MANIFEST_FILENAME, alias.parent), alias)
+
+
+def _write_stage_job_alias(base: Path, stage_root: Path, stage_id: str) -> None:
+    """Expose the historical job path while retaining one actual job tree."""
+
+    if stage_root == base:
+        return
+    actual = stage_root / "jobs" / stage_id
+    if not actual.is_dir():
+        return
+    alias = base / "jobs" / stage_id
+    if alias.exists() or alias.is_symlink():
+        if alias.is_symlink() and alias.resolve() == actual.resolve():
+            return
+        raise ExchangeStageError(
+            f"compatibility exchange job path already exists and is not this stage: {alias}"
+        )
+    alias.parent.mkdir(parents=True, exist_ok=True)
+    os.symlink(os.path.relpath(actual, alias.parent), alias, target_is_directory=True)
+
+
 def _stage_path(root: Path, value: str, label: str) -> Path:
     candidate = Path(value)
     if candidate.is_absolute() or ".." in candidate.parts:
@@ -391,18 +468,16 @@ def _check_reduction_policy(options: Mapping[str, Any]) -> None:
         )
 
 
-def _stage_identity(index: Any, parent_records: Sequence[Mapping[str, Any]], options: Mapping[str, Any]) -> str:
+def _stage_identity(parent_records: Sequence[Mapping[str, Any]], options: Mapping[str, Any]) -> str:
     return hash_json({
         "schema_version": EXCHANGE_STAGE_MANIFEST_SCHEMA,
-        "campaign_id": index.campaign_id,
         "parents": [
             {
                 "entry_id": item["entry_id"],
-                "run_path": item["run_path"],
-                "manifest_hash": item["manifest_hash"],
+                "exchange_source_identity": item["exchange_source_identity"],
             }
             for item in parent_records
-            if item.get("parent_status_eligible")
+            if item.get("exchange_source_identity")
         ],
         "exchange_options": dict(options),
     })
@@ -475,7 +550,6 @@ def prepare_exchange_stage(
     index, parent_root, index_path = _load_index(
         campaign_index, campaign_root=campaign_root
     )
-    stage_root = _stage_root(destination, parent_root)
     options = _canonical_exchange_options(
         cutoff=cutoff,
         unique=unique,
@@ -509,11 +583,11 @@ def prepare_exchange_stage(
             "diagnostics": diagnostics,
         })
 
-    stage_id = _stage_identity(index, parent_records, options)
-    jobs_by_parent = stage_root / "jobs" / stage_id
-    generated: list[tuple[int, int, dict[str, Any]]] = []
+    # Plan first so the stage identity can use the exchange service's
+    # authoritative source-run identity.  This identity includes the current
+    # parent report/Fermi source and required converged atom files.
+    planned: dict[int, tuple[dict[str, Any], dict[str, Path | None], Any]] = {}
     skipped: list[dict[str, Any]] = []
-
     for parent_position, (entry, parent) in enumerate(zip(index.entries, parent_records)):
         if not parent["parent_status_eligible"]:
             skipped.append(dict(parent))
@@ -530,8 +604,6 @@ def prepare_exchange_stage(
             skipped.append(dict(parent))
             continue
         try:
-            # The service reads the parent run explicitly, while the writer
-            # publishes the resulting Atom_* directories under the stage.
             plan = ExchangeService(run_dir).plan(
                 cutoff=options["cutoff"],
                 unique=options["unique"],
@@ -573,8 +645,40 @@ def prepare_exchange_stage(
                 })
                 skipped.append(dict(parent))
                 continue
+            source_identities = {
+                str(job.source_run_identity)
+                for job in plan.jobs
+                if str(job.source_run_identity)
+            }
+            if len(source_identities) != 1:
+                raise ExchangeStageError(
+                    "exchange service did not provide one authoritative parent source-run identity"
+                )
+            parent["exchange_source_identity"] = next(iter(source_identities))
+            parent["eligible"] = True
+            parent["reference_inputs"] = {
+                name: path.name for name, path in paths.items() if path is not None
+            }
+            planned[parent_position] = (parent, paths, plan)
+        except UnsupportedMagneticContextError:
+            raise
+        except Exception as exc:
+            parent["diagnostics"].append({
+                "code": "exchange_preparation_failed",
+                "message": str(exc),
+                "type": exc.__class__.__name__,
+            })
+            skipped.append(dict(parent))
 
+    stage_id = _stage_identity(parent_records, options)
+    stage_root, stage_base = _stage_directory(destination, parent_root, stage_id)
+    jobs_by_parent = stage_root / "jobs" / stage_id
+    generated: list[tuple[int, int, dict[str, Any]]] = []
+    for parent_position, (parent, paths, plan) in planned.items():
+        entry = index.entries[parent_position]
+        try:
             parent_job_root = jobs_by_parent / entry.entry_id
+            run_dir = (parent_root / entry.run_path).resolve()
             rebased_jobs = tuple(
                 replace(job, output_dir=parent_job_root / f"Atom_{job.atom_index}")
                 for job in plan.jobs
@@ -602,9 +706,6 @@ def prepare_exchange_stage(
                     ),
                 ))
             parent["eligible"] = True
-            parent["reference_inputs"] = {
-                name: path.name for name, path in paths.items() if path is not None
-            }
         except UnsupportedMagneticContextError:
             raise
         except Exception as exc:
@@ -666,8 +767,10 @@ def prepare_exchange_stage(
         "generated_at": generation["timestamp"],
         "generation_version": generation["version"],
     }
+    _write_stage_job_alias(stage_base, stage_root, stage_id)
     manifest_path = stage_root / EXCHANGE_STAGE_MANIFEST_FILENAME
     _atomic_json(manifest_path, manifest)
+    _write_stage_manifest_alias(stage_base, stage_root)
     return ExchangeStagePreparation(
         stage_root=stage_root,
         manifest_path=manifest_path,
@@ -861,6 +964,7 @@ def _slurm_resources(resources: Mapping[str, Any] | None) -> dict[str, Any]:
             continue
         normalized = aliases.get(str(key).lower().replace("-", "_"), str(key).lower().replace("-", "_"))
         result[normalized] = value
+    _validate_resource_values(result)
     return result
 
 
