@@ -27,7 +27,8 @@ class CampaignEntry:
     scientific setup contract; ``setup`` is accepted as a JSON spelling for
     convenient construction and is normalized into the same field.  Entry
     ``metadata`` is intentionally part of scientific identity; campaign-wide
-    provenance belongs on ``Campaign.metadata``.
+    provenance belongs on ``Campaign.metadata``.  ``resources`` contains
+    optional operational allocation metadata and is not part of identity.
     """
 
     name: str
@@ -41,6 +42,7 @@ class CampaignEntry:
     seed: int | None = None
     setup: SetupSpec | Mapping[str, Any] | None = None
     entry_id: str | None = None
+    resources: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not isinstance(self.name, str) or not self.name.strip():
@@ -59,6 +61,10 @@ class CampaignEntry:
         self.calculation = _mapping(self.calculation)
         self.exchange = None if self.exchange is None else _mapping(self.exchange)
         self.metadata = _mapping(self.metadata)
+        # Resource allocation is operational policy.  It is carried with the
+        # campaign entry for rendering, but is intentionally excluded from
+        # ``identity_payload`` below.
+        self.resources = _mapping(self.resources)
         if self.destination is not None:
             if not isinstance(self.destination, str) or not self.destination.strip():
                 raise ValueError("entry destination must be a non-empty string")
@@ -80,6 +86,8 @@ class CampaignEntry:
             result["destination"] = self.destination
         if self.seed is not None:
             result["seed"] = self.seed
+        if self.resources:
+            result["resources"] = dict(self.resources)
         if include_id and self.entry_id is not None:
             result["entry_id"] = self.entry_id
         return result
@@ -97,6 +105,7 @@ class CampaignEntry:
             metadata=known.get("metadata"),
             destination=known.get("destination"),
             seed=known.get("seed"),
+            resources=known.get("resources"),
             entry_id=known.get("entry_id"),
         )
 
@@ -224,9 +233,13 @@ class CampaignIndexEntry:
     manifest_path: str
     manifest_hash: str
     status: str = "generated"
+    resources: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "resources", _mapping(self.resources))
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        result = {
             "entry_id": self.entry_id,
             "name": self.name,
             "run_path": self.run_path,
@@ -234,6 +247,9 @@ class CampaignIndexEntry:
             "manifest_hash": self.manifest_hash,
             "status": self.status,
         }
+        if self.resources:
+            result["resources"] = dict(self.resources)
+        return result
 
 
 @dataclass(frozen=True)

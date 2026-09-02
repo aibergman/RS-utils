@@ -121,10 +121,20 @@ rsutil campaign status pilot-runs
 rsutil campaign collect pilot-runs --csv pilot-runs/results.csv
 ```
 
+Entries may optionally carry operational resource requirements, for example
+`"resources": {"ntasks": 8, "memory": "4G", "time": "02:00:00"}`.
+With entry overrides, rendering creates one Slurm array per homogeneous
+resource class and writes `resource_plan.json` plus `submit_all.sh`. Resource
+allocation is operational policy, not scientific calculation identity. RS-utils
+does not yet infer an optimal MPI size; use early HT campaigns to collect
+scaling data before introducing an automatic policy.
+
 `create` prepares setup-owned run directories but does not execute RS-LMTO.
-`render-slurm` writes `slurm_run_list.tsv` and `submit_array.sbatch` but does
-not submit them. Inspect the rendered files before submitting. `status` and
-`collect` do not query Slurm, retry jobs, restart runs, or manage dependencies.
+For a homogeneous campaign, `render-slurm` writes the familiar
+`slurm_run_list.tsv` and `submit_array.sbatch`; resource-aware campaigns put
+these files under their class directories. It does not submit them. Inspect
+the rendered files before submitting. `status` and `collect` do not query
+Slurm, retry jobs, restart runs, or manage dependencies.
 See [HT campaigns](HT_CAMPAIGNS) for the full schema and state table.
 
 ## 5. Interpret statuses scientifically

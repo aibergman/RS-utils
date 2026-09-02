@@ -30,6 +30,8 @@ SLURM_SCHEMA_VERSION = "rsutil-slurm-array-v1"
 CAMPAIGN_RESULTS_SCHEMA_VERSION = "rsutil-campaign-results-v1"
 RUN_LIST_FILENAME = "slurm_run_list.tsv"
 SLURM_SCRIPT_FILENAME = "submit_array.sbatch"
+SUBMIT_ALL_FILENAME = "submit_all.sh"
+RESOURCE_PLAN_FILENAME = "resource_plan.json"
 CAMPAIGN_RESULTS_FILENAME = "campaign_results.json"
 EXECUTION_EVIDENCE_FILENAME = "rsutil_execution.json"
 EXECUTION_SCHEMA_VERSION = "rsutil-execution-v1"
@@ -186,6 +188,10 @@ class SlurmRenderResult:
     script_path: Path
     array_size: int
     schema_version: str = SLURM_SCHEMA_VERSION
+    class_count: int = 1
+    resource_aware: bool = False
+    submit_all_path: Path | None = None
+    resource_plan_path: Path | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -194,10 +200,14 @@ class SlurmRenderResult:
             "run_list_path": str(self.run_list_path),
             "script_path": str(self.script_path),
             "array_size": self.array_size,
+            "class_count": self.class_count,
+            "resource_aware": self.resource_aware,
+            "submit_all_path": None if self.submit_all_path is None else str(self.submit_all_path),
+            "resource_plan_path": None if self.resource_plan_path is None else str(self.resource_plan_path),
         }
 
 
-def render_slurm_array(
+def _render_single_slurm_array(
     campaign_index: CampaignIndex | str | Path,
     *,
     executable: str | Path | Sequence[str] | None = None,
@@ -376,6 +386,262 @@ def render_slurm_array(
     _atomic_write(script_path, "\n".join(lines))
     script_path.chmod(script_path.stat().st_mode | 0o111)
     return SlurmRenderResult(root, run_list_path, script_path, len(index.entries))
+
+
+_RESOURCE_ALIASES = {
+    "mem": "memory",
+    "memory": "memory",
+    "time": "time",
+    "time_limit": "time",
+    "cpus_per_task": "cpus_per_task",
+    "ntasks": "ntasks",
+    "gpus": "gpus",
+    "nodes": "nodes",
+    "ntasks_per_node": "ntasks_per_node",
+    "constraint": "constraint",
+    "qos": "qos",
+}
+_RESOURCE_OPTIONS = {
+    "cpus_per_task": "cpus-per-task",
+    "memory": "mem",
+    "gpus": "gpus",
+    "nodes": "nodes",
+    "ntasks": "ntasks",
+    "ntasks_per_node": "ntasks-per-node",
+    "time": "time",
+    "constraint": "constraint",
+    "qos": "qos",
+}
+_RESOURCE_KEY_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
+
+
+def _canonical_resource_key(value: Any) -> str:
+    key = str(value)
+    if not key or any(character in key for character in "\x00\r\n"):
+        raise ValueError("resource names must be non-empty and single-line")
+    if not _RESOURCE_KEY_RE.fullmatch(key):
+        raise ValueError(f"invalid resource name: {key!r}")
+    normalized = key.lower().replace("-", "_")
+    return _RESOURCE_ALIASES.get(normalized, normalized)
+
+
+def _canonical_resources(value: Mapping[str, Any] | None) -> dict[str, Any]:
+    if value is None:
+        return {}
+    if not isinstance(value, Mapping):
+        raise ValueError("resources must be a mapping")
+    result: dict[str, Any] = {}
+    for raw_key, raw_value in value.items():
+        if raw_value is None:
+            continue
+        key = _canonical_resource_key(raw_key)
+        _safe_directive(raw_value, key)
+        result[key] = raw_value
+    return result
+
+
+def _effective_resources(
+    index: CampaignIndex,
+    *,
+    time_limit: str | None,
+    resources: Mapping[str, Any] | None,
+) -> tuple[dict[str, Any], ...]:
+    defaults = _canonical_resources(resources)
+    if time_limit is not None and "time" not in defaults:
+        defaults["time"] = _safe_directive(time_limit, "time")
+    result: list[dict[str, Any]] = []
+    for entry in index.entries:
+        values = dict(defaults)
+        values.update(_canonical_resources(getattr(entry, "resources", {})))
+        result.append(values)
+    return tuple(result)
+
+
+def _resource_group_key(resources: Mapping[str, Any]) -> tuple[tuple[str, str], ...]:
+    # Compare the scalar spelling used in the generated #SBATCH directive so
+    # JSON integer 4 and CLI string "4" describe the same resource class.
+    return tuple((key, str(resources[key])) for key in sorted(resources))
+
+
+def _slurm_resource_values(resources: Mapping[str, Any]) -> dict[str, Any]:
+    """Translate canonical names back to the renderer's legacy option names."""
+
+    return {
+        ("mem" if key == "memory" else key): value
+        for key, value in resources.items()
+    }
+
+
+def _resource_plan_entry(
+    entry: CampaignIndexEntry,
+    *,
+    resource_class: str,
+    effective: Mapping[str, Any],
+) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "entry_id": entry.entry_id,
+        "run_path": entry.run_path,
+        "run_directory": entry.run_path,
+        "resource_class": resource_class,
+        "ntasks": effective.get("ntasks"),
+        "cpus_per_task": effective.get("cpus_per_task"),
+        "effective_resources": dict(effective),
+    }
+    if "memory" in effective:
+        result["memory"] = effective["memory"]
+    if "time" in effective:
+        result["time"] = effective["time"]
+        result["time_limit"] = effective["time"]
+    return result
+
+
+def _resource_class_summary(effective: Mapping[str, Any]) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "resources": dict(effective),
+        "ntasks": effective.get("ntasks"),
+        "cpus_per_task": effective.get("cpus_per_task"),
+    }
+    if "memory" in effective:
+        result["memory"] = effective["memory"]
+    if "time" in effective:
+        result["time"] = effective["time"]
+        result["time_limit"] = effective["time"]
+    return result
+
+
+def render_slurm_array(
+    campaign_index: CampaignIndex | str | Path,
+    *,
+    executable: str | Path | Sequence[str] | None = None,
+    launcher: str | Sequence[str] | None = None,
+    arguments: Sequence[str] = (),
+    campaign_root: str | Path | None = None,
+    output_dir: str | Path | None = None,
+    run_list_name: str = RUN_LIST_FILENAME,
+    script_name: str = SLURM_SCRIPT_FILENAME,
+    job_name: str | None = None,
+    partition: str | None = None,
+    account: str | None = None,
+    time_limit: str | None = None,
+    resources: Mapping[str, Any] | None = None,
+    environment_preamble: str | Sequence[str] | None = None,
+    resource_aware: bool = False,
+) -> SlurmRenderResult:
+    """Render a homogeneous array or deterministic resource-class arrays.
+
+    Without entry overrides this retains the original single-array artifact
+    names.  Entry overrides automatically enable resource classes; callers
+    may also request the explicit resource-aware layout for a homogeneous
+    campaign with ``resource_aware=True``.
+    """
+
+    index, root, _ = _load_index(campaign_index, campaign_root=campaign_root)
+    destination = root if output_dir is None else Path(output_dir).expanduser().resolve()
+    destination.mkdir(parents=True, exist_ok=True)
+    if Path(run_list_name).name != run_list_name or Path(script_name).name != script_name:
+        raise ValueError("run-list and script names must be simple file names")
+    effective = _effective_resources(index, time_limit=time_limit, resources=resources)
+    has_entry_overrides = any(_canonical_resources(getattr(entry, "resources", {})) for entry in index.entries)
+    use_resource_classes = bool(resource_aware or has_entry_overrides)
+    groups: dict[tuple[tuple[str, str], ...], list[int]] = {}
+    for position, values in enumerate(effective):
+        groups.setdefault(_resource_group_key(values), []).append(position)
+    ordered_groups = sorted(groups.items(), key=lambda item: item[0])
+    base_job_name = job_name or index.campaign_name
+    class_records: list[dict[str, Any]] = []
+    class_positions: list[tuple[str, tuple[int, ...]]] = []
+    class_script_paths: list[Path] = []
+
+    for class_number, (group_key, positions_list) in enumerate(ordered_groups, start=1):
+        del group_key
+        resource_class = f"class-{class_number:03d}"
+        positions = tuple(positions_list)
+        class_resources = effective[positions[0]]
+        if use_resource_classes:
+            class_dir = destination / resource_class
+            class_dir.mkdir(parents=True, exist_ok=True)
+            class_output = class_dir
+            rendered_job_name = f"{base_job_name}-{resource_class}"
+        else:
+            class_output = destination
+            rendered_job_name = base_job_name
+        class_index = CampaignIndex(
+            campaign_id=index.campaign_id,
+            campaign_name=index.campaign_name,
+            campaign_spec_hash=index.campaign_spec_hash,
+            entries=tuple(index.entries[position] for position in positions),
+        )
+        rendered = _render_single_slurm_array(
+            class_index,
+            executable=executable,
+            launcher=launcher,
+            arguments=arguments,
+            campaign_root=root,
+            output_dir=class_output,
+            run_list_name=run_list_name,
+            script_name=script_name,
+            job_name=rendered_job_name,
+            partition=partition,
+            account=account,
+            time_limit=None,
+            resources=_slurm_resource_values(class_resources),
+            environment_preamble=environment_preamble,
+        )
+        class_script_paths.append(rendered.script_path)
+        class_positions.append((resource_class, positions))
+        class_records.append({
+            "resource_class": resource_class,
+            **_resource_class_summary(class_resources),
+            "entries": [index.entries[position].entry_id for position in positions],
+            "array_size": len(positions),
+            "run_list_path": rendered.run_list_path.relative_to(destination).as_posix(),
+            "script_path": rendered.script_path.relative_to(destination).as_posix(),
+        })
+
+    submit_all_path: Path | None = None
+    if use_resource_classes:
+        submit_all_path = destination / SUBMIT_ALL_FILENAME
+        lines = ["#!/usr/bin/env bash", "set -euo pipefail", ""]
+        lines.extend(f"sbatch {shlex.quote(path.resolve().as_posix())}" for path in class_script_paths)
+        _atomic_write(submit_all_path, "\n".join(lines) + "\n")
+        submit_all_path.chmod(submit_all_path.stat().st_mode | 0o111)
+
+    class_by_position: dict[int, str] = {}
+    for resource_class, positions in class_positions:
+        class_by_position.update({position: resource_class for position in positions})
+    plan_defaults = _canonical_resources(resources)
+    if time_limit is not None and "time" not in plan_defaults:
+        plan_defaults["time"] = _safe_directive(time_limit, "time")
+    plan_path = destination / RESOURCE_PLAN_FILENAME
+    _atomic_json(plan_path, {
+        "schema_version": "rsutil-resource-plan-v1",
+        "campaign_id": index.campaign_id,
+        "campaign_name": index.campaign_name,
+        "render_mode": "resource_classes" if use_resource_classes else "single_array",
+        "resource_aware": use_resource_classes,
+        "defaults": plan_defaults,
+        "classes": class_records,
+        "entries": [
+            _resource_plan_entry(
+                entry,
+                resource_class=class_by_position[position],
+                effective=effective[position],
+            )
+            for position, entry in enumerate(index.entries)
+        ],
+    })
+
+    first = class_records[0]
+    return SlurmRenderResult(
+        campaign_root=root,
+        run_list_path=destination / first["run_list_path"],
+        script_path=destination / first["script_path"],
+        array_size=len(index.entries),
+        class_count=len(class_records),
+        resource_aware=use_resource_classes,
+        submit_all_path=submit_all_path,
+        resource_plan_path=plan_path,
+    )
 
 
 render_slurm = render_slurm_array
@@ -833,6 +1099,7 @@ __all__ = [
     "OUTPUT_PARSE_INVALID",
     "OUTPUT_PARSE_UNSUPPORTED",
     "OUTPUT_PARSE_VALID",
+    "RESOURCE_PLAN_FILENAME",
     "RUN_LIST_FILENAME",
     "SCIENTIFIC_CONVERGED",
     "SCIENTIFIC_NOT_APPLICABLE",
@@ -840,6 +1107,7 @@ __all__ = [
     "SCIENTIFIC_UNKNOWN",
     "SLURM_SCHEMA_VERSION",
     "SLURM_SCRIPT_FILENAME",
+    "SUBMIT_ALL_FILENAME",
     "SlurmRenderResult",
     "UNKNOWN",
     "campaign_collect",

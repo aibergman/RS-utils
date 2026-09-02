@@ -29,6 +29,16 @@ The primary format is JSON with schema `rsutil-campaign-v1`:
       "structure": "fen",
       "setup": {"seed": 12},
       "calculation": {"executable": "rs-lmto", "mode": "scf"}
+    },
+    {
+      "name": "large-fen",
+      "structure": "fen",
+      "resources": {
+        "ntasks": 8,
+        "cpus_per_task": 1,
+        "memory": "4G",
+        "time": "02:00:00"
+      }
     }
   ]
 }
@@ -39,6 +49,12 @@ contain `lattice.nml` and `input.nml`; an explicit source mapping can provide
 `lattice` and `input` file paths. Per-entry setup values override
 `setup_template`. `exchange` is retained as optional metadata for later
 post-SCF job generation and is not executed by HT-16.
+
+`resources` is optional entry-level operational metadata. Resource allocation
+is operational policy, not scientific calculation identity: changing
+`ntasks`, memory, or time does not change an entry ID or create a new
+scientific calculation. Older campaign JSON without `resources` remains
+valid.
 
 For source trees that already contain prepared RS-LMTO bundles, scaffold a
 conservative SCF campaign without converting CIF files or generating new
@@ -153,6 +169,32 @@ rsutil campaign render-slurm pilot-runs/campaign_index.json \
 This writes `slurm_run_list.tsv` and `submit_array.sbatch` in the campaign
 root by default. Run the rendered script through Slurm, for example with
 `sbatch submit_array.sbatch`, when the site configuration is ready.
+
+For a campaign with entry resource overrides, `render-slurm` automatically
+groups entries by identical effective requirements (command-line defaults
+merged with the explicit entry values). It writes one array and run list per
+class, plus a `submit_all.sh` containing ordinary `sbatch` commands and a
+machine-readable `resource_plan.json`:
+
+```text
+slurm/
+  class-001/submit_array.sbatch
+  class-001/slurm_run_list.tsv
+  class-002/submit_array.sbatch
+  class-002/slurm_run_list.tsv
+  submit_all.sh
+  resource_plan.json
+```
+
+Use `--resource-aware` to request this class layout explicitly even when all
+entries are homogeneous. A homogeneous campaign without entry overrides and
+without that flag keeps the familiar root-level single array. The resource
+plan records each entry ID, run directory, class, effective task/CPU/memory/
+time settings, and the class artifacts. It does not infer MPI ranks from
+`nbulk_bulk`, `ntot`, `nbas`, or chemical species. RS-utils intentionally does
+not yet claim an optimal automatic MPI sizing model; use initial HT campaigns
+to collect scaling, wall-time, and convergence evidence before adopting a
+separate resource policy.
 
 Filesystem status is intentionally conservative and does not query Slurm. It
 retains three independent axes for each entry:

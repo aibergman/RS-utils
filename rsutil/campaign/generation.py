@@ -565,6 +565,7 @@ class CampaignGenerator:
                     run_path=_relative_path(run_dir, root),
                     manifest_path=_relative_path(manifest_path, root),
                     manifest_hash=manifest_hash,
+                    resources=entry.resources,
                 ))
                 continue
             lattice, input_nml = _source_files(campaign, entry, base)
@@ -595,6 +596,7 @@ class CampaignGenerator:
                 run_path=_relative_path(run_dir, root),
                 manifest_path=_relative_path(manifest_path, root),
                 manifest_hash=manifest_hash,
+                resources=entry.resources,
             ))
 
         index = CampaignIndex(

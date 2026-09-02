@@ -1154,6 +1154,7 @@ def run_campaign_render_slurm(args):
             time_limit=args.time_limit,
             resources=resources,
             environment_preamble=args.env_preamble or (),
+            resource_aware=getattr(args, "resource_aware", False),
         )
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
@@ -1161,6 +1162,11 @@ def run_campaign_render_slurm(args):
     print(f"Run list: {result.run_list_path}")
     print(f"Slurm script: {result.script_path}")
     print(f"Array size: {result.array_size}")
+    print(f"Resource classes: {result.class_count}")
+    if result.submit_all_path is not None:
+        print(f"Submit all: {result.submit_all_path}")
+    if result.resource_plan_path is not None:
+        print(f"Resource plan: {result.resource_plan_path}")
     return 0
 
 
@@ -1268,10 +1274,15 @@ def create_campaign_parser(subparsers):
     render.add_argument("--time", dest="time_limit")
     render.add_argument("--resource", action="append", default=[], metavar="KEY=VALUE", help="Additional #SBATCH resource (repeatable)")
     render.add_argument("--cpus-per-task", dest="cpus_per_task", type=int, help="SBATCH CPU count")
-    render.add_argument("--mem", help="SBATCH memory request")
+    render.add_argument("--mem", "--memory", dest="mem", help="SBATCH memory request")
     render.add_argument("--gpus", help="SBATCH GPU request")
     render.add_argument("--nodes", type=int, help="SBATCH node count")
     render.add_argument("--ntasks", type=int, help="SBATCH task count")
+    render.add_argument(
+        "--resource-aware",
+        action="store_true",
+        help="Render one Slurm array and run-list per effective resource class",
+    )
     render.add_argument("--env-preamble", "--environment-preamble", dest="env_preamble", action="append", default=[], help="User-supplied shell environment line (repeatable)")
     render.set_defaults(func=run_campaign_render_slurm)
 

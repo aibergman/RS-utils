@@ -174,6 +174,13 @@ they do not query Slurm or retry jobs. See [HT_CAMPAIGNS.md](docs/HT_CAMPAIGNS.m
 and [HT_READINESS_REPORT.md](docs/HT_READINESS_REPORT.md) for the support
 matrix and closeout evidence.
 
+Entry-level Slurm resources are optional operational metadata. When overrides
+are present, rendering groups entries into homogeneous resource classes and
+writes `resource_plan.json` plus `submit_all.sh`; `--resource-aware` requests
+that layout explicitly. Resource allocation is operational policy, not
+scientific calculation identity, and RS-utils does not yet claim an optimal
+automatic MPI sizing model.
+
 ### Bands and DOS workflows (pure Python)
 
 ```bash
