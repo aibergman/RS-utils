@@ -528,6 +528,7 @@ def _write_staged_job(
     *,
     lattice: Path,
     source_root: Path,
+    manifest_root: Path,
 ) -> dict[str, Any]:
     stage_dir.mkdir(parents=True, exist_ok=False)
     shutil.copy2(lattice, stage_dir / "lattice.nml")
@@ -541,7 +542,7 @@ def _write_staged_job(
         filename: hash_file(stage_dir / filename)
         for filename in ("lattice.nml", "input.nml", *job.required_atom_files)
     }
-    manifest = build_exchange_manifest(job, root=source_root, file_hashes=hashes)
+    manifest = build_exchange_manifest(job, root=manifest_root, file_hashes=hashes)
     with (stage_dir / EXCHANGE_MANIFEST_FILENAME).open("w", encoding="utf-8") as handle:
         json.dump(manifest, handle, indent=2, sort_keys=True)
         handle.write("\n")
@@ -568,10 +569,15 @@ def write_exchange_jobs(
     *,
     lattice_path: str | Path,
     source_dir: str | Path,
+    destination_root: str | Path | None = None,
     collision_policy: str = "error",
     force_legacy_collision: bool = False,
 ) -> ExchangeWriteResult:
     """Stage, validate, and transactionally publish familiar ``Atom_*`` jobs.
+
+    ``source_dir`` owns the converged source inputs.  When ``destination_root``
+    is supplied, generated jobs are published below that separate root while
+    retaining the same manifest and regeneration checks.
 
     ``error`` is the safe default.  ``replace_generated`` can replace only a
     directory carrying a valid rsutil ownership marker.  ``reuse_if_identical``
@@ -584,6 +590,7 @@ def write_exchange_jobs(
         jobs,
         lattice_path=lattice_path,
         source_dir=source_dir,
+        destination_root=destination_root,
         collision_policy=collision_policy,
         force_legacy_collision=force_legacy_collision,
     )
@@ -594,8 +601,9 @@ def _write_exchange_jobs(
     *,
     lattice_path: str | Path,
     source_dir: str | Path,
-    collision_policy: str,
-    force_legacy_collision: bool,
+    destination_root: str | Path | None = None,
+    collision_policy: str = "error",
+    force_legacy_collision: bool = False,
 ) -> ExchangeWriteResult:
     """Implementation for the public writer and service collision policies."""
 
@@ -605,29 +613,34 @@ def _write_exchange_jobs(
         return ExchangeWriteResult()
 
     root = Path(source_dir).expanduser().resolve()
+    publish_root = (
+        root if destination_root is None else Path(destination_root).expanduser().resolve()
+    )
     lattice = Path(lattice_path).expanduser()
     if not lattice.is_absolute():
         lattice = root / lattice
     if not lattice.is_file():
         raise FileNotFoundError(lattice)
     root.mkdir(parents=True, exist_ok=True)
+    publish_root.mkdir(parents=True, exist_ok=True)
 
-    stage_root = Path(tempfile.mkdtemp(prefix=".rsutil-exchange-stage-", dir=str(root)))
+    stage_root = Path(tempfile.mkdtemp(prefix=".rsutil-exchange-stage-", dir=str(publish_root)))
     prepared: list[tuple[ExchangeJobSpec, Path, dict[str, Any], Path]] = []
     reused: list[Path] = []
     try:
         for index, job in enumerate(jobs):
             destination = Path(job.output_dir).expanduser()
             if not destination.is_absolute():
-                destination = root / destination
+                destination = publish_root / destination
             destination = destination.resolve(strict=False)
-            _destination_is_safe(destination, root)
+            _destination_is_safe(destination, publish_root)
             stage_dir = stage_root / f"job-{index}"
             manifest = _write_staged_job(
                 stage_dir,
                 job,
                 lattice=lattice,
                 source_root=root,
+                manifest_root=publish_root,
             )
             existing = destination.exists() or destination.is_symlink()
             if existing:
@@ -677,11 +690,11 @@ def _write_exchange_jobs(
             for commit_index, (_job, destination, _manifest, stage_dir) in enumerate(prepared):
                 backup: Path | None = None
                 if destination.exists() or destination.is_symlink():
-                    backup = root / f".rsutil-exchange-backup-{commit_index}-{os.getpid()}"
+                    backup = publish_root / f".rsutil-exchange-backup-{commit_index}-{os.getpid()}"
                     suffix = 0
                     while backup.exists():
                         suffix += 1
-                        backup = root / f".rsutil-exchange-backup-{commit_index}-{os.getpid()}-{suffix}"
+                        backup = publish_root / f".rsutil-exchange-backup-{commit_index}-{os.getpid()}-{suffix}"
                     os.replace(destination, backup)
                     backups.append((destination, backup))
                 os.replace(stage_dir, destination)

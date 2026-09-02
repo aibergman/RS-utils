@@ -1216,6 +1216,141 @@ def run_campaign_collect(args):
     return 0
 
 
+def run_campaign_exchange_prepare(args):
+    """Prepare exchange jobs from successful, parsed, converged parent runs."""
+
+    from .campaign import prepare_exchange_stage
+
+    try:
+        result = prepare_exchange_stage(
+            Path(args.campaign).resolve(),
+            args.destination,
+            cutoff=args.cutoff,
+            full_pairs=args.full_pairs,
+            unique=not args.full_pairs,
+            shell_width=args.shell_width,
+            soc=args.soc,
+            magnetic_axis=(
+                None if args.magnetic_axis is None else tuple(args.magnetic_axis)
+            ),
+            magnetic_reference=args.magnetic_reference,
+        )
+    except Exception as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    print(f"Exchange stage manifest: {result.manifest_path}")
+    print(f"Parent entries used: {len({item['parent_entry_id'] for item in result.jobs})}")
+    print(f"Exchange jobs: {len(result.jobs)}")
+    print(f"Skipped parents: {len(result.skipped_parents)}")
+    for parent in result.skipped_parents:
+        print(f"  SKIPPED {parent['entry_id']} ({parent['name']})")
+        for diagnostic in parent.get("diagnostics", ()):
+            print(f"    - {diagnostic.get('message', diagnostic)}")
+    return 0
+
+
+def run_campaign_exchange_render_slurm(args):
+    """Render exchange-stage Slurm artifacts without submitting them."""
+
+    from .campaign import render_exchange_slurm
+
+    try:
+        resources = _campaign_resources(args.resource)
+        for key in ("cpus_per_task", "mem", "gpus", "nodes", "ntasks"):
+            value = getattr(args, key, None)
+            if value is not None:
+                resources[key] = value
+        result = render_exchange_slurm(
+            Path(args.stage).resolve(),
+            executable=args.executable,
+            launcher=args.launcher,
+            arguments=args.arguments or (),
+            output_dir=None if args.output_dir is None else Path(args.output_dir).resolve(),
+            job_name=args.job_name,
+            partition=args.partition,
+            account=args.account,
+            time_limit=args.time_limit,
+            resources=resources,
+            environment_preamble=args.env_preamble or (),
+        )
+    except Exception as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    print(f"Run list: {result.run_list_path}")
+    print(f"Slurm script: {result.script_path}")
+    print(f"Array size: {result.array_size}")
+    return 0
+
+
+def run_campaign_exchange_status(args):
+    """Inspect exchange-stage filesystem evidence without querying Slurm."""
+
+    from .campaign import status_exchange_stage
+
+    try:
+        report = status_exchange_stage(Path(args.stage).resolve())
+    except Exception as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    import json
+
+    if args.output is not None:
+        Path(args.output).resolve().write_text(
+            json.dumps(report.to_dict(), indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    if args.json:
+        print(json.dumps(report.to_dict(), indent=2, sort_keys=True))
+    elif args.output is None:
+        print(f"Exchange stage '{report.stage_id}' ({report.scheduler_state}; scheduler not queried)")
+        print("INDEX\tPARENT_ENTRY_ID\tJOB_IDENTITY\tSTATUS\tATOM_PATH\tEVIDENCE")
+        for entry in report.entries:
+            print(
+                f"{entry.array_index}\t{entry.parent_entry_id}\t{entry.job_identity}\t"
+                f"{entry.status}\t{entry.atom_path}\t{entry.evidence}"
+            )
+    return 0
+
+
+def run_campaign_exchange_collect(args):
+    """Collect canonical exchange results for one prepared stage."""
+
+    from .campaign import collect_exchange_stage
+
+    try:
+        result = collect_exchange_stage(
+            Path(args.stage).resolve(),
+            output=None if args.output is None else Path(args.output).resolve(),
+            sidecar_dir=None if args.sidecar_dir is None else Path(args.sidecar_dir).resolve(),
+        )
+    except Exception as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    print(f"Aggregate: {result.aggregate_path}")
+    print(f"Exchange jobs: {len(result.entries)}")
+    print(f"Valid results: {len(result.successful)}")
+    print(f"Job failures: {len(result.failures)}")
+    return 0
+
+
+def _add_exchange_slurm_options(parser):
+    parser.add_argument("--executable", required=True, help="Exchange executable or shell-word command")
+    parser.add_argument("--launcher", help="Optional launcher command, for example 'srun --exclusive'")
+    parser.add_argument("--argument", dest="arguments", action="append", default=[], help="Static argument passed to the executable (repeatable)")
+    parser.add_argument("--output-dir", help="Directory for rendered artifacts (default: stage root)")
+    parser.add_argument("--job-name")
+    parser.add_argument("--partition")
+    parser.add_argument("--account")
+    parser.add_argument("--time", dest="time_limit")
+    parser.add_argument("--resource", action="append", default=[], metavar="KEY=VALUE", help="Additional #SBATCH resource (repeatable)")
+    parser.add_argument("--cpus-per-task", dest="cpus_per_task", type=int)
+    parser.add_argument("--mem", "--memory", dest="mem")
+    parser.add_argument("--gpus")
+    parser.add_argument("--nodes", type=int)
+    parser.add_argument("--ntasks", type=int)
+    parser.add_argument("--env-preamble", "--environment-preamble", dest="env_preamble", action="append", default=[], help="User-supplied shell environment line (repeatable)")
+
+
 def create_campaign_parser(subparsers):
     """Create the lightweight campaign command surface."""
 
@@ -1299,6 +1434,44 @@ def create_campaign_parser(subparsers):
     collect.add_argument("--csv", help="Optional scalar summary CSV path")
     collect.add_argument("--jsonl", help="Optional per-entry JSONL summary path")
     collect.set_defaults(func=run_campaign_collect)
+
+    exchange = commands.add_parser("exchange", help="Prepare and inspect an explicit campaign exchange stage")
+    exchange_commands = exchange.add_subparsers(dest="exchange_command", required=True)
+
+    prepare = exchange_commands.add_parser("prepare", help="Generate exchange Atom_* jobs from eligible parent runs")
+    prepare.add_argument("campaign", help="Parent campaign directory or campaign_index.json")
+    prepare.add_argument("--cutoff", type=float, default=1.0)
+    pair_policy = prepare.add_mutually_exclusive_group()
+    pair_policy.add_argument("--full-pairs", dest="full_pairs", action="store_true", default=True, help="Generate the complete conservative pair set (default)")
+    pair_policy.add_argument("--unique", dest="full_pairs", action="store_false", help="Request explicitly supported symmetry reduction")
+    prepare.add_argument("--shell-width", type=float, default=0.1)
+    prepare.add_argument("--soc", action="store_true", default=None, help="Request SOC; must agree with the parent input")
+    prepare.add_argument(
+        "--magnetic-reference",
+        choices=["unknown", "collinear_fm", "afm", "ferrimagnetic", "noncollinear", "magnetic_space_group"],
+        default=None,
+        help="Explicit magnetic reference for symmetry reduction",
+    )
+    prepare.add_argument("--magnetic-axis", nargs=3, type=float, metavar=("X", "Y", "Z"))
+    prepare.add_argument("--destination", default="exchange-stage", help="Exchange-stage directory (default: exchange-stage under the parent campaign)")
+    prepare.set_defaults(func=run_campaign_exchange_prepare)
+
+    render_exchange = exchange_commands.add_parser("render-slurm", aliases=["render"], help="Render a Slurm array for exchange Atom_* jobs")
+    render_exchange.add_argument("stage", help="Exchange-stage directory or manifest")
+    _add_exchange_slurm_options(render_exchange)
+    render_exchange.set_defaults(func=run_campaign_exchange_render_slurm)
+
+    status_exchange = exchange_commands.add_parser("status", help="Classify exchange jobs from local filesystem evidence")
+    status_exchange.add_argument("stage", help="Exchange-stage directory or manifest")
+    status_exchange.add_argument("--json", action="store_true", help="Print the machine-readable status report")
+    status_exchange.add_argument("--output", help="Also write the machine-readable status report to this path")
+    status_exchange.set_defaults(func=run_campaign_exchange_status)
+
+    collect_exchange = exchange_commands.add_parser("collect", help="Collect canonical exchange results")
+    collect_exchange.add_argument("stage", help="Exchange-stage directory or manifest")
+    collect_exchange.add_argument("--output", help="Aggregate JSON path (default: exchange_stage_results.json in stage root)")
+    collect_exchange.add_argument("--sidecar-dir", help="Structured result sidecar directory (default: collected)")
+    collect_exchange.set_defaults(func=run_campaign_exchange_collect)
     return parser
 
 
