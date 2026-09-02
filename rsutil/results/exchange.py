@@ -7,7 +7,9 @@ reference structure; they are never used as the canonical pair identity.
 
 from __future__ import annotations
 
+import csv
 import hashlib
+import io
 import json
 import math
 import re
@@ -181,6 +183,266 @@ def write_exchange_json(result: ExchangeSet, path: str | Path, *, indent: int = 
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(result.to_json(indent=indent) + "\n", encoding="utf-8")
     return destination
+
+
+EXCHANGE_TEXT_EXPORT_SCHEMA = "rsutil-exchange-text-v1"
+_EXCHANGE_TEXT_CORE_COLUMNS = (
+    "i_site",
+    "j_site",
+    "rs_label_i",
+    "rs_label_j",
+    "rx",
+    "ry",
+    "rz",
+    "distance",
+    "J",
+)
+_EXCHANGE_TEXT_IDENTITY_COLUMNS = (
+    # The Cartesian displacement in the core columns is the legacy table
+    # representation; retain the canonical lattice translation separately so
+    # it cannot be mistaken for PairKey.R.
+    "R_x",
+    "R_y",
+    "R_z",
+    "rs_type_i",
+    "rs_type_j",
+)
+_DMI_COLUMNS = ("Dx", "Dy", "Dz")
+_TENSOR_COLUMNS = (
+    "Axx", "Axy", "Axz",
+    "Ayx", "Ayy", "Ayz",
+    "Azx", "Azy", "Azz",
+)
+
+
+def format_exchange_text(
+    result: ExchangeSet,
+    *,
+    include_dmi: bool | None = None,
+    include_tensor: bool | None = None,
+) -> str:
+    """Render an ``ExchangeSet`` as deterministic, human-readable TSV text.
+
+    This is an interoperability view only.  It consumes the already parsed
+    canonical model and never reads or reparses the raw exchange tables.
+    ``rx``, ``ry``, and ``rz`` are Cartesian displacement components; the
+    integer ``PairKey.R`` is retained explicitly as ``R_x``, ``R_y``, and
+    ``R_z``.
+    """
+
+    if not isinstance(result, ExchangeSet):
+        raise TypeError("format_exchange_text expects an ExchangeSet")
+    interactions = result.interactions
+    has_dmi = any(record.D is not None for record in interactions)
+    has_tensor = any(record.tensor is not None for record in interactions)
+    use_dmi = has_dmi if include_dmi is None else bool(include_dmi)
+    use_tensor = has_tensor if include_tensor is None else bool(include_tensor)
+    columns = list(_EXCHANGE_TEXT_CORE_COLUMNS)
+    if use_dmi:
+        columns.extend(_DMI_COLUMNS)
+    if use_tensor:
+        columns.extend(_TENSOR_COLUMNS)
+    columns.extend(_EXCHANGE_TEXT_IDENTITY_COLUMNS)
+
+    lines = [
+        "# RS-utils canonical exchange export",
+        f"# schema: {EXCHANGE_TEXT_EXPORT_SCHEMA}",
+        "# site index unit: zero-based reference-cell site",
+        f"# J unit: {_common_quantity_unit(interactions, 'J')}",
+        f"# distance unit: {_common_length_unit(interactions)}",
+    ]
+    if use_dmi:
+        lines.append(f"# D unit: {_common_quantity_unit(interactions, 'D')}")
+    if use_tensor:
+        lines.append(f"# A unit: {_common_quantity_unit(interactions, 'tensor')}")
+    lines.extend(_provenance_header(result))
+    lines.append(
+        "# columns: "
+        + " ".join(columns)
+        + " (PairKey(i_site,j_site,R_x,R_y,R_z); rx/ry/rz are Cartesian displacement)"
+    )
+
+    stream = io.StringIO(newline="")
+    writer = csv.writer(stream, delimiter="\t", lineterminator="\n")
+    writer.writerow(columns)
+    for record in interactions:
+        pair = record.pair
+        displacement = None if pair is None else pair.cartesian_displacement
+        values: dict[str, Any] = {
+            "i_site": record.key.i,
+            "j_site": record.key.j,
+            "rs_label_i": None if pair is None else pair.label_i,
+            "rs_label_j": None if pair is None else pair.label_j,
+            "rx": None if displacement is None else displacement[0],
+            "ry": None if displacement is None else displacement[1],
+            "rz": None if displacement is None else displacement[2],
+            "distance": None if pair is None else pair.distance,
+            "J": _quantity_scalar(record.J),
+            "R_x": record.key.R[0],
+            "R_y": record.key.R[1],
+            "R_z": record.key.R[2],
+            "rs_type_i": None if pair is None else pair.rs_type_i,
+            "rs_type_j": None if pair is None else pair.rs_type_j,
+        }
+        if use_dmi:
+            components = _quantity_vector(record.D, 3)
+            values.update({name: value for name, value in zip(_DMI_COLUMNS, components or (None,) * 3)})
+        if use_tensor:
+            components = _quantity_matrix(record.tensor)
+            values.update({name: value for name, value in zip(_TENSOR_COLUMNS, components or (None,) * 9)})
+        writer.writerow([_format_text_value(values.get(column)) for column in columns])
+    return "\n".join(lines) + "\n" + stream.getvalue()
+
+
+def write_exchange_text(
+    result: ExchangeSet,
+    path: str | Path,
+    *,
+    include_dmi: bool | None = None,
+    include_tensor: bool | None = None,
+) -> Path:
+    """Write the human-readable view of a canonical exchange result."""
+
+    destination = Path(path).expanduser()
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(
+        format_exchange_text(
+            result,
+            include_dmi=include_dmi,
+            include_tensor=include_tensor,
+        ),
+        encoding="utf-8",
+    )
+    return destination
+
+
+def export_exchange_text(
+    result: ExchangeSet | str | Path,
+    path: str | Path,
+    *,
+    include_dmi: bool | None = None,
+    include_tensor: bool | None = None,
+) -> Path:
+    """Load a structured exchange JSON result and write its text view.
+
+    A JSON input is deserialized through :class:`ExchangeSet`; raw exchange
+    output files are deliberately not accepted by this convenience exporter.
+    """
+
+    if isinstance(result, ExchangeSet):
+        parsed = result
+    else:
+        source = Path(result).expanduser()
+        try:
+            parsed = ExchangeSet.from_json(source.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+            raise MalformedResultError(f"could not read structured exchange result {source}: {exc}") from exc
+    return write_exchange_text(
+        parsed,
+        path,
+        include_dmi=include_dmi,
+        include_tensor=include_tensor,
+    )
+
+
+def _quantity_scalar(quantity: Quantity | None) -> float | None:
+    if quantity is None or isinstance(quantity.value, (list, tuple, dict)):
+        return None
+    return float(quantity.value)
+
+
+def _quantity_vector(quantity: Quantity | None, size: int) -> tuple[float, ...] | None:
+    if quantity is None or not isinstance(quantity.value, (list, tuple)) or len(quantity.value) != size:
+        return None
+    return tuple(float(value) for value in quantity.value)
+
+
+def _quantity_matrix(quantity: Quantity | None) -> tuple[float, ...] | None:
+    if quantity is None or not isinstance(quantity.value, (list, tuple)) or len(quantity.value) != 3:
+        return None
+    rows = tuple(quantity.value)
+    if any(not isinstance(row, (list, tuple)) or len(row) != 3 for row in rows):
+        return None
+    return tuple(float(value) for row in rows for value in row)
+
+
+def _format_text_value(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, int):
+        return str(value)
+    return repr(float(value))
+
+
+def _common_quantity_unit(interactions: Sequence[InteractionRecord], field: str) -> str:
+    quantities = [getattr(record, field) for record in interactions if getattr(record, field) is not None]
+    units = {_unit_name(quantity.unit) for quantity in quantities}
+    if not units:
+        return "unknown"
+    return next(iter(units)) if len(units) == 1 else "mixed"
+
+
+def _common_length_unit(interactions: Sequence[InteractionRecord]) -> str:
+    units = {_unit_name(record.pair.length_unit) for record in interactions if record.pair is not None}
+    if not units:
+        return "unknown"
+    return next(iter(units)) if len(units) == 1 else "mixed"
+
+
+def _unit_name(value: Any) -> str:
+    return str(getattr(value, "value", value))
+
+
+def _provenance_header(result: ExchangeSet) -> list[str]:
+    lines: list[str] = []
+    manifest = result.run_manifest if isinstance(result.run_manifest, Mapping) else {}
+
+    system = _first_text(manifest, "system", "system_name")
+    if system is not None:
+        lines.append(f"# system: {system}")
+
+    parent_entry = _first_text(manifest, "parent_campaign_entry", "parent_entry_id", "campaign_entry_id")
+    campaign = manifest.get("campaign")
+    if parent_entry is None and isinstance(campaign, Mapping):
+        parent_entry = _first_text(campaign, "entry_id", "parent_entry_id")
+    if parent_entry is not None:
+        lines.append(f"# parent campaign entry: {parent_entry}")
+
+    source_run = manifest.get("source_run")
+    source_identity = None
+    if isinstance(source_run, Mapping):
+        source_identity = _first_text(source_run, "identity", "run_identity")
+    if source_identity is None:
+        source_identity = _first_text(manifest, "source_run_identity", "run_identity")
+    if source_identity is not None:
+        lines.append(f"# source/run identity: {source_identity}")
+
+    try:
+        import rsutil
+
+        version = getattr(rsutil, "__version__", None)
+    except Exception:  # pragma: no cover - defensive for minimal installations
+        version = None
+    if version:
+        lines.append(f"# RS-utils version: {version}")
+
+    manifest_schema = _first_text(manifest, "schema_version")
+    if manifest_schema is not None:
+        lines.append(f"# exchange manifest/schema version: {manifest_schema}")
+    lines.append(f"# exchange result schema version: {result.schema_version}")
+    return lines
+
+
+def _first_text(mapping: Mapping[str, Any], *keys: str) -> str | None:
+    for key in keys:
+        value = mapping.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return None
 
 
 def validate_exchange_set(
@@ -715,6 +977,9 @@ def _combined_hash(source_files: Sequence[SourceFile]) -> str:
 
 
 __all__ = [
+    "EXCHANGE_TEXT_EXPORT_SCHEMA",
+    "export_exchange_text",
+    "format_exchange_text",
     "parse_exchange",
     "parse_exchange_file",
     "parse_exchange_results",
@@ -722,4 +987,5 @@ __all__ = [
     "parse_interactions",
     "validate_exchange_set",
     "write_exchange_json",
+    "write_exchange_text",
 ]

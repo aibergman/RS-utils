@@ -5,10 +5,12 @@ from __future__ import annotations
 import importlib
 import json
 import math
+import shutil
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 import f90nml
+import pytest
 
 from .conftest import assert_cli_success, copy_example_files, run_rsutil
 
@@ -157,6 +159,35 @@ def test_seeded_sqs_setup_is_reproducible_in_isolated_runs(tmp_path: Path) -> No
         _read_namelist(first / "input_new.nml"),
         _read_namelist(second / "input_new.nml"),
     )
+
+
+@pytest.mark.parametrize("example", ["bccFe", "FeN"])
+def test_identical_setup_is_a_semantic_fixed_point_after_promoting_outputs(
+    tmp_path: Path, example: str
+) -> None:
+    _copy_setup_fixture(tmp_path, example)
+    arguments = ("-S", "--seed", "42")
+
+    assert_cli_success(run_rsutil(tmp_path, *arguments))
+    first_generated = {
+        path.name: _read_namelist(path)
+        for path in tmp_path.glob("*.nml")
+        if path.name not in {"lattice.nml", "input.nml"}
+    }
+    assert {"lattice_new.nml", "input_new.nml"} <= set(first_generated)
+
+    shutil.copy2(tmp_path / "lattice_new.nml", tmp_path / "lattice.nml")
+    shutil.copy2(tmp_path / "input_new.nml", tmp_path / "input.nml")
+    assert_cli_success(run_rsutil(tmp_path, *arguments))
+    second_generated = {
+        path.name: _read_namelist(path)
+        for path in tmp_path.glob("*.nml")
+        if path.name not in {"lattice.nml", "input.nml"}
+    }
+
+    assert set(second_generated) == set(first_generated)
+    for name in first_generated:
+        _assert_semantically_equal(first_generated[name], second_generated[name], path=name)
 
 
 def test_legacy_setup_accepts_source_derived_unequal_counts(tmp_path: Path) -> None:

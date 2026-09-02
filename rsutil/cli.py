@@ -1054,6 +1054,39 @@ def run_campaign_validate(args):
     return 1
 
 
+def run_exchange_export_text(args):
+    """Render a human-readable view from a structured exchange result JSON."""
+
+    from .results import export_exchange_text, format_exchange_text, ExchangeSet
+
+    try:
+        source = Path(args.result).resolve()
+        if args.output is None:
+            # Keep stdout useful for shell pipelines while retaining exactly
+            # the same formatter used by file export.
+            result = ExchangeSet.from_json(source.read_text(encoding="utf-8"))
+            print(
+                format_exchange_text(
+                    result,
+                    include_dmi=True if args.dmi else None,
+                    include_tensor=True if args.tensor else None,
+                ),
+                end="",
+            )
+        else:
+            output = export_exchange_text(
+                source,
+                Path(args.output).resolve(),
+                include_dmi=True if args.dmi else None,
+                include_tensor=True if args.tensor else None,
+            )
+            print(f"Exchange text export: {output}")
+    except Exception as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
 def run_campaign_create(args):
     """Generate deterministic setup-owned run directories, without job execution."""
 
@@ -1472,6 +1505,34 @@ def create_campaign_parser(subparsers):
     collect_exchange.add_argument("--output", help="Aggregate JSON path (default: exchange_stage_results.json in stage root)")
     collect_exchange.add_argument("--sidecar-dir", help="Structured result sidecar directory (default: collected)")
     collect_exchange.set_defaults(func=run_campaign_exchange_collect)
+    return parser
+
+
+def create_exchange_parser(subparsers):
+    """Create the result-level exchange interoperability commands."""
+
+    parser = subparsers.add_parser(
+        "exchange",
+        help="Export or inspect canonical structured exchange results",
+    )
+    commands = parser.add_subparsers(dest="exchange_command", required=True)
+    export_text = commands.add_parser(
+        "export-text",
+        help="Export a structured exchange-result JSON as deterministic TSV text",
+    )
+    export_text.add_argument("result", help="Structured ExchangeSet JSON result")
+    export_text.add_argument("--output", help="Output text path (default: stdout)")
+    export_text.add_argument(
+        "--dmi",
+        action="store_true",
+        help="Include DMI columns even when no DMI record is populated",
+    )
+    export_text.add_argument(
+        "--tensor",
+        action="store_true",
+        help="Include anisotropic A-tensor columns even when no tensor is populated",
+    )
+    export_text.set_defaults(func=run_exchange_export_text)
     return parser
 
 
@@ -2451,6 +2512,7 @@ Examples:
     # Add band/DOS subcommands
     create_bands_parser(subparsers)
     create_dos_parser(subparsers)
+    create_exchange_parser(subparsers)
     create_campaign_parser(subparsers)
 
     # Existing flags for backward compatibility

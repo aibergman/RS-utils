@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 import os
 import re
 import shlex
@@ -909,8 +910,36 @@ def _scalar_summary(result: Any) -> dict[str, Any]:
             summary[field_name] = quantity.to_dict()
         else:
             summary[field_name] = None
+
+    # Keep the source quantity intact, while exposing genuinely vector-valued
+    # moments as numeric columns for CSV/JSONL consumers.  In particular, a
+    # scalar moment must not be presented as a fabricated x/y/z vector.
+    for field_name in ("total_spin_moment", "total_orbital_moment"):
+        quantity = getattr(result, field_name, None)
+        summary[field_name] = None if quantity is None else quantity.to_dict()
+        components = {"x": None, "y": None, "z": None, "norm": None}
+        if quantity is not None and isinstance(quantity.value, (list, tuple)) and len(quantity.value) == 3:
+            try:
+                values = tuple(float(value) for value in quantity.value)
+                if all(math.isfinite(value) for value in values):
+                    components.update(
+                        x=values[0],
+                        y=values[1],
+                        z=values[2],
+                        norm=math.sqrt(sum(value * value for value in values)),
+                    )
+            except (TypeError, ValueError):
+                pass
+        for component, value in components.items():
+            summary[f"{field_name}_{component}"] = value
     summary["validation_valid"] = bool(result.validation.valid)
     return summary
+
+
+def _csv_quantity(value: Any) -> str:
+    """Serialize a preserved quantity while keeping absent data blank."""
+
+    return "" if value is None else json.dumps(value, sort_keys=True)
 
 
 def _exchange_subjobs(root: Path, run_dir: Path, entry_id: str, sidecar_root: Path) -> list[dict[str, Any]]:
@@ -1047,7 +1076,16 @@ def collect_campaign(
 
     csv_path = None if csv_output is None else Path(csv_output).expanduser().resolve()
     if csv_path is not None:
-        fields = ["array_index", "entry_id", "name", "run_path", "status", "execution_status", "output_status", "scientific_status", "convergence", "fermi_energy", "total_energy", "band_energy", "validation_valid", "result_sidecar", "parse_error"]
+        fields = [
+            "array_index", "entry_id", "name", "run_path", "status",
+            "execution_status", "output_status", "scientific_status",
+            "convergence", "fermi_energy", "total_energy", "band_energy",
+            "total_spin_moment", "total_spin_moment_x", "total_spin_moment_y", "total_spin_moment_z",
+            "total_spin_moment_norm", "total_orbital_moment",
+            "total_orbital_moment_x", "total_orbital_moment_y", "total_orbital_moment_z",
+            "total_orbital_moment_norm", "validation_valid", "result_sidecar",
+            "parse_error",
+        ]
         csv_path.parent.mkdir(parents=True, exist_ok=True)
         with tempfile.NamedTemporaryFile("w", encoding="utf-8", newline="", prefix=f".{csv_path.name}.", dir=str(csv_path.parent), delete=False) as stream:
             temporary_csv = Path(stream.name)
@@ -1062,6 +1100,16 @@ def collect_campaign(
                     "fermi_energy": json.dumps(summary.get("fermi_energy"), sort_keys=True),
                     "total_energy": json.dumps(summary.get("total_energy"), sort_keys=True),
                     "band_energy": json.dumps(summary.get("band_energy"), sort_keys=True),
+                    "total_spin_moment": _csv_quantity(summary.get("total_spin_moment")),
+                    "total_spin_moment_x": summary.get("total_spin_moment_x"),
+                    "total_spin_moment_y": summary.get("total_spin_moment_y"),
+                    "total_spin_moment_z": summary.get("total_spin_moment_z"),
+                    "total_spin_moment_norm": summary.get("total_spin_moment_norm"),
+                    "total_orbital_moment": _csv_quantity(summary.get("total_orbital_moment")),
+                    "total_orbital_moment_x": summary.get("total_orbital_moment_x"),
+                    "total_orbital_moment_y": summary.get("total_orbital_moment_y"),
+                    "total_orbital_moment_z": summary.get("total_orbital_moment_z"),
+                    "total_orbital_moment_norm": summary.get("total_orbital_moment_norm"),
                     "validation_valid": entry.get("validation", {}).get("valid"), "result_sidecar": entry.get("result_sidecar"), "parse_error": json.dumps(entry.get("parse_error"), sort_keys=True),
                 })
         os.replace(temporary_csv, csv_path)

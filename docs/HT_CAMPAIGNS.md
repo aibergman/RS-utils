@@ -230,6 +230,18 @@ exported as CSV or JSONL:
 rsutil campaign collect pilot-runs --csv pilot-runs/results.csv --jsonl pilot-runs/results.jsonl
 ```
 
+The scalar CSV and JSONL summaries include the parsed magnetic observables when
+the result supplies them: `total_spin_moment_x`, `total_spin_moment_y`,
+`total_spin_moment_z`, and `total_spin_moment_norm` (plus the corresponding
+orbital-moment fields when available).  Vector components and the norm are
+numeric values; absent observables remain empty in CSV and `null` in JSONL.
+The norm is `sqrt(Mx**2 + My**2 + Mz**2)` and is not a magnetic-classification
+policy.  For example, choose a threshold explicitly in pandas:
+
+```python
+magnetic = df[df.total_spin_moment_norm > 0.1]
+```
+
 Parser and validation errors are recorded on their entry and do not prevent
 other entries from being collected. Collection preserves the three status
 axes and exposes `successful` only for explicit converged successes; the

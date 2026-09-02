@@ -24,6 +24,9 @@ from .models import (
 )
 from .parser import parse_report, parse_run, parse_scf
 from .exchange import (
+    EXCHANGE_TEXT_EXPORT_SCHEMA,
+    export_exchange_text,
+    format_exchange_text,
     parse_exchange,
     parse_exchange_file,
     parse_exchange_results,
@@ -31,6 +34,7 @@ from .exchange import (
     parse_interactions,
     validate_exchange_set,
     write_exchange_json,
+    write_exchange_text,
 )
 from .units import (
     DIMENSIONLESS,
@@ -91,6 +95,7 @@ __all__ = [
     "MILLI_RY",
     "MILLI_RYDBERG",
     "ElectronicResult",
+    "EXCHANGE_TEXT_EXPORT_SCHEMA",
     "ExchangeSet",
     "InteractionMappingError",
     "InteractionRecord",
@@ -130,6 +135,8 @@ __all__ = [
     "TB_MODEL_SCHEMA",
     "TightBindingModel",
     "export_ml_dataset",
+    "export_exchange_text",
+    "format_exchange_text",
     "export_tight_binding_ml",
     "load_tight_binding",
     "read_fable_v4_tb",
@@ -152,4 +159,5 @@ __all__ = [
     "vector",
     "validate_exchange_set",
     "write_exchange_json",
+    "write_exchange_text",
 ]

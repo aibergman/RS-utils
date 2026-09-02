@@ -105,3 +105,13 @@ The optional extras are:
 The release candidate package version is `0.11.0rc1`. The wheel and installed
 artifact checks in this page are the release evidence path; the editable
 installation above remains the developer/source-test workflow.
+
+## Setup fixed-point regression
+
+The deterministic setup contract is tested by promoting `lattice_new.nml` and
+`input_new.nml` from a first `-S` pass to the next pass with identical options.
+The scientifically relevant generated namelists must be semantically equal;
+formatting differences alone are not significant.  This regression records
+the observed fixed-point property for representative single-site and
+multisite/multispecies fixtures.  It is test evidence, not a user workflow:
+production setup performs one pass only.

@@ -104,6 +104,19 @@ proof.
 value and unit, and the export retains source hashes, source rows, format
 metadata, the canonical pair key, and optional derived geometry.
 
+For human-readable interoperability, the canonical JSON can be rendered as a
+deterministic TSV report:
+
+```bash
+rsutil exchange export-text exchange-result.json --output jij_report.txt
+```
+
+The report includes explicit J/D/A and distance units, RS labels and types,
+Cartesian displacement, and the integer `PairKey(i,j,R)` components.  It is a
+convenience/interop product generated from the parsed `ExchangeSet`; it does
+not reparse raw exchange output.  Structured versioned RS-utils exchange
+results remain the authoritative representation.
+
 The raw tensor is serialized under `anisotropic_exchange_tensor`; the old
 `exchange_tensor` input key remains readable as a deprecated compatibility
 alias.

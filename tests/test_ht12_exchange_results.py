@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import json
 from pathlib import Path
 
@@ -9,10 +10,13 @@ import numpy as np
 import pytest
 import f90nml
 
-from rsutil.core import PairKey, RSStructure, StructureSite
+from rsutil.core import ExchangePair, PairKey, RSStructure, StructureSite
 from rsutil.core.hashing import hash_json
 from rsutil.results import (
+    ExchangeSet,
+    export_exchange_text,
     InteractionMappingError,
+    InteractionRecord,
     MILLI_RYDBERG,
     MalformedResultError,
     Quantity,
@@ -87,6 +91,68 @@ def test_json_export_round_trips_schema_units_and_pair_identity(tmp_path: Path) 
     assert payload["schema_version"] == "rsutil-exchange-result-v1"
     assert payload["records"][0]["key"] == {"i": 0, "j": 0, "R": [-2, 0, 0]}
     assert payload["records"][0]["isotropic_exchange"]["unit"] == "mRy"
+
+
+def test_text_export_preserves_canonical_identity_labels_values_and_units(tmp_path: Path) -> None:
+    key = PairKey(1, 0, (2, -1, 0))
+    pair = ExchangePair(
+        key=key,
+        cartesian_displacement=(2.0, -1.0, 0.5),
+        distance=2.29128784747792,
+        length_unit="angstrom",
+        species_i="Fe",
+        species_j="Fe",
+        label_i="Fe2",
+        label_j="Fe1",
+        rs_type_i=2,
+        rs_type_j=1,
+    )
+    result = ExchangeSet(
+        records=(
+            InteractionRecord(
+                key=key,
+                pair=pair,
+                isotropic_exchange=Quantity(1.25, MILLI_RYDBERG),
+                dmi_vector=Quantity((0.1, -0.2, 0.3), MILLI_RYDBERG),
+                anisotropic_exchange_tensor=Quantity(
+                    ((1.0, 2.0, 3.0), (4.0, 5.0, 6.0), (7.0, 8.0, 9.0)),
+                    MILLI_RYDBERG,
+                ),
+            ),
+        ),
+        run_manifest={
+            "schema_version": "rsutil-exchange-v3",
+            "parent_entry_id": "entry-1",
+            "source_run": {"identity": "run-1"},
+            "system": "Fe",
+        },
+    )
+    source = write_exchange_json(result, tmp_path / "exchange-result.json")
+    first = tmp_path / "first.txt"
+    second = tmp_path / "second.txt"
+    export_exchange_text(source, first)
+    export_exchange_text(source, second)
+
+    assert first.read_text(encoding="utf-8") == second.read_text(encoding="utf-8")
+    text = first.read_text(encoding="utf-8")
+    assert "# J unit: mRy" in text
+    assert "# D unit: mRy" in text
+    assert "# A unit: mRy" in text
+    assert "# distance unit: angstrom" in text
+    assert "# parent campaign entry: entry-1" in text
+    assert "# source/run identity: run-1" in text
+    assert "# exchange manifest/schema version: rsutil-exchange-v3" in text
+    rows = list(csv.DictReader((line for line in text.splitlines() if not line.startswith("#")), delimiter="\t"))
+    assert rows[0]["i_site"] == "1"
+    assert rows[0]["j_site"] == "0"
+    assert rows[0]["rs_label_i"] == "Fe2"
+    assert rows[0]["rs_label_j"] == "Fe1"
+    assert rows[0]["R_x"] == "2"
+    assert rows[0]["R_y"] == "-1"
+    assert rows[0]["J"] == "1.25"
+    assert rows[0]["Dx"] == "0.1"
+    assert rows[0]["Axx"] == "1.0"
+    assert rows[0]["Azy"] == "8.0"
 
 
 def test_explicit_ry_mry_conversion_is_factor_of_1000() -> None:

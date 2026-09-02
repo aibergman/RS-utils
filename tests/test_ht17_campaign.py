@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import json
 import os
 import subprocess
@@ -130,6 +131,53 @@ def test_collection_continues_and_preserves_hashes_and_sidecars(tmp_path: Path) 
     assert malformed["parse_error"]["code"] == "malformed_result"
     assert result.csv_path is not None and result.csv_path.is_file()
     assert result.jsonl_path is not None and len(result.jsonl_path.read_text(encoding="utf-8").splitlines()) == 4
+
+
+def test_collection_exports_vector_magnetic_scalars_without_classifying_entries(tmp_path: Path) -> None:
+    index = _make_index(tmp_path)
+    valid = tmp_path / index.entries[0].run_path
+    (valid / "report.out").write_text(
+        "Total spin moment: 1.0 2.0 2.0\n"
+        "Total orbital moment: 0.0 0.0 0.5\n"
+        "Fermi energy: -0.125\n",
+        encoding="utf-8",
+    )
+    collection = collect_campaign(
+        tmp_path,
+        csv_output=tmp_path / "summary.csv",
+        jsonl_output=tmp_path / "summary.jsonl",
+    )
+
+    entry = collection.entries[0]
+    summary = entry["summary"]
+    assert summary["total_spin_moment_x"] == 1.0
+    assert summary["total_spin_moment_y"] == 2.0
+    assert summary["total_spin_moment_z"] == 2.0
+    assert summary["total_spin_moment_norm"] == 3.0
+    assert summary["total_orbital_moment_norm"] == 0.5
+    assert "magnetic" not in summary
+    assert "nonmagnetic" not in summary
+
+    jsonl_entry = json.loads(collection.jsonl_path.read_text(encoding="utf-8").splitlines()[0])
+    assert jsonl_entry["summary"]["total_spin_moment_norm"] == 3.0
+    with collection.csv_path.open(newline="", encoding="utf-8") as stream:
+        row = next(csv.DictReader(stream))
+    assert float(row["total_spin_moment_norm"]) == 3.0
+    assert "magnetic" not in row
+    assert "nonmagnetic" not in row
+
+
+def test_collection_keeps_missing_magnetic_scalars_empty(tmp_path: Path) -> None:
+    index = _make_index(tmp_path)
+    collection = collect_campaign(tmp_path, csv_output=tmp_path / "summary.csv")
+    summary = collection.entries[0]["summary"]
+    assert summary["total_spin_moment_x"] is None
+    assert summary["total_spin_moment_y"] is None
+    assert summary["total_spin_moment_z"] is None
+    assert summary["total_spin_moment_norm"] is None
+    with collection.csv_path.open(newline="", encoding="utf-8") as stream:
+        row = next(csv.DictReader(stream))
+    assert row["total_spin_moment_norm"] == ""
 
 
 def _single_index(root: Path, name: str = "case") -> tuple[CampaignIndex, Path]:
