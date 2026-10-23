@@ -126,6 +126,11 @@ rsutil --lmto47 --nspin 2 --lmx 3 --out lmto47_out
 rsutil --lmto47 --supercell 2 2 2 --out lmto47_out
 ```
 
+The UppASD `momfile` moments (muB) are read from `report.out` in `--data`
+(`Spin moment of atom N`), or from the file given with `--report`. If the
+report or an atom's entry is missing, that moment falls back to 1.0 muB and a
+warning is printed.
+
 Existing UppASD export functionality remains available, but automated UppASD
 integration is not currently part of the validated `0.11.0rc1` HT campaign
 workflow. RS-utils does not claim an automatic `SCF -> exchange -> UppASD`

@@ -443,6 +443,7 @@ The ``--export`` flag exports RS-LMTO inputs to the UppASD (Uppsala Atomistic Sp
 - ``--data``: Directory containing input files and exchange data (default: current directory).
 - ``--out``: Output directory for exported files relative to ``--data`` (default: ``uppasd_out``).
 - ``--jij``: Path to ``jijso.out`` file containing exchange interactions.
+- ``--report``: Path to ``report.out`` providing the atomic spin moments (muB) for the ``momfile`` (default: ``report.out`` in ``--data``). Moments fall back to 1.0 with a warning if the file or an atom entry is missing.
 - ``--dmi``: Path to ``dijso.out`` or ``dmi`` file containing DM vector interactions.
 
 **Example:**

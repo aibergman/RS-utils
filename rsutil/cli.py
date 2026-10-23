@@ -2677,6 +2677,13 @@ Examples:
         help="Path to dijso.out / dmi file to include in export (DM vectors)",
     )
     parser.add_argument(
+        "--report",
+        type=str,
+        default=None,
+        help="report.out providing atomic spin moments (muB) for the UppASD momfile "
+        "(default: report.out in --data; moments fall back to 1.0 if it is missing)",
+    )
+    parser.add_argument(
         "--out",
         type=str,
         default="uppasd_out",
@@ -2982,6 +2989,11 @@ Examples:
             out_dir=out_dir,
             jij_file=args.jij,
             dij_file=args.dmi,
+            report_file=(
+                args.report
+                if args.report is not None
+                else os.path.join(args.data, "report.out")
+            ),
         )
     # Print help message if no valid flag is provided
     else:

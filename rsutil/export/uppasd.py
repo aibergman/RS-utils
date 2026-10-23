@@ -8,6 +8,8 @@ imported as `rsutil.export.uppasd` and exposed from the package CLI.
 from __future__ import annotations
 
 import os
+import re
+import warnings
 from typing import Dict, List, Optional, Tuple
 
 try:
@@ -218,6 +220,77 @@ def parse_jijso(jij_path: str):
     return pairs
 
 
+_REPORT_SPIN_MOMENT_RE = re.compile(
+    r"^\s*Spin moment of atom\s+(?P<index>\d+)\s*:\s*(?P<value>[-+]?(?:\d+\.?\d*|\.\d+)(?:[eEdD][-+]?\d+)?)\s*$",
+    re.I,
+)
+
+
+def read_report_spin_moments(report_file: str) -> Dict[int, float]:
+    """Return ``{one-based atom index: spin moment in muB}`` from ``report.out``.
+
+    Only the ``Spin moment of atom N:`` lines are read.  An empty mapping is
+    returned if the file contains none.
+    """
+
+    moments: Dict[int, float] = {}
+    with open(report_file, "r", encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            match = _REPORT_SPIN_MOMENT_RE.match(line)
+            if match:
+                moments[int(match.group("index"))] = float(match.group("value").replace("d", "e").replace("D", "e"))
+    return moments
+
+
+def _moments_from_report(
+    report_file: Optional[str], n_atoms: int, default_moment: float
+) -> List[float]:
+    """Atomic moment magnitudes (muB) from ``report.out``, else ``default_moment``.
+
+    A missing report, or a missing atom within it, falls back to
+    ``default_moment`` with a warning so the placeholder is never silent.
+    """
+
+    if report_file is None or not os.path.isfile(report_file):
+        warnings.warn(
+            f"report.out not found ({report_file}); momfile moments set to {default_moment} muB",
+            UserWarning,
+            stacklevel=3,
+        )
+        return [float(default_moment)] * n_atoms
+    reported = read_report_spin_moments(report_file)
+    moments: List[float] = []
+    missing: List[int] = []
+    for index in range(1, n_atoms + 1):
+        if index in reported:
+            moments.append(abs(reported[index]))
+        else:
+            missing.append(index)
+            moments.append(float(default_moment))
+    if missing:
+        warnings.warn(
+            f"no 'Spin moment of atom N' entry in {report_file} for atom(s) {missing}; "
+            f"using {default_moment} muB",
+            UserWarning,
+            stacklevel=3,
+        )
+    if len(reported) > n_atoms:
+        warnings.warn(
+            f"{report_file} lists {len(reported)} atoms but the exported structure has {n_atoms}; "
+            "extra moments ignored",
+            UserWarning,
+            stacklevel=3,
+        )
+    if any(value < 0 for value in reported.values()):
+        warnings.warn(
+            "report.out contains negative spin moments; momfile stores magnitudes only and "
+            "the moment direction is not taken from report.out",
+            UserWarning,
+            stacklevel=3,
+        )
+    return moments
+
+
 def parse_dijso(dij_path: str):
     dm = []
     with open(dij_path, "r", encoding="utf-8") as fh:
@@ -255,7 +328,8 @@ def export_from_files(lattice_nml: Optional[str] = None, input_nml: Optional[str
                       simid: str = "rs_export", ncell: Tuple[int, int, int] = (1, 1, 1),
                       BC: Tuple[str, str, str] = ("P", "P", "P"), Sym: int = 1,
                       jij_file: Optional[str] = None, dij_file: Optional[str] = None,
-                      default_type: int = 1, default_moment: float = 1.0) -> List[str]:
+                      default_type: int = 1, default_moment: float = 1.0,
+                      report_file: Optional[str] = None) -> List[str]:
     if not os.path.exists(out_dir):
         os.makedirs(out_dir, exist_ok=True)
 
@@ -320,8 +394,11 @@ def export_from_files(lattice_nml: Optional[str] = None, input_nml: Optional[str
 
     payload = build_uppasd_payload(struct, moments=None)
 
-    if not any(payload.get("moments", [])):
-        payload["moments"] = [float(default_moment)] * len(payload.get("atoms", []))
+    # Moment magnitudes (muB) come from report.out; ``default_moment`` is only
+    # a warned-about fallback for a missing report or atom.
+    payload["moments"] = _moments_from_report(
+        report_file, len(payload.get("atoms", [])), default_moment
+    )
 
     if jij_file:
         jlist = parse_jijso(jij_file)
