@@ -13,6 +13,7 @@ from pathlib import Path
 import f90nml
 
 from rsutil import process_lattice
+from rsutil.core import SetupSpec
 from rsutil.setup import FortranSetupRunner
 
 from .conftest import copy_example_files
@@ -20,6 +21,80 @@ from .conftest import copy_example_files
 
 def _fixture(destination: Path) -> None:
     copy_example_files(destination, "bccFe", ["Dist/lattice.nml", "Dist/input.nml"])
+
+
+def _fcc_nio_fixture(destination: Path) -> None:
+    (destination / "lattice.nml").write_text(
+        """&lattice
+nbulk_bulk = 4
+ntot = 4
+nbas = 4
+nrec = 4
+a(:, 1) = 1.0, 0.5, 0.5
+a(:, 2) = 0.5, 1.0, 0.5
+a(:, 3) = 0.5, 0.5, 1.0
+crd(:, 1) = 0.0, 0.0, 0.0
+crd(:, 2) = 1.0, 1.0, 1.0
+crd(:, 3) = 0.5, 0.5, 0.5
+crd(:, 4) = 1.5, 1.5, 1.5
+izp = 1, 2, 3, 4
+no = 1, 2, 3, 4
+iu = 1, 2, 3, 4
+ib = 1, 2, 3, 4
+irec = 1, 2, 3, 4
+/
+""",
+        encoding="utf-8",
+    )
+    (destination / "input.nml").write_text(
+        """&calculation
+pre_processing = 'bravais'
+verbose = .true.
+/
+&lattice
+rc = 80
+alat = 4.1684002458
+crystal_sym = 'file'
+wav = 1.2929345694
+ntype = 4
+ct = 3.3, 3.3, 3.3, 3.3
+r2 = 10.9
+pbc = .true.
+b1 = .true.
+b2 = .true.
+b3 = .true.
+n1 = 10
+n2 = 10
+n3 = 10
+/
+&atoms
+database = './'
+label = 'Niu', 'Nid', 'O1', 'O2'
+/
+&self
+nstep = 35
+use_kspace = .true.
+cold = .true.
+/
+&energy
+fermi = -0.187938
+energy_min = -1.0
+energy_max = 1.5
+channels_ldos = 2000
+/
+&control
+calctype = 'B'
+nsp = 1
+lld = 200
+recur = 'chebyshev'
+/
+&mix
+beta = 0.1
+mixtype = 'broyden'
+/
+""",
+        encoding="utf-8",
+    )
 
 
 def _run_direct(destination: Path) -> None:
@@ -55,6 +130,29 @@ def test_worker_matches_direct_setup_outputs(tmp_path: Path) -> None:
     assert {"lattice_new.nml", "input_new.nml", "radii.out", "spheres.log", "Fe.nml"} <= set(
         result.candidate_files
     )
+
+
+def test_empty_spheres_found_on_first_pass_are_kept(tmp_path: Path) -> None:
+    _fcc_nio_fixture(tmp_path)
+    result = FortranSetupRunner().run(
+        tmp_path / "lattice.nml",
+        tmp_path / "input.nml",
+        SetupSpec(empty_spheres=True),
+        workspace=tmp_path / "worker",
+    )
+
+    assert result.success, result.to_dict()
+    output = tmp_path / "worker"
+    radii = (output / "radii.out").read_text(encoding="utf-8").splitlines()
+    generated_lattice = f90nml.read(output / "lattice_new.nml")["lattice"]
+    generated_input = f90nml.read(output / "input_new.nml")
+    assert int(radii[0]) > 4
+    assert any("/ E/" in line for line in radii[1:])
+    assert generated_lattice["nrec"] == int(radii[0])
+    assert generated_input["atoms"]["label"][4:] == [
+        f"E{index}" for index in range(1, int(radii[0]) - 3)
+    ]
+    assert f90nml.read(output / "E1.nml")["element"]["atomic_number"] == 0
 
 
 def test_malformed_input_does_not_modify_source_directory(tmp_path: Path) -> None:

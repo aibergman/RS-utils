@@ -244,13 +244,6 @@ contains
             do I = NATOM+1, NATOMNEW
                 RWS(I) = SES(ISNEW(I)-NM)
             end do
-            NATOMNEW = NATOM
-
-            call EMPTYSPHERES(AV, BV, CV, BAS, IMQ, ALAT, NATOM, NSORT, RWS, NSORTES, TAUES, SES, MAX2SORT, ITOP, IQA, NG, &
-               ISNEW, BASNEW, NATOMNEW)
-            do I = NATOM+1, NATOMNEW
-                RWS(I) = SES(ISNEW(I)-NM)
-            end do
         else
             do IATOM = 1, NATOM
                 ISNEW(IATOM) = IMQ(IATOM)
@@ -390,7 +383,7 @@ contains
             do I = temp_nbulk_bulk + 1, NATOMNEW
                 lat_data%crd(:, I) = BASNEW(:, I)
                 write(atm_input%label(I), '(A,I0)') 'E', I-temp_nbulk_bulk
-                atm_input%atomic_number(I) = Z(I)
+                atm_input%atomic_number(I) = 0
                 lat_data%ws(I) = RWS(I)
             end do
             lat_data%nbulk_bulk = NATOMNEW
