@@ -35,6 +35,11 @@ For the familiar command-line workflow, run from a directory containing
 rsutil -S --validate --json-report rsutil-setup-report.json
 ```
 
+The optional `--preset KS` flag enables `use_kspace = .true.` in the
+`&self` namelist of the generated `input_new.nml`. Generated input also
+defaults `strux_backend` to `'strux_lib'` unless a backend is specified
+in the source `input.nml`.
+
 The report is optional and does not change the ordinary human-readable
 console output. Its top-level schemas are `rsutil-setup-report-v1` and
 `rsutil-run-v1`; diagnostic `code` values are stable machine-facing values,

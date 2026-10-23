@@ -206,7 +206,11 @@ contains
           write(unit, '(A, I0)') "ntype = ", lat%ntype
           write(unit, '(A, F10.4)') "ct(:) = ", lat%ct(1)
           write(unit, '(A, F12.6)') "r2 = ", lat%r2
-          if (lat%has_strux_backend) write(unit, '(A, A, A)') "strux_backend = '", trim(lat%strux_backend), "'"
+          if (lat%has_strux_backend .and. len_trim(lat%strux_backend) > 0) then
+            write(unit, '(A, A, A)') "strux_backend = '", trim(lat%strux_backend), "'"
+          else
+            write(unit, '(A)') "strux_backend = 'strux_lib'"
+          end if
           if (lat%has_strux_want_sdot) write(unit, '(A, L1)') "strux_want_sdot = ", lat%strux_want_sdot
           if (lat%has_strux_solve_scale) write(unit, '(A, ES16.8)') "strux_solve_scale = ", lat%strux_solve_scale
           write(unit, '(A)') "/"

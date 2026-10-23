@@ -65,6 +65,13 @@ contain `lattice.nml` and `input.nml`; an explicit source mapping can provide
 `setup_template`. `exchange` is retained as optional metadata for later
 post-SCF job generation and is not executed by HT-16.
 
+Setup options are the same `SetupSpec` values used by `rsutil -S`; add
+`"preset": "KS"` to `setup_template` or an entry's `setup` to set
+`use_kspace = .true.` in the generated `&self` namelist. Because setup values
+contribute to scientific identity, changing the preset changes the entry ID.
+Generated `input_new.nml` also defaults `strux_backend` to `'strux_lib'` in its
+`&lattice` namelist when no backend is specified in the source input.
+
 `resources` is optional entry-level operational metadata. Resource allocation
 is operational policy, not scientific calculation identity: changing
 `ntasks`, memory, or time does not change an entry ID or create a new

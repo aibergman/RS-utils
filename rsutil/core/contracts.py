@@ -288,6 +288,7 @@ class SetupSpec:
     sqs_shells: int = 3
     sqs_steps: int = 5000
     sqs_seed: int | None = None
+    preset: str | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.cluster_type, str) or self.cluster_type not in {"periodic", "free"}:
@@ -323,6 +324,10 @@ class SetupSpec:
             raise ValidationError("seed must be an integer or None")
         if self.sqs_seed is not None and not isinstance(self.sqs_seed, int):
             raise ValidationError("sqs_seed must be an integer or None")
+        if self.preset is not None:
+            if not isinstance(self.preset, str) or self.preset.upper() != "KS":
+                raise ValidationError("preset must be 'KS' or None")
+            object.__setattr__(self, "preset", self.preset.upper())
         object.__setattr__(self, "rec_method", self.rec_method.lower())
 
     @property
@@ -336,7 +341,7 @@ class SetupSpec:
         return cls(**dict(data))
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        values = {
             "cluster_type": self.cluster_type,
             "empty_spheres": self.empty_spheres,
             "min_empty_radius": self.min_empty_radius,
@@ -356,6 +361,9 @@ class SetupSpec:
             "sqs_steps": self.sqs_steps,
             "sqs_seed": self.sqs_seed,
         }
+        if self.preset is not None:
+            values["preset"] = self.preset
+        return values
 
 
 @dataclass(frozen=True)

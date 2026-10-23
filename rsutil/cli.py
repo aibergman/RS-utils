@@ -2340,6 +2340,7 @@ def _run_setup_cli(args):
             sqs_shells=args.sqs_shells,
             sqs_steps=args.sqs_steps,
             sqs_seed=args.sqs_seed,
+            preset=args.preset,
         )
         service_validate_setup_parameters(spec)
         service_validate_setup_inputs(Path.cwd())
@@ -2371,6 +2372,8 @@ def _run_setup_cli(args):
     print(f"  LMAX override:     {spec.lmx}")
     print(f"  Rec method:        {spec.rec_method}")
     print(f"  Rec steps:         {spec.rec_steps}")
+    if spec.preset is not None:
+        print(f"  Preset:            {spec.preset}")
     print(f"  Lattice dist:      {spec.lattice_dist} alat")
     print(f"  Basis dist:        {spec.basis_dist} alat")
     print(f"  Alat scale:        {spec.alat_scale}")
@@ -2663,6 +2666,13 @@ Examples:
         type=int,
         default=2,
         help="Maximum L channel override (default: 2; spd)",
+    )
+    parser.add_argument(
+        "--preset",
+        type=str.upper,
+        choices=["KS"],
+        default=None,
+        help="Apply a setup preset (KS enables use_kspace in &self)",
     )
     parser.add_argument(
         "--rec-method",

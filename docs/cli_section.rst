@@ -231,6 +231,7 @@ The ``--setup`` flag processes lattice structures and calculates optimal Wigner-
 - ``--backup``: Create .bak backups of input files before processing.
 - ``--in-place``: Replace input files with generated outputs (creates .bak backups).
 - ``--lmx``: Override maximum l-channel used in setup path (default: ``2``; supported range ``0..3``).
+- ``--preset KS``: Enable ``use_kspace = .true.`` in the ``&self`` namelist.
 - ``--lattice-dist``: Gaussian std.dev for lattice-vector distortion in units of ``alat``.
 - ``--basis-dist``: Gaussian std.dev for basis-vector distortion in units of ``alat``.
 - ``--alat-scale``: Scalar factor applied to ``alat`` before distortion.
@@ -244,12 +245,18 @@ The ``--setup`` flag processes lattice structures and calculates optimal Wigner-
 - ``--sqs-steps``: Number of MC swap steps for SQS optimization.
 - ``--sqs-seed``: Integer seed for reproducible SQS optimization.
 
+Generated ``input_new.nml`` uses ``strux_backend = 'strux_lib'`` in its
+``&lattice`` namelist unless the input specifies a backend explicitly.
+
 **Example:**
 
 .. code-block:: bash
 
     # Basic lattice processing
     rsutil --setup
+
+    # Enable the KS setup preset
+    rsutil -S --preset KS
 
     # With empty spheres
     rsutil --setup --empty_spheres --min_empty_radius 1.0 --max_empty_radius 3.0

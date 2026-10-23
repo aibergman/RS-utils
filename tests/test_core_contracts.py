@@ -56,6 +56,17 @@ def test_setup_spec_is_scientific_only_and_validates() -> None:
         SetupSpec(z_iso_factor=2.0)
 
 
+def test_setup_spec_preset_is_normalized_and_identity_bearing() -> None:
+    default = SetupSpec()
+    ks = SetupSpec(preset="ks")
+
+    assert "preset" not in default.to_dict()
+    assert ks.preset == "KS"
+    assert ks.to_dict()["preset"] == "KS"
+    with pytest.raises(ValidationError, match="preset"):
+        SetupSpec(preset="unknown")
+
+
 def test_hashing_is_order_independent_and_excludes_timestamps() -> None:
     left = {"b": [2, 3], "a": {"value": 1, "timestamp": "old"}}
     right = {"a": {"timestamp": "new", "value": 1}, "b": [2, 3]}

@@ -76,7 +76,29 @@ def test_setup_simple_magnetic_metal_and_reports(tmp_path: Path) -> None:
     assert input_nml["atoms"]["label"] == ["Fe"]
     assert input_nml["control"]["recur"] == "block"
     assert input_nml["control"]["lld"] == 21
+    assert input_nml["lattice"]["strux_backend"] == "strux_lib"
     assert {name: (tmp_path / name).read_bytes() for name in original_inputs} == original_inputs
+
+
+def test_setup_ks_preset_and_explicit_strux_backend(tmp_path: Path) -> None:
+    _copy_setup_fixture(tmp_path)
+    input_path = tmp_path / "input.nml"
+    input_path.write_text(
+        input_path.read_text(encoding="utf-8").replace(
+            "crystal_sym = 'file'",
+            "crystal_sym = 'file'\nstrux_backend = 'custom_backend'",
+        ),
+        encoding="utf-8",
+    )
+    original_input = input_path.read_bytes()
+
+    result = run_rsutil(tmp_path, "-S", "--preset", "KS", "--validate")
+    assert_cli_success(result)
+
+    generated = _read_namelist(tmp_path / "input_new.nml")
+    assert generated["self"]["use_kspace"] is True
+    assert generated["lattice"]["strux_backend"] == "custom_backend"
+    assert input_path.read_bytes() == original_input
 
 
 def test_setup_multisite_multispecies_fixture(tmp_path: Path) -> None:

@@ -620,6 +620,16 @@ def validate_setup_namelists(
                     diagnostics.append(_warning(ErrorCode.RECURSION_INVALID, "generated recursion steps differ from setup specification; preserving legacy output", path=str(input_file), expected=setup_spec.rec_steps, actual=steps))
 
         if setup_spec is not None:
+            if setup_spec.preset == "KS":
+                self_group = _group(input_document, "self", diagnostics, input_file)
+                if self_group is not None and _value(self_group, "use_kspace") is not True:
+                    diagnostics.append(
+                        _error(
+                            ErrorCode.SETUP_SPEC_INVALID,
+                            "KS preset output must set &self use_kspace = .true.",
+                            path=str(input_file),
+                        )
+                    )
             if setup_spec.mode_2d:
                 b3 = _value(input_lattice_group, "b3")
                 n3 = _as_int(_value(input_lattice_group, "n3"))

@@ -89,6 +89,23 @@ def test_only_changed_scientific_entry_identity_changes(tmp_path: Path) -> None:
     assert original_validation.entry_ids["second"] != changed_validation.entry_ids["second"]
 
 
+def test_setup_preset_is_accepted_and_identity_bearing(tmp_path: Path) -> None:
+    _source(tmp_path, "bccFe", "bcc")
+    base_data = {
+        "name": "preset-identity",
+        "structures": {"bcc": "bcc"},
+        "entries": [{"name": "case", "structure": "bcc"}],
+    }
+    base = Campaign.from_dict(base_data)
+    with_ks = Campaign.from_dict({**base_data, "setup_template": {"preset": "KS"}})
+
+    base_id = CampaignGenerator().validate(base, base_dir=tmp_path).entry_ids["case"]
+    ks_id = CampaignGenerator().validate(with_ks, base_dir=tmp_path).entry_ids["case"]
+
+    assert with_ks.to_dict()["setup_template"]["preset"] == "KS"
+    assert base_id != ks_id
+
+
 def test_entry_metadata_remains_identity_bearing(tmp_path: Path) -> None:
     _source(tmp_path, "bccFe", "bcc")
     first = Campaign.from_dict({

@@ -43,6 +43,50 @@ def _diagnostic(code: ErrorCode, message: str, **details: Any) -> Diagnostic:
     return Diagnostic(DiagnosticSeverity.ERROR, code, message, details=details)
 
 
+def _apply_setup_preset(input_path: Path, preset: str) -> None:
+    """Set preset-controlled values in a staged input namelist."""
+    if preset != "KS":
+        raise ValueError(f"unsupported setup preset: {preset}")
+
+    lines = input_path.read_text(encoding="utf-8").splitlines(keepends=True)
+    group_start = re.compile(r"^\s*&([a-z][a-z0-9_]*)\b", re.IGNORECASE)
+    assignment = re.compile(r"^\s*use_kspace\s*=", re.IGNORECASE)
+    in_self = False
+    self_found = False
+    value_written = False
+    output: list[str] = []
+
+    for line in lines:
+        content = line.rstrip("\r\n")
+        line_ending = line[len(content):]
+        code = content.split("!", 1)[0]
+        start = group_start.match(code)
+        if start:
+            in_self = start.group(1).lower() in {"self", "selfnamelist"}
+            self_found = self_found or in_self
+
+        if in_self and assignment.match(code):
+            comment = content[len(code):]
+            output.append(f" use_kspace = .true.{comment}{line_ending}")
+            value_written = True
+            continue
+
+        if in_self and (code.strip() == "/" or code.strip().lower() == "&end") and not value_written:
+            output.append(" use_kspace = .true.\n")
+            value_written = True
+
+        output.append(line)
+        if in_self and (code.strip() == "/" or code.strip().lower() == "&end"):
+            in_self = False
+
+    if not self_found:
+        if output and not output[-1].endswith(("\n", "\r")):
+            output[-1] += "\n"
+        output.extend(["&self\n", " use_kspace = .true.\n", "/\n"])
+
+    input_path.write_text("".join(output), encoding="utf-8")
+
+
 def parse_sqs_spec(sqs_spec: str) -> tuple[list[str], np.ndarray]:
     """Parse an SQS composition such as ``Fe=0.5,Ni=0.5``."""
     parts = [part.strip() for part in sqs_spec.split(",") if part.strip()]
@@ -453,12 +497,17 @@ class SetupService:
         runner_workspace: Workspace | None = None
         try:
             run_lattice, run_input = lattice, input_nml
-            if setup_spec.supercell != (1, 1, 1):
+            if setup_spec.supercell != (1, 1, 1) or setup_spec.preset is not None:
                 transform_workspace = Workspace.create(prefix="rsutil-setup-transform-")
-                run_lattice = transform_workspace.path / "lattice.nml"
                 run_input = transform_workspace.path / "input.nml"
-                if not create_supercell(*setup_spec.supercell, lattice, input_nml, run_lattice, run_input, False, setup_spec.sqs, setup_spec.sqs_shells, setup_spec.sqs_steps, setup_spec.sqs_seed):
-                    raise ValueError("failed to create supercell")
+                if setup_spec.supercell != (1, 1, 1):
+                    run_lattice = transform_workspace.path / "lattice.nml"
+                    if not create_supercell(*setup_spec.supercell, lattice, input_nml, run_lattice, run_input, False, setup_spec.sqs, setup_spec.sqs_shells, setup_spec.sqs_steps, setup_spec.sqs_seed):
+                        raise ValueError("failed to create supercell")
+                else:
+                    shutil.copy2(input_nml, run_input)
+                if setup_spec.preset is not None:
+                    _apply_setup_preset(run_input, setup_spec.preset)
             if workspace is None:
                 runner_workspace = Workspace.create(prefix="rsutil-setup-run-")
                 run_workspace = runner_workspace.path
