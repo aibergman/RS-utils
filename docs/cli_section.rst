@@ -398,6 +398,12 @@ The ``--exchange`` flag creates exchange interaction input files (J_ij) for spin
 - ``--shell-width``: Retained for compatibility; it does not define pair equivalence (default: 0.1).
 - ``--soc``: Use conservative symmetry for the legacy collinear +z magnetic reference.
 - ``--full-pairs``: Disable symmetry reduction and generate the complete pair set.
+- ``--max-pairs-per-job N`` (alias ``--max-pairs``): Split the exchange pairs of each atom into
+  jobs of at most ``N`` pairs, written as ``Atom_1a``, ``Atom_1b``, ... instead of one ``Atom_1``.
+  Use this to keep a single RS-LMTO-ASA run within memory limits. ``0`` (default) keeps all pairs
+  of an atom in one ``Atom_<n>`` directory. Pairs are sliced in neighbor order, so the slices
+  together contain exactly the pairs of the unsliced job. Remove or ignore any earlier
+  ``Atom_<n>`` directory when switching layouts.
 - ``--data``: Directory for input files (default: current directory).
 - ``--rij-out``: Path to write R_ij neighbor mappings (optional). Use with ``--exchange``.
 - ``--rij-format``: Format for R_ij output; supported values: ``json`` (machine readable) and

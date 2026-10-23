@@ -68,18 +68,22 @@ def test_missing_nsp_is_explicitly_unknown(tmp_path: Path) -> None:
     assert reference.has_soc is None
 
 
-def test_nsp_does_not_infer_ferromagnetic_order_or_reduce(tmp_path: Path) -> None:
+def test_collinear_nsp_defaults_to_collinear_fm(tmp_path: Path) -> None:
     _reference_with_nsp(tmp_path, 1)
 
-    with pytest.warns(UserWarning, match="identity-only"):
-        unknown = ExchangeService(tmp_path).plan(cutoff=1.0, unique=True)
+    default = ExchangeService(tmp_path).plan(cutoff=1.0, unique=True)
     full = ExchangeService(tmp_path).plan(cutoff=1.0, full_pairs=True)
 
-    assert len(unknown.pairs) == len(full.pairs)
-    assert all(job.magnetic_reference == MAGNETIC_REFERENCE_UNKNOWN for job in unknown.jobs)
-    assert all(job.soc is False for job in unknown.jobs)
-    assert all(job.symmetry_reduction_applied is False for job in unknown.jobs)
-    assert all(job.symmetry_reduction_reason for job in unknown.jobs)
+    assert len(default.pairs) < len(full.pairs)
+    assert all(job.magnetic_reference == MAGNETIC_REFERENCE_COLLINEAR_FM for job in default.jobs)
+    assert all(job.soc is False for job in default.jobs)
+    assert all(job.symmetry_reduction_applied is True for job in default.jobs)
+
+    with pytest.warns(UserWarning, match="identity-only"):
+        explicit = ExchangeService(tmp_path).plan(
+            cutoff=1.0, unique=True, magnetic_reference=MAGNETIC_REFERENCE_UNKNOWN
+        )
+    assert len(explicit.pairs) == len(full.pairs)
 
 
 def test_nsp_two_enables_soc_and_rejects_conflicting_explicit_default(
@@ -129,21 +133,21 @@ def test_explicit_fm_no_soc_enables_only_proven_reduction(tmp_path: Path) -> Non
     assert all(job.symmetry_reduction_applied is True for job in reduced.jobs)
 
 
-def test_explicit_fm_soc_requires_axis_and_valid_axis_is_restricted(
+def test_fm_soc_assumes_z_axis_unless_specified(
     tmp_path: Path,
 ) -> None:
     _reference_with_nsp(tmp_path, 2)
     service = ExchangeService(tmp_path)
     full = service.plan(cutoff=1.0, full_pairs=True)
 
-    with pytest.warns(UserWarning, match="explicit global magnetization axis"):
-        no_axis = service.plan(
-            cutoff=1.0,
-            unique=True,
-            magnetic_reference=MAGNETIC_REFERENCE_COLLINEAR_FM,
-        )
-    assert len(no_axis.pairs) == len(full.pairs)
-    assert all(job.symmetry_reduction_applied is False for job in no_axis.jobs)
+    no_axis = service.plan(
+        cutoff=1.0,
+        unique=True,
+        magnetic_reference=MAGNETIC_REFERENCE_COLLINEAR_FM,
+    )
+    assert len(no_axis.pairs) < len(full.pairs)
+    assert all(job.magnetic_axis == (0.0, 0.0, 1.0) for job in no_axis.jobs)
+    assert all(job.symmetry_reduction_applied is True for job in no_axis.jobs)
 
     with_axis = service.plan(
         cutoff=1.0,

@@ -161,6 +161,15 @@ class ExchangeJobSpec:
     soc_source: str = "unknown"
     symmetry_reduction_applied: bool = False
     symmetry_reduction_reason: str = ""
+    chunk_index: int = 0
+    chunk_count: int = 1
+    chunk_label: str = ""
+
+    @property
+    def directory_name(self) -> str:
+        """Job directory name: ``Atom_<n>`` or ``Atom_<n><label>`` when sliced."""
+
+        return f"Atom_{self.atom_index}{self.chunk_label}"
 
     @property
     def pair_keys(self) -> tuple[PairKey, ...]:
@@ -191,6 +200,33 @@ class ExchangeJobSpec:
         return self.fermi_energy_source
 
 
+def chunk_label(index: int) -> str:
+    """Return the bijective base-26 label for a zero-based chunk index.
+
+    ``0 -> a``, ``25 -> z``, ``26 -> aa``, ``27 -> ab``.
+    """
+
+    if index < 0:
+        raise ValueError("chunk index must be non-negative")
+    number = index + 1
+    label = ""
+    while number:
+        number, remainder = divmod(number - 1, 26)
+        label = chr(ord("a") + remainder) + label
+    return label
+
+
+def _chunk_bounds(count: int, max_pairs_per_job: int) -> list[tuple[int, int]]:
+    """Split ``count`` pairs into consecutive slices of at most the limit."""
+
+    if max_pairs_per_job <= 0 or count == 0:
+        return [(0, count)]
+    return [
+        (start, min(start + max_pairs_per_job, count))
+        for start in range(0, count, max_pairs_per_job)
+    ]
+
+
 def construct_exchange_jobs(
     input_nml: Mapping[str, Any],
     cluster: Sequence[Any],
@@ -216,8 +252,24 @@ def construct_exchange_jobs(
     soc_source: str = "unknown",
     symmetry_reduction_applied: bool = False,
     symmetry_reduction_reason: str = "",
+    max_pairs_per_job: int = 0,
 ) -> tuple[ExchangeJobSpec, ...]:
-    """Construct canonical pair-backed jobs while preserving legacy indices."""
+    """Construct canonical pair-backed jobs while preserving legacy indices.
+
+    With ``max_pairs_per_job > 0`` the pairs of each atom are split, in
+    neighbor order, into consecutive slices of at most that many pairs.  Every
+    slice is its own job in ``Atom_<n>a``, ``Atom_<n>b``, ... so that memory
+    use of one RS-LMTO-ASA run is bounded.  ``0`` keeps one ``Atom_<n>`` job
+    holding all pairs of the atom.
+    """
+
+    if (
+        isinstance(max_pairs_per_job, bool)
+        or int(max_pairs_per_job) != max_pairs_per_job
+        or max_pairs_per_job < 0
+    ):
+        raise ValueError("max_pairs_per_job must be zero or a positive integer")
+    max_pairs_per_job = int(max_pairs_per_job)
 
     root = Path(output_root).expanduser().resolve()
     output_files = tuple(required_atom_files or required_atom_files_from_input(input_nml))
@@ -226,52 +278,61 @@ def construct_exchange_jobs(
         if atom_index <= 0 or atom_index > len(canonical_structure.sites):
             raise ValueError(f"recursion site {atom_index} is outside the reference cell")
         entries = tuple(neighbors.get(center_cluster_index, ()))
-        pairs = tuple(
-            map_cluster_neighbor(
-                canonical_structure,
-                cluster,
-                center_cluster_index,
-                neighbor,
-                center_site_index=atom_index - 1,
+        bounds = _chunk_bounds(len(entries), max_pairs_per_job)
+        for chunk_index, (start, stop) in enumerate(bounds):
+            chunk_entries = entries[start:stop]
+            pairs = tuple(
+                map_cluster_neighbor(
+                    canonical_structure,
+                    cluster,
+                    center_cluster_index,
+                    neighbor,
+                    center_site_index=atom_index - 1,
+                )
+                for neighbor in chunk_entries
             )
-            for neighbor in entries
-        )
-        matching_indices = tuple(int(neighbor.index) + 1 for neighbor in entries)
-        job_input = build_exchange_input(
-            input_nml,
-            atom_index=atom_index,
-            matching_indices=matching_indices,
-            fermi_energy=fermi_energy,
-        )
-        jobs.append(
-            ExchangeJobSpec(
+            matching_indices = tuple(int(neighbor.index) + 1 for neighbor in chunk_entries)
+            job_input = build_exchange_input(
+                input_nml,
                 atom_index=atom_index,
-                center_cluster_index=center_cluster_index,
-                center_site_index=atom_index - 1,
                 matching_indices=matching_indices,
-                pairs=pairs,
-                input_nml=job_input,
-                output_dir=root / f"Atom_{atom_index}",
-                cutoff=float(cutoff),
-                reduction=str(reduction),
-                soc=bool(soc),
-                magnetic_axis=(
-                    None if magnetic_axis is None else tuple(float(value) for value in magnetic_axis)
-                ),
-                magnetic_reference=str(magnetic_reference),
-                fermi_energy_source=str(fermi_energy_source),
-                required_atom_files=output_files,
-                source_run_identity=str(source_run_identity),
-                source_run_hash=str(source_run_hash),
-                nsp=None if nsp is None else int(nsp),
-                nsp_source=str(nsp_source),
-                is_collinear=is_collinear,
-                is_noncollinear=is_noncollinear,
-                soc_source=str(soc_source),
-                symmetry_reduction_applied=bool(symmetry_reduction_applied),
-                symmetry_reduction_reason=str(symmetry_reduction_reason),
+                fermi_energy=fermi_energy,
             )
-        )
+            label = chunk_label(chunk_index) if max_pairs_per_job > 0 else ""
+            jobs.append(
+                ExchangeJobSpec(
+                    atom_index=atom_index,
+                    center_cluster_index=center_cluster_index,
+                    center_site_index=atom_index - 1,
+                    matching_indices=matching_indices,
+                    pairs=pairs,
+                    input_nml=job_input,
+                    output_dir=root / f"Atom_{atom_index}{label}",
+                    cutoff=float(cutoff),
+                    reduction=str(reduction),
+                    soc=bool(soc),
+                    magnetic_axis=(
+                        None
+                        if magnetic_axis is None
+                        else tuple(float(value) for value in magnetic_axis)
+                    ),
+                    magnetic_reference=str(magnetic_reference),
+                    fermi_energy_source=str(fermi_energy_source),
+                    required_atom_files=output_files,
+                    source_run_identity=str(source_run_identity),
+                    source_run_hash=str(source_run_hash),
+                    nsp=None if nsp is None else int(nsp),
+                    nsp_source=str(nsp_source),
+                    is_collinear=is_collinear,
+                    is_noncollinear=is_noncollinear,
+                    soc_source=str(soc_source),
+                    symmetry_reduction_applied=bool(symmetry_reduction_applied),
+                    symmetry_reduction_reason=str(symmetry_reduction_reason),
+                    chunk_index=chunk_index,
+                    chunk_count=len(bounds),
+                    chunk_label=label,
+                )
+            )
     return tuple(jobs)
 
 
@@ -307,7 +368,7 @@ def _spec_payload(job: ExchangeJobSpec) -> dict[str, Any]:
         }
         for pair in job.canonical_pair_records
     ]
-    return {
+    payload = {
         "atom_index": job.atom_index,
         "center_cluster_index": job.center_cluster_index,
         "center_site_index": job.center_site_index,
@@ -335,6 +396,14 @@ def _spec_payload(job: ExchangeJobSpec) -> dict[str, Any]:
             list(job.matching_indices),
         ],
     }
+    if job.chunk_label:
+        # Recorded only for sliced jobs so unsliced job hashes are unchanged.
+        payload["chunk"] = {
+            "index": job.chunk_index,
+            "count": job.chunk_count,
+            "label": job.chunk_label,
+        }
+    return payload
 
 
 def build_exchange_manifest(
@@ -731,6 +800,7 @@ __all__ = [
     "EXCHANGE_MANIFEST_SCHEMA",
     "build_exchange_input",
     "build_exchange_manifest",
+    "chunk_label",
     "construct_exchange_jobs",
     "inventory_pairs",
     "read_exchange_manifest",

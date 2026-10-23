@@ -156,7 +156,21 @@ def test_exchange_stage_identity_tracks_parent_output_and_persists_each_stage(tm
     assert len(list((tmp_path / "exchange-stage").glob("*/exchange_stage_manifest.json"))) == 3
 
 
-def test_unique_reduction_requires_explicit_supported_magnetic_context(tmp_path: Path) -> None:
+def test_unique_reduction_defaults_to_collinear_fm(tmp_path: Path) -> None:
+    entry = _write_parent(tmp_path, entry_id="a" * 64, name="valid")
+    _write_campaign(tmp_path, (entry,))
+
+    stage = prepare_exchange_stage(
+        tmp_path,
+        tmp_path / "exchange-stage",
+        unique=True,
+        full_pairs=False,
+    )
+    assert stage.jobs
+    assert all(item.get("magnetic_reference") in (None, "collinear_fm") for item in stage.jobs)
+
+
+def test_unique_reduction_rejects_explicit_unsupported_magnetic_reference(tmp_path: Path) -> None:
     entry = _write_parent(tmp_path, entry_id="a" * 64, name="valid")
     _write_campaign(tmp_path, (entry,))
 
@@ -166,6 +180,7 @@ def test_unique_reduction_requires_explicit_supported_magnetic_context(tmp_path:
             tmp_path / "exchange-stage",
             unique=True,
             full_pairs=False,
+            magnetic_reference="unknown",
         )
     except ValueError as exc:
         assert "magnetic_reference" in str(exc)
@@ -287,3 +302,29 @@ def test_collection_uses_canonical_exchange_parser_and_preserves_pair_provenance
     assert record["key"]
     assert record["pair"]["rs_type_i"] is not None
     assert record["pair"]["species_i"] == "Fe"
+
+
+def test_max_pairs_per_job_slices_stage_jobs_and_changes_identity(tmp_path: Path) -> None:
+    entry = _write_parent(tmp_path, entry_id="a" * 64, name="valid")
+    _write_campaign(tmp_path, (entry,))
+
+    whole = prepare_exchange_stage(tmp_path, tmp_path / "exchange-stage", cutoff=1.0)
+    sliced = prepare_exchange_stage(
+        tmp_path, tmp_path / "exchange-stage", cutoff=1.0, max_pairs_per_job=2
+    )
+
+    assert sliced.stage_id != whole.stage_id
+    assert len(sliced.jobs) > len(whole.jobs)
+    assert [item["array_index"] for item in sliced.jobs] == list(range(len(sliced.jobs)))
+    assert all(Path(item["atom_path"]).name.startswith("Atom_") for item in sliced.jobs)
+    assert all(item["chunk_label"] for item in sliced.jobs)
+    assert len({item["job_identity"] for item in sliced.jobs}) == len(sliced.jobs)
+    pairs = lambda stage: sorted(  # noqa: E731
+        json.dumps(key, sort_keys=True)
+        for item in stage.jobs
+        for key in item["canonical_pair_list"]
+    )
+    assert pairs(sliced) == pairs(whole)
+    payload = json.loads(sliced.manifest_path.read_text())
+    assert payload["exchange_options"]["max_pairs_per_job"] == 2
+    assert "max_pairs_per_job" not in json.loads(whole.manifest_path.read_text())["exchange_options"]

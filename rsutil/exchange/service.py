@@ -112,6 +112,21 @@ def _logical_source_path(path: Path, root: Path) -> str:
         return path.resolve().as_posix()
 
 
+_DEFAULT_MAGNETIC_AXIS = (0.0, 0.0, 1.0)
+
+
+def _default_axis(
+    reference_class: str,
+    soc: bool,
+    axis: tuple[float, float, float] | None,
+) -> tuple[float, float, float] | None:
+    """Assume z quantization for collinear-FM SOC unless an axis is given."""
+
+    if axis is None and soc and reference_class == MAGNETIC_REFERENCE_COLLINEAR_FM:
+        return _DEFAULT_MAGNETIC_AXIS
+    return axis
+
+
 def _resolve_magnetic_context(
     reference: ReferenceCalculation,
     *,
@@ -148,6 +163,7 @@ def _resolve_magnetic_context(
             )
         return replace(
             magnetic_context,
+            magnetic_axis=_default_axis(magnetic_context.reference_class, magnetic_context.soc, magnetic_context.magnetic_axis),
             nsp=reference.nsp,
             nsp_source=_logical_source_path(reference.input_path, reference.source_dir),
         )
@@ -158,7 +174,12 @@ def _resolve_magnetic_context(
             f"(soc={source_soc})"
         )
     effective_soc = source_soc if soc is None and source_soc is not None else bool(soc or False)
-    selected_reference = magnetic_reference or MAGNETIC_REFERENCE_UNKNOWN
+    if magnetic_reference is not None:
+        selected_reference = magnetic_reference
+    elif reference.is_noncollinear is True:
+        selected_reference = MAGNETIC_REFERENCE_UNKNOWN
+    else:
+        selected_reference = MAGNETIC_REFERENCE_COLLINEAR_FM
     if (
         selected_reference == MAGNETIC_REFERENCE_COLLINEAR_FM
         and reference.is_noncollinear is True
@@ -169,7 +190,7 @@ def _resolve_magnetic_context(
     return MagneticSymmetryContext(
         reference_class=selected_reference,
         soc=effective_soc,
-        magnetic_axis=magnetic_axis,
+        magnetic_axis=_default_axis(selected_reference, effective_soc, magnetic_axis),
         nsp=reference.nsp,
         nsp_source=_logical_source_path(reference.input_path, reference.source_dir),
     )
@@ -207,6 +228,7 @@ class ExchangeService:
         magnetic_axis: tuple[float, float, float] | None = None,
         magnetic_context: MagneticSymmetryContext | None = None,
         magnetic_reference: str | None = None,
+        max_pairs_per_job: int = 0,
         verbose: bool = False,
         input_path: str | Path | None = None,
         lattice_path: str | Path | None = None,
@@ -289,6 +311,7 @@ class ExchangeService:
             ),
             symmetry_reduction_applied=reduction_applied,
             symmetry_reduction_reason=reduction_reason,
+            max_pairs_per_job=max_pairs_per_job,
         )
         return ExchangePlan(
             reference=reference,
@@ -308,6 +331,7 @@ class ExchangeService:
         magnetic_axis: tuple[float, float, float] | None = None,
         magnetic_context: MagneticSymmetryContext | None = None,
         magnetic_reference: str | None = None,
+        max_pairs_per_job: int = 0,
         rij_out: str | Path | None = None,
         rij_fmt: str = "json",
         verbose: bool = False,
@@ -329,6 +353,7 @@ class ExchangeService:
             magnetic_axis=magnetic_axis,
             magnetic_context=magnetic_context,
             magnetic_reference=magnetic_reference,
+            max_pairs_per_job=max_pairs_per_job,
             verbose=verbose,
             input_path=input_path,
             lattice_path=lattice_path,

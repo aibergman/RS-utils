@@ -36,6 +36,10 @@ ordinary names and recognizable layout expected by existing workflows:
 | Exchange source data | `clust`, `report.out`, and root `lattice.nml`/`input.nml` |
 | Optional exchange mapping | `R_ij` mapping artifact when the option is available and requested |
 
+With `--max-pairs-per-job N` the directories are `Atom_<index><letters>`
+(`Atom_1a`, `Atom_1b`, ...), each holding a slice of at most `N` pairs; the
+default keeps `Atom_<index>`.
+
 `Atom_<index>` is a compatibility disk/job layout, not the scientific pair
 identity. Future services may use an isolated staging area and commit these
 familiar artifacts on success.

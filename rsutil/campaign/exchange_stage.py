@@ -408,7 +408,10 @@ def _canonical_exchange_options(
     magnetic_axis: Sequence[float] | None,
     magnetic_reference: str | None,
     magnetic_context: MagneticSymmetryContext | None,
+    max_pairs_per_job: int = 0,
 ) -> dict[str, Any]:
+    if isinstance(max_pairs_per_job, bool) or int(max_pairs_per_job) != max_pairs_per_job or max_pairs_per_job < 0:
+        raise ValueError("max_pairs_per_job must be zero or a positive integer")
     if not math.isfinite(float(cutoff)) or float(cutoff) <= 0:
         raise ValueError("exchange cutoff must be a finite positive number")
     if not math.isfinite(float(shell_width)) or float(shell_width) < 0:
@@ -420,8 +423,12 @@ def _canonical_exchange_options(
         raise ValueError("magnetic_axis must contain exactly three values")
     if axis is not None and not all(math.isfinite(value) for value in axis):
         raise ValueError("magnetic_axis must contain finite values")
-    reference = "unknown" if magnetic_reference is None else str(magnetic_reference).strip().lower()
-    return {
+    reference = (
+        MAGNETIC_REFERENCE_COLLINEAR_FM
+        if magnetic_reference is None
+        else str(magnetic_reference).strip().lower()
+    )
+    options: dict[str, Any] = {
         "cutoff": float(cutoff),
         "shell_width": float(shell_width),
         "full_pairs": effective_full_pairs,
@@ -446,6 +453,10 @@ def _canonical_exchange_options(
             }
         ),
     }
+    if max_pairs_per_job:
+        # Recorded only when slicing so unsliced stage identities are unchanged.
+        options["max_pairs_per_job"] = int(max_pairs_per_job)
+    return options
 
 
 def _check_reduction_policy(options: Mapping[str, Any]) -> None:
@@ -510,6 +521,11 @@ def _job_record(
         "parent_manifest_path": parent["manifest_path"],
         "parent_manifest_hash": parent["manifest_hash"],
         "atom_index": int(job.atom_index),
+        **(
+            {"chunk_index": int(job.chunk_index), "chunk_count": int(job.chunk_count), "chunk_label": job.chunk_label}
+            if job.chunk_label
+            else {}
+        ),
         "exchange_manifest_path": relative_manifest,
         "exchange_job_manifest": relative_manifest,
         "exchange_manifest_hash": hash_file(manifest_path),
@@ -537,6 +553,7 @@ def prepare_exchange_stage(
     magnetic_axis: Sequence[float] | None = None,
     magnetic_reference: str | None = None,
     magnetic_context: MagneticSymmetryContext | None = None,
+    max_pairs_per_job: int = 0,
 ) -> ExchangeStagePreparation:
     """Prepare exchange jobs from only successful, parsed, converged parents."""
 
@@ -559,6 +576,7 @@ def prepare_exchange_stage(
         magnetic_axis=magnetic_axis,
         magnetic_reference=magnetic_reference,
         magnetic_context=magnetic_context,
+        max_pairs_per_job=max_pairs_per_job,
     )
     _check_reduction_policy(options)
 
@@ -615,12 +633,15 @@ def prepare_exchange_stage(
                     if options["magnetic_axis"] is None
                     else tuple(options["magnetic_axis"])
                 ),
+                # Leave an unspecified reference to the service so each
+                # parent resolves its own default (noncollinear -> unknown).
                 magnetic_reference=(
                     None
-                    if magnetic_context is not None
+                    if magnetic_context is not None or magnetic_reference is None
                     else options["magnetic_reference"]
                 ),
                 magnetic_context=magnetic_context,
+                max_pairs_per_job=options.get("max_pairs_per_job", 0),
                 input_path=paths["input"],
                 lattice_path=paths["lattice"],
                 cluster_path=paths["cluster"],
@@ -673,14 +694,14 @@ def prepare_exchange_stage(
     stage_id = _stage_identity(parent_records, options)
     stage_root, stage_base = _stage_directory(destination, parent_root, stage_id)
     jobs_by_parent = stage_root / "jobs" / stage_id
-    generated: list[tuple[int, int, dict[str, Any]]] = []
+    generated: list[tuple[int, tuple[int, int], dict[str, Any]]] = []
     for parent_position, (parent, paths, plan) in planned.items():
         entry = index.entries[parent_position]
         try:
             parent_job_root = jobs_by_parent / entry.entry_id
             run_dir = (parent_root / entry.run_path).resolve()
             rebased_jobs = tuple(
-                replace(job, output_dir=parent_job_root / f"Atom_{job.atom_index}")
+                replace(job, output_dir=parent_job_root / job.directory_name)
                 for job in plan.jobs
             )
             write_exchange_jobs(
@@ -696,7 +717,7 @@ def prepare_exchange_stage(
                 manifest = read_exchange_manifest(manifest_path)
                 generated.append((
                     parent_position,
-                    int(job.atom_index),
+                    (int(job.atom_index), int(job.chunk_index)),
                     _job_record(
                         stage_root=stage_root,
                         parent=parent,

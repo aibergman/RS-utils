@@ -1250,6 +1250,16 @@ def run_campaign_collect(args):
     return 0
 
 
+def _non_negative_int(value):
+    try:
+        number = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"expected a non-negative integer, got {value!r}")
+    if number < 0:
+        raise argparse.ArgumentTypeError(f"expected a non-negative integer, got {value!r}")
+    return number
+
+
 def run_campaign_exchange_prepare(args):
     """Prepare exchange jobs from successful, parsed, converged parent runs."""
 
@@ -1268,6 +1278,7 @@ def run_campaign_exchange_prepare(args):
                 None if args.magnetic_axis is None else tuple(args.magnetic_axis)
             ),
             magnetic_reference=args.magnetic_reference,
+            max_pairs_per_job=args.max_pairs_per_job,
         )
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
@@ -1484,14 +1495,23 @@ def create_campaign_parser(subparsers):
     pair_policy.add_argument("--full-pairs", dest="full_pairs", action="store_true", default=True, help="Generate the complete conservative pair set (default)")
     pair_policy.add_argument("--unique", dest="full_pairs", action="store_false", help="Request explicitly supported symmetry reduction")
     prepare.add_argument("--shell-width", type=float, default=0.1)
+    prepare.add_argument(
+        "--max-pairs-per-job",
+        "--max-pairs",
+        dest="max_pairs_per_job",
+        type=_non_negative_int,
+        default=0,
+        metavar="N",
+        help="Split each atom's exchange pairs into jobs of at most N pairs (Atom_1a, Atom_1b, ...); 0 keeps one job per atom (default: 0)",
+    )
     prepare.add_argument("--soc", action="store_true", default=None, help="Request SOC; must agree with the parent input")
     prepare.add_argument(
         "--magnetic-reference",
         choices=["unknown", "collinear_fm", "afm", "ferrimagnetic", "noncollinear", "magnetic_space_group"],
         default=None,
-        help="Explicit magnetic reference for symmetry reduction",
+        help="Magnetic reference for symmetry reduction (default: collinear_fm; unknown for noncollinear parents)",
     )
-    prepare.add_argument("--magnetic-axis", nargs=3, type=float, metavar=("X", "Y", "Z"))
+    prepare.add_argument("--magnetic-axis", nargs=3, type=float, metavar=("X", "Y", "Z"), help="Global magnetization axis for collinear-FM SOC reduction (default: 0 0 1)")
     prepare.add_argument("--destination", default="exchange-stage", help="Exchange-stage directory (default: exchange-stage under the parent campaign)")
     prepare.set_defaults(func=run_campaign_exchange_prepare)
 
@@ -2590,7 +2610,7 @@ Examples:
             "magnetic_space_group",
         ],
         default=None,
-        help="Explicit magnetic order assertion required for symmetry reduction",
+        help="Magnetic reference for symmetry reduction (default: collinear_fm, unknown for noncollinear nsp)",
     )
     parser.add_argument(
         "--magnetic-axis",
@@ -2598,13 +2618,26 @@ Examples:
         type=float,
         metavar=("X", "Y", "Z"),
         default=None,
-        help="Global magnetization axis for explicit collinear-FM SOC reduction",
+        help="Global magnetization axis for collinear-FM SOC reduction (default: 0 0 1)",
     )
     parser.add_argument(
         "--full-pairs",
         action="store_true",
         default=False,
         help="Disable symmetry reduction and generate the complete pair set",
+    )
+    parser.add_argument(
+        "--max-pairs-per-job",
+        "--max-pairs",
+        dest="max_pairs_per_job",
+        type=_non_negative_int,
+        default=0,
+        metavar="N",
+        help=(
+            "Split the exchange pairs of each atom into jobs of at most N pairs "
+            "(Atom_1a, Atom_1b, ...) to bound memory use; 0 keeps all pairs of an "
+            "atom in one Atom_<n> job (default: 0)"
+        ),
     )
     parser.add_argument(
         "--rij-out",
@@ -2841,6 +2874,7 @@ Examples:
                     None if args.magnetic_axis is None else tuple(args.magnetic_axis)
                 ),
                 full_pairs=args.full_pairs,
+                max_pairs_per_job=args.max_pairs_per_job,
                 rij_out=args.rij_out,
                 rij_fmt=args.rij_format,
                 source_dir=args.data,

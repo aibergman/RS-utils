@@ -10,6 +10,25 @@ Each generated directory contains:
 - the explicitly required `<label>_out.nml` files from the selected source run;
 - `rsutil_exchange_manifest.json`.
 
+## Slicing large atoms
+
+The RS-LMTO-ASA exchange run holds all pairs of one job in memory, so an atom
+with many neighbors can exhaust memory. `--max-pairs-per-job N` (API:
+`max_pairs_per_job=N`; campaign: `rsutil campaign exchange prepare
+--max-pairs-per-job N`) splits the pairs of each atom, in neighbor order, into
+consecutive jobs of at most `N` pairs. Directories are named `Atom_<n>a`,
+`Atom_<n>b`, ..., `Atom_<n>z`, `Atom_<n>aa`, ... . When slicing is enabled
+every atom gets lettered directories, even if it fits in one slice
+(`Atom_2a`); `0`, the default, keeps the single `Atom_<n>` job per atom.
+
+Each slice is an ordinary exchange job with its own `input.nml` (`njij` and
+`ijpair` cover only that slice), manifest, and `spec_hash`. Sliced manifests
+additionally record `spec.chunk = {index, count, label}`; unsliced manifests are
+byte-for-byte unchanged. Pair identity remains the canonical `(i, j, R)` key,
+so results from all slices of an atom are matched by pair key like any other
+job. Changing `N` changes the campaign exchange-stage identity. Slicing does
+not remove an existing `Atom_<n>` directory from an earlier unsliced run.
+
 The manifest uses schema `rsutil-exchange-v3` and records the deterministic job
 specification hash, source-run hash, cutoff/reduction/SOC policy, Fermi-energy
 source, one-based legacy `ijpair` values, and the canonical `(i, j, R)` pair

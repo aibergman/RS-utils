@@ -279,6 +279,12 @@ AiiDA/workflow-engine boundary.
 
 ## Explicit exchange stage
 
+To stay within the memory limits of a single RS-LMTO-ASA run, add
+`--max-pairs-per-job N` to `prepare`. Each atom's pairs are then split into
+`Atom_<n>a`, `Atom_<n>b`, ... jobs of at most `N` pairs, each its own row in
+the Slurm array; `status` and `collect` treat the slices as independent jobs.
+The default `0` keeps one `Atom_<n>` job per atom.
+
 Exchange is an explicit second campaign stage. By default it is prepared only
 from successfully executed, parse-valid, explicitly converged parent SCF
 runs. The supported workflow is:
@@ -327,8 +333,10 @@ therefore creates a different stage, while identical preparation can reuse
 valid jobs.
 
 Full pairs are the conservative starting point. Symmetry reduction must be
-requested with `--unique` and an explicitly supported magnetic context, such
-as `--magnetic-reference collinear_fm`; it is not inferred generically.
+requested with `--unique`. The magnetic reference defaults to `collinear_fm`
+(with a z magnetization axis under SOC) for collinear parents; noncollinear
+parents resolve to `unknown` and are not reduced. Use
+`--magnetic-reference` / `--magnetic-axis` to override.
 
 Exchange is an explicit second campaign stage. RS-utils does not yet
 implement a generic automatic SCF→exchange DAG or retry engine.

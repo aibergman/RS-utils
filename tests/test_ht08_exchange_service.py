@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import f90nml
 import pytest
 
 from rsutil.exchange.exchange_map import (
@@ -13,6 +14,7 @@ from rsutil.exchange.exchange_map import (
     read_rs_clust,
 )
 from rsutil.exchange.fermi import FermiEnergyParseError, parse_fermi_energy
+from rsutil.exchange.jobs import _spec_payload
 from rsutil.exchange.service import ExchangeService
 
 from .conftest import copy_example_files, run_rsutil
@@ -132,3 +134,49 @@ def test_unproven_afm_reference_disables_unique_reduction(tmp_path: Path) -> Non
 
     assert set(afm.pair_keys) == set(full.pair_keys)
     assert all(job.magnetic_reference == "afm" for job in afm.jobs)
+
+
+def test_max_pairs_per_job_slices_each_atom_into_lettered_jobs(tmp_path: Path) -> None:
+    _copy_exchange_fixture(tmp_path)
+    service = ExchangeService(tmp_path)
+    whole = service.plan(cutoff=1.0, full_pairs=True)
+    sliced = service.plan(cutoff=1.0, full_pairs=True, max_pairs_per_job=3)
+
+    assert all(job.directory_name == f"Atom_{job.atom_index}" for job in whole.jobs)
+    assert all(len(job.pairs) <= 3 for job in sliced.jobs)
+    assert max(len(job.pairs) for job in whole.jobs) > 3
+    # Slicing is a pure re-partitioning: same pairs, same per-atom order.
+    assert set(sliced.pair_keys) == set(whole.pair_keys)
+    for atom in {job.atom_index for job in whole.jobs}:
+        parts = [job for job in sliced.jobs if job.atom_index == atom]
+        original = next(job for job in whole.jobs if job.atom_index == atom)
+        assert [job.chunk_label for job in parts][:2] == ["a", "b"][: len(parts)]
+        assert [job.chunk_index for job in parts] == list(range(len(parts)))
+        assert all(job.chunk_count == len(parts) for job in parts)
+        assert sum((job.matching_indices for job in parts), ()) == original.matching_indices
+        assert [job.output_dir.name for job in parts] == [
+            f"Atom_{atom}{job.chunk_label}" for job in parts
+        ]
+    assert len({job.spec_hash for job in sliced.jobs}) == len(sliced.jobs)
+    # Unsliced job identity must be unchanged by the feature.
+    assert all("chunk" not in _spec_payload(job) for job in whole.jobs)
+
+
+def test_max_pairs_per_job_generates_valid_directories(tmp_path: Path) -> None:
+    _copy_exchange_fixture(tmp_path)
+    result = ExchangeService(tmp_path).generate(
+        cutoff=1.0, full_pairs=True, max_pairs_per_job=3
+    )
+    names = {path.name for path in result.write_result.written}
+    assert "Atom_1a" in names and "Atom_1b" in names
+    assert "Atom_1" not in names
+    for path in result.write_result.written:
+        lattice = f90nml.read(str(path / "input.nml"))["lattice"]
+        assert lattice["njij"] <= 3
+
+
+@pytest.mark.parametrize("value", [-1, 2.5, True])
+def test_max_pairs_per_job_rejects_invalid_values(tmp_path: Path, value) -> None:
+    _copy_exchange_fixture(tmp_path)
+    with pytest.raises(ValueError, match="max_pairs_per_job"):
+        ExchangeService(tmp_path).plan(max_pairs_per_job=value)
