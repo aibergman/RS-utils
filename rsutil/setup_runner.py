@@ -184,8 +184,16 @@ class FortranSetupRunner:
         environment = os.environ.copy()
         environment.update(self.environment)
         package_root = str(Path(__file__).resolve().parent.parent)
-        python_path = environment.get("PYTHONPATH")
-        environment["PYTHONPATH"] = package_root if not python_path else os.pathsep.join((package_root, python_path))
+        # A source checkout needs to be added explicitly because the worker
+        # runs from its isolated workspace. Installed packages are already on
+        # sys.path; adding site-packages to PYTHONPATH puts it ahead of the
+        # standard library and can make legacy modules there (for example an
+        # old pathlib backport) shadow Python's standard library modules.
+        if Path(package_root).name.lower() not in {"site-packages", "dist-packages"}:
+            python_path = environment.get("PYTHONPATH")
+            environment["PYTHONPATH"] = (
+                package_root if not python_path else os.pathsep.join((package_root, python_path))
+            )
         command = [
             self.python_executable,
             "-m",

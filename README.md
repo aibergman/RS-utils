@@ -109,6 +109,10 @@ rsutil --setup --supercell 2 2 2 --sqs "Fe=0.5,Ni=0.3,Co=0.2" \
 rsutil --setup --rec-method chebyshev           # default rec-steps becomes 200
 rsutil --setup --rec-method lanczos --rec-steps 64
 
+# Prepare an RS-LMTO-ASA surface from a converged bulk calculation
+rsutil surface prepare --bulk tmp/fccCu --output tmp/fccCu001 \
+       --hkl 0 0 1 --layers 6 --empty-spheres 1
+
 # Reproducible distortions and scaling
 rsutil --setup --lattice-dist 0.01 --basis-dist 0.02 --alat-scale 1.01 --seed 1234
 ```
@@ -254,6 +258,55 @@ Caveats:
 - ``--z-iso-factor`` requires ``--2d``.
 - Surface-layer counting for isotropic mode uses a small z-tolerance; strongly rumpled surfaces may need manual verification.
 - This is a practical ASA setup heuristic, not a full electrostatic vacuum convergence protocol; verify sensitivity for production runs.
+
+Surface preparation
+-------------------
+
+``rsutil surface prepare`` creates a new surface input directory from a
+converged bulk calculation. It stages the host ``*_out.nml`` potential files,
+host radial ground-state data, and the bulk ``lattice.nml`` when
+``crystal_sym='file'``. The generated ``input.nml`` uses
+``pre_processing='buildsurf'``, ``calctype='S'``, the selected ``surftype``,
+``fix_fermi=.true.``, and the bulk Fermi level. RS-LMTO creates its cluster and
+surface maps when its ``buildsurf`` preprocessor runs.
+
+``--layers`` sets ``nlay`` and the added surface/interface type count. In
+RS-LMTO, ``nlay`` counts the near-surface planes assigned self-consistent
+representative types. The output enforces ``ntype_surface = ntype_bulk +
+nlay``. ``--empty-spheres`` chooses how many of those added types use the
+empty-sphere label; it does not insert extra geometric sites. The
+``buildsurf`` preprocessor constructs the cluster and maps its selected
+planes to the labels. RS-utils clones the converged bulk host atom potential
+into the interface-layer starting files. It generates empty-sphere radial
+parameters with the existing Fortran setup kernel, then assigns a small
+starting occupancy while preserving the kernel's native namelist array
+indexing. No empty-sphere search in the bulk geometry is required. By default, each
+empty-sphere type starts with a 0.2-electron occupancy;
+when interface types are present, that charge is removed from their guesses
+with an erf-derived profile concentrated near the outermost interface layer.
+The profile is normalized so the total transfer equals the empty-sphere seed
+charge. ``--charge-sigma`` controls its width in layer spacings. This is an
+initial guess, not a predicted surface charge. Use ``--empty-sphere-charge``
+to change the occupancy or set it to zero. The workflow writes a
+``surface_setup.json`` manifest alongside the namelist.
+Defaults are ``n1=n2=n3=32``, ``rc=100``, ``nstep=15``, and ``beta=0.01``;
+each can be overridden on the command line.
+
+Crystal symmetry is inherited from the bulk input or can be selected with
+``--crystal-sym fcc|bcc|hcp|file``. ``file`` requires the bulk
+``lattice.nml``. ``--hkl`` accepts any nonzero integer surface normal and
+reduces common factors before writing ``surftype``. For hcp, a three-value
+``h k l`` input is expanded to Miller-Bravais ``h k -(h+k) l``; four values
+may also be given directly, with the required ``i=-(h+k)`` relation.
+
+``--orientation preserve`` passes the requested normal through as
+``surftype``. ``--orientation global-z`` rotates the lattice and basis
+together, writes the rotated cell to ``lattice.nml``, and uses
+``crystal_sym='file'`` with ``surftype='0 0 1'``. This rigid rotation retains
+the bulk stacking. For built-in fcc, bcc, or hcp symmetry, RS-utils creates
+the same primitive cell and basis used by RS-LMTO when no source
+``lattice.nml`` is present; hcp uses the bulk ``celldm`` value when set and
+otherwise defaults to ``c/a=1.633``.
 
 Setup safety workflow
 ---------------------

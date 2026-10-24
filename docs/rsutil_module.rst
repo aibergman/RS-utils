@@ -17,6 +17,8 @@ high-throughput services and analysis packages:
   and tight-binding data into versioned contracts.
 - **Analysis and interoperability**: bands/DOS, visualization, exchange
   mapping, ASE conversion, and UppASD/LMTO47 export.
+- **Surface preparation**: :func:`rsutil.prepare_surface` builds an RS-LMTO
+  ``buildsurf`` input bundle from a converged bulk calculation.
 
 Core Functions
 ~~~~~~~~~~~~~~
@@ -32,6 +34,17 @@ Notes:
 - Current backend support in this repository is ``0 <= lmax <= 3``.
 - Extended lattice keys ``strux_backend``, ``strux_want_sdot``, and ``strux_solve_scale`` are preserved when present.
 - CLI-level SQS controls (``--sqs``, ``--sqs-shells``, ``--sqs-steps``, ``--sqs-seed``) can be combined with ``--supercell`` for both ``--setup`` and ``--lmto47`` workflows.
+
+Surface Preparation API
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+The Python API mirrors ``rsutil surface prepare``. It writes to a new output
+directory and returns a manifest describing the staged files and settings:
+
+.. autoclass:: rsutil.SurfaceSpec
+   :members:
+
+.. autofunction:: rsutil.prepare_surface
 
 Submodules
 ~~~~~~~~~~

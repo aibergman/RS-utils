@@ -3,13 +3,15 @@
 Command-Line Interface (CLI)
 =============================
 
-The **RS-utils CLI** provides two main Python-only subcommands for band/DOS analysis plus legacy flags for lattice, exchange, export, and visualization.
+The **RS-utils CLI** provides subcommands for surface preparation, band/DOS
+analysis, and campaign workflows, plus legacy flags for lattice, exchange,
+export, and visualization.
 
 Top-level usage:
 
 .. code-block:: bash
 
-    rsutil {bands,dos} [options]
+    rsutil {surface,bands,dos,campaign} [options]
     rsutil [--setup|--exchange|--export|--lmto47|--lattice|--clust] [options]
 
 Common Tasks
@@ -39,8 +41,65 @@ Common Tasks
      - ``rsutil --lmto47 --nspin 2 --lmx 3 --out lmto47_out``
    * - Plot band structure
      - ``rsutil bands --lattice lattice.nml --hamiltonian rs2txt.dat --nk 100 --output bands.png``
+   * - Prepare a surface setup from converged bulk files
+     - ``rsutil surface prepare --bulk bulk_run --output surface_run``
    * - Compute DOS + moments
      - ``rsutil dos --lattice lattice.nml --hamiltonian rs2txt.dat --mesh 6 6 6 --electrons 16 --moments``
+
+Surface preparation
+--------------------
+
+Prepare an RS-LMTO-ASA ``buildsurf`` calculation from an existing converged
+bulk directory:
+
+.. code-block:: bash
+
+    rsutil surface prepare --bulk tmp/fccCu --output tmp/fccCu001 \
+        --hkl 0 0 1 --layers 6 --empty-spheres 1
+
+The command creates a new output directory, copies the bulk host potential and
+radial ground-state files, carries over ``lattice.nml`` for ``crystal_sym='file'``,
+and writes ``input.nml`` plus ``surface_setup.json``. It sets
+``pre_processing='buildsurf'``, ``calctype='S'``, and the bulk Fermi level with
+``fix_fermi=.true.``. RS-LMTO generates the surface cluster when it runs.
+RS-utils clones the converged host atom file for both the self-consistent
+surface types. It generates empty-sphere radial parameters with the existing
+Fortran setup kernel, then assigns a small starting occupancy while preserving
+the kernel's native namelist array indexing. It does not need to discover
+empty spheres in the bulk geometry.
+
+Options:
+
+* ``--crystal-sym fcc|bcc|hcp|file`` selects or overrides the bulk symmetry.
+  ``file`` requires ``lattice.nml`` in the bulk directory.
+* ``--hkl H K L`` selects a nonzero integer surface normal. For hcp, this is
+  expanded to Miller-Bravais ``H K -(H+K) L``; four values can also be supplied
+  directly as ``H K I L`` with ``I=-(H+K)``.
+* ``--layers`` sets ``nlay``. RS-LMTO uses these near-surface planes as
+  self-consistent representatives, and the output sets
+  ``ntype_surface = ntype_bulk + nlay``.
+* ``--empty-spheres`` assigns that many of the added representative types the
+  empty-sphere label. It controls type labels, not extra geometric sites;
+  ``buildsurf`` constructs the geometry and maps its planes to those labels.
+* ``--empty-sphere-charge`` sets the initial occupancy per empty-sphere
+  type. The default is 0.2 electrons; the same total amount is removed from
+  interface-layer starting potentials when interface types are present.
+* ``--charge-sigma`` sets the width, in layer spacings, of the erf-derived
+  transfer profile. The default is 1.0; larger values spread the compensation
+  farther into the interface. The weights are normalized over the available
+  interface layers, so the net initial transfer is charge balanced.
+* ``--orientation preserve`` keeps the input orientation and writes the
+  requested normal to ``surftype``. ``--orientation global-z`` rigidly rotates
+  the lattice and basis so the normal is global Z, writes ``lattice.nml``, and
+  sets ``crystal_sym='file'`` and ``surftype='0 0 1'``.
+* ``--n1``, ``--n2``, ``--n3``, ``--rc``, ``--self-steps``, and
+  ``--mixing-beta`` set surface calculation controls. Defaults are 32, 32, 32,
+  100, 15, and 0.01 respectively.
+
+The source and destination must be separate directories; the destination must
+not already exist. Built-in fcc/bcc/hcp inputs can use ``global-z`` without a
+bulk ``lattice.nml``. Hcp uses the bulk ``celldm`` value when available and
+otherwise uses ``c/a=1.633``.
 
 Band and DOS
 ------------
