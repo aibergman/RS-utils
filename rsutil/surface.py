@@ -25,6 +25,13 @@ from .core.contracts import SetupSpec
 from .setup_runner import FortranSetupRunner
 
 
+# P_l = n_l + 1/2 - atan(l)/pi for a zero-potential free-electron
+# partial wave on the lowest radial branch (n_l = l + 1).
+_EMPTY_SPHERE_FREE_ELECTRON_PL = tuple(
+    l + 1.5 - math.atan(l) / math.pi for l in range(3)
+)
+
+
 @dataclass(frozen=True)
 class SurfaceSpec:
     """User-controlled surface setup parameters."""
@@ -33,7 +40,7 @@ class SurfaceSpec:
     nlay: int = 6
     empty_spheres: int = 1
     empty_sphere_charge: float = 0.2
-    charge_sigma: float = 1.0
+    charge_sigma: float = 0.5
     crystal_sym: str | None = None
     orientation: str = "preserve"
     n1: int | None = 32
@@ -380,6 +387,7 @@ def _write_atom_seed(
     *,
     ql: list[list[list[float]]],
     empty_sphere: bool,
+    pl: tuple[float, ...] | None = None,
 ) -> None:
     """Patch an atom file while preserving RS-LMTO's native array indexing.
 
@@ -394,6 +402,7 @@ def _write_atom_seed(
     in_element = False
     in_par = False
     ql_inserted = False
+    pl_line = re.compile(r"^(\s*)pl\s*\(\s*:\s*,\s*(\d+)\s*\)\s*=", re.IGNORECASE)
     ql_line = re.compile(r"^(\s*)ql\s*\(\s*\d+\s*,\s*:\s*,\s*\d+\s*\)\s*=", re.IGNORECASE)
     assignment = re.compile(r"^(\s*)([a-z_][a-z_0-9]*)\s*=\s*([^!]*?)(\s*!.*)?$", re.IGNORECASE)
     for line in lines:
@@ -412,6 +421,12 @@ def _write_atom_seed(
                     line = f"{indent}{key} = '{label}'{comment or ''}"
                 elif empty_sphere and key_lower in {"atomic_number", "core", "valence", "f_core"}:
                     line = f"{indent}{key} = 0{comment or ''}"
+        if in_par and pl is not None:
+            match = pl_line.match(line)
+            if match:
+                indent, spin_index = match.groups()
+                values = ", ".join(f"{float(value):.16E}" for value in pl)
+                line = f"{indent}pl(:, {spin_index}) = {values}"
         if in_par and ql_line.match(line):
             if not ql_inserted:
                 indent = ql_line.match(line).group(1)
@@ -524,7 +539,14 @@ def _write_surface_atomic_files(
             ql = _occupancy_seed(seed_atom[seed_par_key], charge_per_empty_sphere, empty_sphere=True)
             for label in empty_labels:
                 path = candidate / f"{label}.nml"
-                _write_atom_seed(generated[0], path, label, ql=ql, empty_sphere=True)
+                _write_atom_seed(
+                    generated[0],
+                    path,
+                    label,
+                    ql=ql,
+                    empty_sphere=True,
+                    pl=_EMPTY_SPHERE_FREE_ELECTRON_PL,
+                )
                 written.append(path.name)
         finally:
             shutil.rmtree(generator_work, ignore_errors=True)

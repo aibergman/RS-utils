@@ -66,7 +66,9 @@ RS-utils clones the converged host atom file for both the self-consistent
 surface types. It generates empty-sphere radial parameters with the existing
 Fortran setup kernel, then assigns a small starting occupancy while preserving
 the kernel's native namelist array indexing. It does not need to discover
-empty spheres in the bulk geometry.
+empty spheres in the bulk geometry. The ES seed uses the lowest-branch
+free-electron PL values ``1.5``, ``2.25``, and ``3.1476`` for s, p, and d,
+respectively, in both spin channels.
 
 Options:
 
@@ -85,7 +87,7 @@ Options:
   type. The default is 0.2 electrons; the same total amount is removed from
   interface-layer starting potentials when interface types are present.
 * ``--charge-sigma`` sets the width, in layer spacings, of the erf-derived
-  transfer profile. The default is 1.0; larger values spread the compensation
+  transfer profile. The default is 0.5; larger values spread the compensation
   farther into the interface. The weights are normalized over the available
   interface layers, so the net initial transfer is charge balanced.
 * ``--orientation preserve`` keeps the input orientation and writes the

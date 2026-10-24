@@ -280,13 +280,15 @@ planes to the labels. RS-utils clones the converged bulk host atom potential
 into the interface-layer starting files. It generates empty-sphere radial
 parameters with the existing Fortran setup kernel, then assigns a small
 starting occupancy while preserving the kernel's native namelist array
-indexing. No empty-sphere search in the bulk geometry is required. By default, each
+indexing. The initial s, p, and d logarithmic-derivative parameters use the
+lowest-branch free-electron values ``1.5``, ``2.25``, and ``3.1476`` for both
+spins. No empty-sphere search in the bulk geometry is required. By default, each
 empty-sphere type starts with a 0.2-electron occupancy;
 when interface types are present, that charge is removed from their guesses
 with an erf-derived profile concentrated near the outermost interface layer.
 The profile is normalized so the total transfer equals the empty-sphere seed
-charge. ``--charge-sigma`` controls its width in layer spacings. This is an
-initial guess, not a predicted surface charge. Use ``--empty-sphere-charge``
+charge. ``--charge-sigma`` controls its width in layer spacings and defaults
+to 0.5. This is an initial guess, not a predicted surface charge. Use ``--empty-sphere-charge``
 to change the occupancy or set it to zero. The workflow writes a
 ``surface_setup.json`` manifest alongside the namelist.
 Defaults are ``n1=n2=n3=32``, ``rc=100``, ``nstep=15``, and ``beta=0.01``;

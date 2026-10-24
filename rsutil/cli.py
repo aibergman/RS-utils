@@ -1585,7 +1585,7 @@ def create_surface_parser(subparsers):
     prepare.add_argument("--layers", type=int, default=6, help="Number of added surface/interface types (nlay)")
     prepare.add_argument("--empty-spheres", type=int, default=1, help="Number of empty-sphere types among the nlay added types")
     prepare.add_argument("--empty-sphere-charge", type=float, default=0.2, help="Initial occupancy per empty-sphere type (electrons; default 0.2)")
-    prepare.add_argument("--charge-sigma", type=float, default=1.0, help="Width of the erf-derived charge-transfer profile in layer spacings (default: 1.0)")
+    prepare.add_argument("--charge-sigma", type=float, default=0.5, help="Width of the erf-derived charge-transfer profile in layer spacings (default: 0.5)")
     prepare.add_argument("--crystal-sym", choices=("fcc", "bcc", "hcp", "file"), help="Override bulk crystal_sym (file requires bulk/lattice.nml)")
     prepare.add_argument("--orientation", choices=("preserve", "global-z"), default="preserve", help="Requested orientation convention")
     prepare.add_argument("--n1", type=int, default=32, help="Surface input n1 (default: 32)")
