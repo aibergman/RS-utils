@@ -320,6 +320,86 @@ def _copy_bulk_restart_files(bulk: Path, candidate: Path, host_labels: list[str]
     return sorted(copied)
 
 
+def _rename_atom_symbol(source: Path, destination: Path, label: str) -> None:
+    """Copy an atom/restart namelist while assigning it a new site label."""
+    lines = source.read_text(encoding="utf-8").splitlines()
+    in_element = False
+    changed = False
+    output: list[str] = []
+    symbol = re.compile(r"^(\s*symbol\s*=\s*)(?:'[^']*'|\"[^\"]*\")(.*)$", re.I)
+    for line in lines:
+        stripped = line.strip().lower()
+        if stripped.startswith("&element"):
+            in_element = True
+        elif stripped.startswith("&"):
+            in_element = False
+        if in_element:
+            match = symbol.match(line)
+            if match:
+                line = f"{match.group(1)}'{label}'{match.group(2)}"
+                changed = True
+        output.append(line)
+    if not changed:
+        raise ValueError(f"atom/restart file has no &element symbol assignment: {source}")
+    destination.write_text("\n".join(output) + "\n", encoding="utf-8")
+
+
+def _copy_surface_restarts(
+    source: Path,
+    candidate: Path,
+    source_manifest: Mapping[str, Any],
+    bulk_labels: list[str],
+    target_surface_labels: list[str],
+) -> list[str]:
+    """Carry matching surface restarts forward and seed newly added types."""
+    old_surface_labels = [str(label) for label in source_manifest.get("surface_labels", [])]
+    old_empty_count = int(source_manifest.get("empty_spheres", 0))
+    old_empty = old_surface_labels[:old_empty_count]
+    old_interface = old_surface_labels[old_empty_count:]
+    copied: set[str] = set()
+
+    def transfer(source_label: str, target_label: str) -> bool:
+        found = False
+        for suffix in (".nml", "_out.nml"):
+            original = source / f"{source_label}{suffix}"
+            if not original.is_file():
+                continue
+            _rename_atom_symbol(original, candidate / f"{target_label}{suffix}", target_label)
+            copied.add(f"{target_label}{suffix}")
+            found = True
+        for original in sorted(source.glob(f"radial_ground_state_{source_label}_*.dat")):
+            renamed = original.name.replace(
+                f"radial_ground_state_{source_label}_",
+                f"radial_ground_state_{target_label}_",
+                1,
+            )
+            shutil.copy2(original, candidate / renamed)
+            copied.add(renamed)
+        return found
+
+    # Existing labels retain their own converged potential and radial files.
+    for label in target_surface_labels:
+        if label in old_surface_labels:
+            transfer(label, label)
+
+    # Additional ES types use the existing ES restart. Additional interface
+    # types use the deepest available interface restart as a local guess.
+    for label in target_surface_labels:
+        if label in old_surface_labels:
+            continue
+        templates = old_empty if label.upper().startswith("ES") else old_interface
+        template = templates[-1] if templates else None
+        if template is not None:
+            transfer(template, label)
+
+    # Keep host restarts from the source surface too. These are normally the
+    # same as the original bulk restarts, but may include a later bulk update.
+    for label in bulk_labels:
+        if (source / f"{label}_out.nml").is_file():
+            transfer(label, label)
+    return sorted(copied)
+
+
 def _empty_sphere_setup_inputs(
     bulk: Path,
     work: Path,
@@ -596,6 +676,8 @@ def prepare_surface(
     bulk_dir: str | Path,
     output_dir: str | Path,
     spec: SurfaceSpec | None = None,
+    *,
+    seed_surface_dir: str | Path | None = None,
 ) -> dict[str, Any]:
     """Prepare a new surface calculation directory without running RS-LMTO.
 
@@ -607,10 +689,27 @@ def prepare_surface(
     spec = spec or SurfaceSpec()
     bulk = Path(bulk_dir).expanduser().resolve()
     output = Path(output_dir).expanduser().resolve()
+    seed_surface = Path(seed_surface_dir).expanduser().resolve() if seed_surface_dir is not None else None
     if not bulk.is_dir():
         raise FileNotFoundError(f"bulk directory does not exist: {bulk}")
     if output.exists():
         raise FileExistsError(f"surface output directory already exists: {output}")
+    if seed_surface is not None:
+        if not seed_surface.is_dir():
+            raise FileNotFoundError(f"seed surface directory does not exist: {seed_surface}")
+        if seed_surface == output:
+            raise ValueError("surface output directory must differ from the seed surface directory")
+        manifest_path = seed_surface / "surface_setup.json"
+        if not manifest_path.is_file():
+            raise FileNotFoundError(f"seed surface manifest is missing: {manifest_path}")
+        try:
+            seed_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ValueError(f"could not read seed surface manifest {manifest_path}: {exc}") from exc
+        if seed_manifest.get("schema_version") != "rsutil-surface-setup-v1":
+            raise ValueError(f"unsupported seed surface manifest schema in {manifest_path}")
+    else:
+        seed_manifest = None
     input_path = bulk / "input.nml"
     if not input_path.is_file():
         raise FileNotFoundError(f"bulk input namelist is missing: {input_path}")
@@ -724,6 +823,10 @@ def prepare_surface(
         control_key = "control"
         surface_input[control_key] = f90nml.Namelist()
     _set(surface_input[control_key], "calctype", "S")
+    if seed_surface is not None:
+        # Local _out.nml files are the intended restart source for an expanded
+        # surface, even if the original bulk template requested fresh starts.
+        _set(surface_input[control_key], "fresh_start", False)
     mix_key = _find_key(surface_input, "mix")
     if mix_key is None:
         mix_key = "mix"
@@ -764,9 +867,35 @@ def prepare_surface(
             spec.empty_sphere_charge,
             spec.charge_sigma,
         )
+        carried_restarts: list[str] = []
+        if seed_surface is not None and seed_manifest is not None:
+            carried_restarts = _copy_surface_restarts(
+                seed_surface,
+                temporary,
+                seed_manifest,
+                bulk_labels,
+                generated_labels[bulk_ntype:],
+            )
+            generated_atomic_files = sorted(set(generated_atomic_files) | {
+                name for name in carried_restarts if name.endswith(".nml") and not name.endswith("_out.nml")
+            })
+            copied = sorted(set(copied) | set(carried_restarts))
+            seed_input = f90nml.read(seed_surface / "input.nml")
+            seed_energy_key = _find_key(seed_input, "energy")
+            if seed_energy_key is None:
+                raise ValueError(f"seed surface input is missing &energy: {seed_surface / 'input.nml'}")
+            energy_group = seed_input[seed_energy_key]
+            seed_fermi_key = _find_key(energy_group, "fermi")
+            if seed_fermi_key is None or not math.isfinite(float(energy_group[seed_fermi_key])):
+                raise ValueError(f"seed surface input has no finite Fermi level: {seed_surface / 'input.nml'}")
+            fermi = float(energy_group[seed_fermi_key])
+            _set(surface_energy, "fermi", fermi)
+            _set(surface_energy, "fix_fermi", True)
+            surface_input.write(str(temporary / "input.nml"), force=True)
         manifest = {
             "schema_version": "rsutil-surface-setup-v1",
             "bulk_dir": str(bulk),
+            "seed_surface_dir": None if seed_surface is None else str(seed_surface),
             "crystal_sym": crystal_sym,
             "output_crystal_sym": output_symmetry,
             "miller_requested": list(spec.miller),
@@ -805,4 +934,63 @@ def prepare_surface(
     return manifest
 
 
-__all__ = ["SurfaceSpec", "prepare_surface"]
+def extend_surface(
+    surface_dir: str | Path,
+    output_dir: str | Path,
+    *,
+    nlay: int,
+    empty_spheres: int | None = None,
+    self_steps: int | None = None,
+    mixing_beta: float | None = None,
+) -> dict[str, Any]:
+    """Prepare a larger surface setup using an existing surface as its seed.
+
+    Matching type restarts are retained. Newly added interface/empty-sphere
+    types are seeded from the deepest existing interface/ES restart when
+    available, while the existing surface geometry and settings are inherited.
+    """
+    source = Path(surface_dir).expanduser().resolve()
+    manifest_path = source / "surface_setup.json"
+    if not source.is_dir():
+        raise FileNotFoundError(f"surface directory does not exist: {source}")
+    if not manifest_path.is_file():
+        raise FileNotFoundError(f"surface manifest is missing: {manifest_path}")
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"could not read surface manifest {manifest_path}: {exc}") from exc
+    if manifest.get("schema_version") != "rsutil-surface-setup-v1":
+        raise ValueError(f"unsupported surface manifest schema in {manifest_path}")
+    bulk_dir = manifest.get("bulk_dir")
+    if not bulk_dir:
+        raise ValueError(f"surface manifest does not record its bulk source: {manifest_path}")
+    old_nlay = int(manifest.get("nlay", 0))
+    old_empty_spheres = int(manifest.get("empty_spheres", 0))
+    new_empty_spheres = old_empty_spheres if empty_spheres is None else int(empty_spheres)
+    if nlay < old_nlay or new_empty_spheres < old_empty_spheres:
+        raise ValueError("surface extension cannot reduce nlay or the empty-sphere count")
+    if nlay - new_empty_spheres < old_nlay - old_empty_spheres:
+        raise ValueError("surface extension cannot reduce the number of interface types")
+    alignment = manifest.get("inplane_bond_alignment") or {}
+    grid = manifest.get("surface_grid") or {}
+    spec = SurfaceSpec(
+        miller=tuple(int(value) for value in manifest["miller_requested"]),
+        nlay=nlay,
+        empty_spheres=new_empty_spheres,
+        empty_sphere_charge=float(manifest.get("empty_sphere_initial_occupancy", 0.2)),
+        charge_sigma=float(manifest.get("charge_transfer_sigma_layers", 0.5)),
+        crystal_sym=str(manifest.get("crystal_sym", "file")),
+        orientation=str(manifest.get("orientation", "preserve")),
+        align_bond=None if "source_cartesian" not in alignment else tuple(alignment["source_cartesian"]),
+        align_bond_to=None if "target_cartesian" not in alignment else tuple(alignment["target_cartesian"]),
+        n1=grid.get("n1", 32),
+        n2=grid.get("n2", 32),
+        n3=grid.get("n3", 32),
+        rc=manifest.get("rc", 100),
+        self_steps=int(manifest.get("self_steps", 15) if self_steps is None else self_steps),
+        mixing_beta=float(manifest.get("mixing_beta", 0.01) if mixing_beta is None else mixing_beta),
+    )
+    return prepare_surface(bulk_dir, output_dir, spec, seed_surface_dir=source)
+
+
+__all__ = ["SurfaceSpec", "prepare_surface", "extend_surface"]

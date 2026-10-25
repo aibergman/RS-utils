@@ -110,6 +110,27 @@ Options:
   ``--mixing-beta`` set surface calculation controls. Defaults are 32, 32, 32,
   100, 15, and 0.01 respectively.
 
+To expand an existing RS-utils surface setup, use it as the restart source:
+
+.. code-block:: bash
+
+    rsutil setup surface --from-surface tmp/fccCu001_3plus1 \
+        --output tmp/fccCu001_5plus2 --layers 7 --empty-spheres 2
+
+This example expands from three interface types plus one empty-sphere type to
+five interface types plus two empty-sphere types. ``--layers`` is total ``nlay``
+and includes empty-sphere types, so the expanded setup has ``nlay=7`` and
+``ntype = ntype_bulk + 7``. Existing type restarts are preserved by label;
+additional interface types are seeded from the deepest existing interface
+restart, and additional empty-sphere types from the existing ES restart. The
+surface normal, rotation, lattice, fixed Fermi level, charge-seed settings,
+and other surface controls are inherited from ``surface_setup.json``. Pass
+``--self-steps`` or ``--mixing-beta`` only when you want to override those
+inherited SCF controls. The source manifest's original bulk directory must
+remain available for rebuilding the input bundle. The source surface is left
+unchanged and RS-LMTO regenerates the larger surface cluster when the new
+calculation runs.
+
 The source and destination must be separate directories; the destination must
 not already exist. Built-in fcc/bcc/hcp inputs can use ``global-z`` without a
 bulk ``lattice.nml``. Hcp uses the bulk ``celldm`` value when available and

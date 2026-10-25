@@ -1540,32 +1540,67 @@ def create_campaign_parser(subparsers):
 
 def run_surface_prepare(args):
     """Prepare an RS-LMTO surface input bundle from a converged bulk run."""
-    from .surface import SurfaceSpec, prepare_surface
+    from .surface import SurfaceSpec, extend_surface, prepare_surface
 
     try:
-        spec = SurfaceSpec(
-            miller=tuple(args.hkl),
-            nlay=args.layers,
-            empty_spheres=args.empty_spheres,
-            empty_sphere_charge=args.empty_sphere_charge,
-            charge_sigma=args.charge_sigma,
-            crystal_sym=args.crystal_sym,
-            orientation=args.orientation,
-            align_bond=None if args.align_bond is None else tuple(args.align_bond),
-            align_bond_to=None if args.align_bond_to is None else tuple(args.align_bond_to),
-            n1=args.n1,
-            n2=args.n2,
-            n3=args.n3,
-            rc=args.rc,
-            self_steps=args.self_steps,
-            mixing_beta=args.mixing_beta,
-        )
-        manifest = prepare_surface(args.bulk, args.output, spec)
+        if args.from_surface:
+            if args.layers is None:
+                raise ValueError("--layers is required when extending an existing surface")
+            geometry_overrides = {
+                "--hkl": args.hkl,
+                "--crystal-sym": args.crystal_sym,
+                "--orientation": args.orientation,
+                "--align-bond": args.align_bond,
+                "--align-bond-to": args.align_bond_to,
+                "--n1": args.n1,
+                "--n2": args.n2,
+                "--n3": args.n3,
+                "--rc": args.rc,
+                "--empty-sphere-charge": args.empty_sphere_charge,
+                "--charge-sigma": args.charge_sigma,
+            }
+            supplied = [key for key, value in geometry_overrides.items() if value is not None]
+            if supplied:
+                raise ValueError(
+                    "surface extension inherits geometry and charge-seed settings; "
+                    "remove these options: " + ", ".join(supplied)
+                )
+            manifest = extend_surface(
+                args.from_surface,
+                args.output,
+                nlay=args.layers,
+                empty_spheres=args.empty_spheres,
+                self_steps=args.self_steps,
+                mixing_beta=args.mixing_beta,
+            )
+        else:
+            manifest = prepare_surface(
+                args.bulk,
+                args.output,
+                SurfaceSpec(
+                    miller=tuple(args.hkl or (0, 0, 1)),
+                    nlay=6 if args.layers is None else args.layers,
+                    empty_spheres=1 if args.empty_spheres is None else args.empty_spheres,
+                    empty_sphere_charge=0.2 if args.empty_sphere_charge is None else args.empty_sphere_charge,
+                    charge_sigma=0.5 if args.charge_sigma is None else args.charge_sigma,
+                    crystal_sym=args.crystal_sym,
+                    orientation=args.orientation or "preserve",
+                    align_bond=None if args.align_bond is None else tuple(args.align_bond),
+                    align_bond_to=None if args.align_bond_to is None else tuple(args.align_bond_to),
+                    n1=32 if args.n1 is None else args.n1,
+                    n2=32 if args.n2 is None else args.n2,
+                    n3=32 if args.n3 is None else args.n3,
+                    rc=100 if args.rc is None else args.rc,
+                    self_steps=15 if args.self_steps is None else args.self_steps,
+                    mixing_beta=0.01 if args.mixing_beta is None else args.mixing_beta,
+                ),
+            )
     except (FileNotFoundError, FileExistsError, ValueError, RuntimeError, OSError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
-    print(f"Prepared surface setup: {args.output}")
+    action = "Expanded" if args.from_surface else "Prepared"
+    print(f"{action} surface setup: {args.output}")
     print(f"  Crystal symmetry: {manifest['crystal_sym']}")
     print(f"  Miller normal:    {manifest['miller_reduced']}")
     print(f"  Orientation:      {manifest['orientation']}")
@@ -1639,24 +1674,26 @@ def add_bulk_setup_arguments(parser):
 
 
 def add_surface_setup_arguments(parser):
-    """Add the converged-bulk surface setup controls to a parser."""
-    parser.add_argument("--bulk", required=True, help="Converged bulk calculation directory")
+    """Add bulk-based and existing-surface expansion controls to a parser."""
+    sources = parser.add_mutually_exclusive_group(required=True)
+    sources.add_argument("--bulk", help="Converged bulk calculation directory")
+    sources.add_argument("--from-surface", help="Existing RS-utils surface setup to expand from")
     parser.add_argument("--output", required=True, help="New surface setup directory")
-    parser.add_argument("--hkl", nargs="+", type=int, default=(0, 0, 1), metavar="INDEX", help="Surface normal as H K L; hcp also accepts Miller-Bravais H K I L")
-    parser.add_argument("--layers", type=int, default=6, help="Number of added surface/interface types (nlay)")
-    parser.add_argument("--empty-spheres", type=int, default=1, help="Number of empty-sphere types among the nlay added types")
-    parser.add_argument("--empty-sphere-charge", type=float, default=0.2, help="Initial occupancy per empty-sphere type (electrons; default 0.2)")
-    parser.add_argument("--charge-sigma", type=float, default=0.5, help="Width of the erf-derived charge-transfer profile in layer spacings (default: 0.5)")
+    parser.add_argument("--hkl", nargs="+", type=int, metavar="INDEX", help="Surface normal as H K L; hcp also accepts Miller-Bravais H K I L")
+    parser.add_argument("--layers", type=int, help="Number of added surface/interface types (nlay); required when extending")
+    parser.add_argument("--empty-spheres", type=int, help="Number of empty-sphere types among the nlay added types")
+    parser.add_argument("--empty-sphere-charge", type=float, help="Initial occupancy per empty-sphere type (electrons; default 0.2)")
+    parser.add_argument("--charge-sigma", type=float, help="Width of the erf-derived charge-transfer profile in layer spacings (default 0.5)")
     parser.add_argument("--crystal-sym", choices=("fcc", "bcc", "hcp", "file"), help="Override bulk crystal_sym (file requires bulk/lattice.nml)")
-    parser.add_argument("--orientation", choices=("preserve", "global-z"), default="preserve", help="Requested orientation convention")
+    parser.add_argument("--orientation", choices=("preserve", "global-z"), help="Requested orientation convention")
     parser.add_argument("--align-bond", nargs=3, type=float, metavar=("X", "Y", "Z"), help="Source Cartesian in-plane bond vector for a global-z rotation")
     parser.add_argument("--align-bond-to", nargs=3, type=float, metavar=("X", "Y", "Z"), help="Direction in the rotated global XY plane to align --align-bond with")
-    parser.add_argument("--n1", type=int, default=32, help="Surface input n1 (default: 32)")
-    parser.add_argument("--n2", type=int, default=32, help="Surface input n2 (default: 32)")
-    parser.add_argument("--n3", type=int, default=32, help="Surface input n3 (default: 32)")
-    parser.add_argument("--rc", type=int, default=100, help="Surface radius cutoff rc (default: 100)")
-    parser.add_argument("--self-steps", type=int, default=15, help="Surface SCF steps (default: 15)")
-    parser.add_argument("--mixing-beta", type=float, default=0.01, help="Surface mixing beta (default: 0.01)")
+    parser.add_argument("--n1", type=int, help="Surface input n1 (default: 32)")
+    parser.add_argument("--n2", type=int, help="Surface input n2 (default: 32)")
+    parser.add_argument("--n3", type=int, help="Surface input n3 (default: 32)")
+    parser.add_argument("--rc", type=int, help="Surface radius cutoff rc (default: 100)")
+    parser.add_argument("--self-steps", type=int, help="Surface SCF steps (default: 15)")
+    parser.add_argument("--mixing-beta", type=float, help="Surface mixing beta (default: 0.01)")
 
 
 def add_impurity_setup_arguments(parser):

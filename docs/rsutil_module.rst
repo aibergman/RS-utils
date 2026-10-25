@@ -48,6 +48,14 @@ directory and returns a manifest describing the staged files and settings:
 
 .. autofunction:: rsutil.prepare_surface
 
+.. autofunction:: rsutil.extend_surface
+
+``extend_surface(surface_dir, output_dir, nlay=..., empty_spheres=...)``
+inherits the existing surface geometry and settings, carries forward matching
+restart potentials, and seeds newly added types from the deepest available
+interface or empty-sphere restart. The source surface must have been prepared
+by RS-utils, and its recorded bulk source directory must remain accessible.
+
 For ``SurfaceSpec``, ``orientation="global-z"`` rotates the requested surface
 normal onto global Z and writes a file-based lattice. The optional
 ``align_bond`` and ``align_bond_to`` vectors select the remaining in-plane
