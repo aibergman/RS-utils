@@ -113,6 +113,13 @@ rsutil setup bulk --rec-method lanczos --rec-steps 64
 rsutil setup surface --bulk tmp/fccCu --output tmp/fccCu001 \
        --hkl 0 0 1 --layers 6 --empty-spheres 1
 
+# Expand an existing surface using its type restarts
+rsutil setup surface --from-surface tmp/fccCu001 --output tmp/fccCu001_more \
+       --layers 7 --empty-spheres 2
+
+# Set up an impurity in a converged bulk or surface host
+rsutil setup impurity --host tmp/fccCu --xyz impurity.xyz --output tmp/Cu_imp
+
 # Reproducible distortions and scaling
 rsutil setup bulk --lattice-dist 0.01 --basis-dist 0.02 --alat-scale 1.01 --seed 1234
 ```
@@ -330,6 +337,46 @@ the bulk stacking. For built-in fcc, bcc, or hcp symmetry, RS-utils creates
 the same primitive cell and basis used by RS-LMTO when no source
 ``lattice.nml`` is present; hcp uses the bulk ``celldm`` value when set and
 otherwise defaults to ``c/a=1.633``.
+
+For ``--orientation global-z``, ``--align-bond X Y Z`` together with
+``--align-bond-to U V W`` fixes the remaining in-plane rotation. The first is
+a Cartesian bond direction in the original bulk frame; the second is its
+desired direction in the rotated global XY plane. The bond must lie in the
+selected surface plane. For example, fcc(111) can align the original
+``(0,0.5,-0.5)`` bond with global ``(1,-1,0)`` using
+``--align-bond 0 0.5 -0.5 --align-bond-to 1 -1 0``. The rotation matrix and
+alignment are recorded in ``surface_setup.json``.
+
+An existing RS-utils surface can be expanded without restarting from bulk
+atomic guesses. For example, five interface types plus two empty-sphere types
+use ``--layers 7 --empty-spheres 2`` because ``nlay`` includes ES types.
+Matching per-type restarts are retained; additional interface types use the
+deepest existing interface restart, and new ES types use an existing ES
+restart. The surface geometry, fixed Fermi level, and other settings are
+inherited from its manifest. The manifest's original bulk directory must
+remain accessible, and the output must be a new directory:
+
+```bash
+rsutil setup surface --from-surface surface_3plus1 \
+       --output surface_5plus2 --layers 7 --empty-spheres 2
+```
+
+Impurity preparation
+--------------------
+
+``rsutil setup impurity`` supports converged bulk and surface hosts. The XYZ
+coordinates are in Å, in the host calculation's Cartesian frame, and must
+match sites in its ``clust`` file. The host's converged restart potentials and
+fixed Fermi level are carried into the new setup. A positive ``--scf-radius``
+also selects nearby host sites as independent self-consistent types; empty
+spheres are skipped. Each selected site adds a type, so larger radii increase
+the number of types and atom files. The available growth region is limited by
+the host's existing ``clust``.
+
+```bash
+rsutil setup impurity --host bulk_or_surface --xyz impurity.xyz \
+       --output impurity_run --scf-radius 4.0
+```
 
 Setup safety workflow
 ---------------------
