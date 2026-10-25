@@ -140,15 +140,28 @@ integration is not currently part of the validated `0.11.0rc1` HT campaign
 workflow. RS-utils does not claim an automatic `SCF -> exchange -> UppASD`
 pipeline.
 
-### Visualization workflows (`--lattice`, `--clust`)
+### Visualization workflows (`viz`)
 
 ```bash
-# Lattice visualization
-rsutil --lattice --data .
+# Plot DOS files from an RS-LMTO calculation (filled overlay by default)
+rsutil viz dos ./calc --fermi 0.7 --output dos.png
 
-# Cluster visualization
+# Select species, change layout, or disable filling
+rsutil viz dos ./calc --species Ni-S Ni-S-1 --layout stack --no-fill
+
+# Interactive structure viewers
+rsutil viz lattice ./calc
+rsutil viz clust ./calc
+
+# Legacy structure-viewer flags remain supported
+rsutil --lattice --data .
 rsutil --clust --data .
 ```
+
+``rsutil dos`` calculates DOS from a Hamiltonian; ``rsutil viz dos`` plots
+DOS output files already present in a calculation directory. DOS plotting
+requires the ``bands`` extra (``pip install 'rsutil[bands]'``); interactive
+structure viewing requires the ``visualization`` extra.
 
 ### Exchange mapping workflow (`--exchange`)
 

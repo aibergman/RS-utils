@@ -412,7 +412,31 @@ These keys are only written to output if present in the input.
 Visualization
 --------------
 
-The ``--lattice`` and ``--clust`` flags launch an interactive 3D visualizer for structures.
+The ``viz`` command group provides DOS plotting and structure visualization.
+
+**Commands:**
+
+- ``rsutil viz dos [FOLDER]``: Plot existing RS-LMTO DOS output files.
+- ``rsutil viz lattice [FOLDER]``: Open the interactive lattice viewer.
+- ``rsutil viz clust [FOLDER]``: Open the interactive cluster viewer.
+
+DOS plotting defaults to a filled overlay plot. Use ``--layout stack`` for one
+panel per DOS file, or ``--no-fill`` to turn off curve filling. The energy
+values are in Ry; ``--fermi`` shifts the energy axis by the supplied Fermi
+energy.
+
+**DOS plotting examples:**
+
+.. code-block:: bash
+
+    rsutil viz dos .
+    rsutil viz dos ./calc --fermi 0.7 --species Ni-S Ni-S-1 --output dos.png
+    rsutil viz dos ./calc --layout stack --no-fill --xlim -0.5 0.2
+
+**Structure visualization:**
+
+The older flags remain supported for compatibility. Both structure viewers
+require the ``visualization`` extra; DOS plotting requires the ``bands`` extra.
 
 **Flags:**
 
@@ -426,9 +450,11 @@ The ``--lattice`` and ``--clust`` flags launch an interactive 3D visualizer for 
 
     # Visualize lattice structure
     rsutil --lattice --data /path/to/data
+    rsutil viz lattice /path/to/data
 
     # Visualize clust file
     rsutil --clust --data /path/to/data
+    rsutil viz clust /path/to/data
 
 Visualizer Controls
 ~~~~~~~~~~~~~~~~~~~

@@ -1597,6 +1597,60 @@ def create_surface_parser(subparsers):
     prepare.set_defaults(func=run_surface_prepare)
 
 
+def run_viz_dos(args):
+    """Plot DOS output files from an existing RS-LMTO calculation."""
+    try:
+        from .viz.plot_dos import plot_dos
+
+        return plot_dos(args)
+    except ImportError as exc:
+        print(
+            "ERROR: DOS plotting requires Matplotlib; install with `pip install 'rsutil[bands]'`",
+            file=sys.stderr,
+        )
+        return 1
+    except (OSError, ValueError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+
+
+def run_viz_structure(args):
+    """Launch the legacy PyVista-based lattice or cluster viewer."""
+    try:
+        from .viz.rs_visualizer import rs_visualizer
+    except ImportError:
+        print(
+            "ERROR: structure visualization requires PyVista; install with `pip install 'rsutil[visualization]'`",
+            file=sys.stderr,
+        )
+        return 1
+    rs_visualizer(args.folder, clust=args.kind == "clust")
+    return 0
+
+
+def create_viz_parser(subparsers):
+    """Create commands for plotting existing calculation output and structures."""
+    parser = subparsers.add_parser(
+        "viz", aliases=["visualize"], help="Plot DOS output or visualize structures"
+    )
+    commands = parser.add_subparsers(dest="viz_command", required=True)
+
+    from .viz.plot_dos import add_plot_dos_arguments
+
+    dos = commands.add_parser("dos", help="Plot DOS files from a calculation directory")
+    add_plot_dos_arguments(dos)
+    dos.set_defaults(func=run_viz_dos)
+
+    for kind, help_text in (
+        ("lattice", "Visualize lattice input"),
+        ("clust", "Visualize a cluster file"),
+    ):
+        structure = commands.add_parser(kind, help=help_text)
+        structure.add_argument("folder", nargs="?", default=".", help="calculation folder (default: .)")
+        structure.set_defaults(func=run_viz_structure, kind=kind)
+    return parser
+
+
 def create_exchange_parser(subparsers):
     """Create the result-level exchange interoperability commands."""
 
@@ -2607,6 +2661,7 @@ Examples:
     create_exchange_parser(subparsers)
     create_campaign_parser(subparsers)
     create_surface_parser(subparsers)
+    create_viz_parser(subparsers)
 
     # Existing flags for backward compatibility
     parser.add_argument(
