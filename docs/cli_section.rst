@@ -43,6 +43,8 @@ Common Tasks
      - ``rsutil bands --lattice lattice.nml --hamiltonian rs2txt.dat --nk 100 --output bands.png``
    * - Prepare a surface setup from converged bulk files
      - ``rsutil setup surface --bulk bulk_run --output surface_run``
+   * - Prepare an impurity in a converged bulk or surface host
+     - ``rsutil setup impurity --host host_run --xyz impurity.xyz --output impurity_run``
    * - Compute DOS + moments
      - ``rsutil dos --lattice lattice.nml --hamiltonian rs2txt.dat --mesh 6 6 6 --electrons 16 --moments``
 
@@ -102,6 +104,33 @@ The source and destination must be separate directories; the destination must
 not already exist. Built-in fcc/bcc/hcp inputs can use ``global-z`` without a
 bulk ``lattice.nml``. Hcp uses the bulk ``celldm`` value when available and
 otherwise uses ``c/a=1.633``.
+
+Impurity preparation
+--------------------
+
+Prepare an embedded impurity calculation from a converged bulk or surface
+calculation. The XYZ file uses standard XYZ structure: atom count, comment,
+then one element symbol and Cartesian position in Å per row. Each listed atom
+must coincide with a site in the host calculation's ``clust`` file. Coordinates
+use the host calculation's Cartesian frame and origin.
+
+.. code-block:: bash
+
+    rsutil setup impurity --host tmp/fccCu --xyz impurity.xyz \
+        --output tmp/Cu_imp --scf-radius 4.0
+
+Without ``--scf-radius``, only the XYZ impurity sites are self-consistent.
+With a positive radius, host sites within that distance of any listed impurity
+are added to the ``inclu`` list and each receives its own host-like atom type.
+Empty spheres are excluded from the grown host region. The command sets
+``calctype='I'``, chooses ``newclubulk`` or ``newclusurf`` from the host, fixes
+the host Fermi level, stages converged host potentials, and generates seed atom
+files for the added types. The output includes ``impurity_sites.xyz`` with the
+resolved site positions and ``impurity_setup.json`` with a setup manifest.
+
+The host ``clust`` file defines the available sites and limits the largest
+usable growth radius. Every selected site becomes a distinct self-consistent
+type, so larger radii increase the number of types and atom files.
 
 Band and DOS
 ------------

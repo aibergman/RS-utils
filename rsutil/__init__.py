@@ -55,6 +55,7 @@ from ._version import __version__
 from .setup_runner import FortranSetupRunner
 from .setup_service import SetupService, run_setup
 from .surface import SurfaceSpec, prepare_surface
+from .impurity import ImpuritySpec, prepare_impurity
 from .results import SCFResult, parse_run
 from .campaign import (
     Campaign,
@@ -74,6 +75,8 @@ __all__ = [
     'run_setup',
     'SurfaceSpec',
     'prepare_surface',
+    'ImpuritySpec',
+    'prepare_impurity',
     'SCFResult',
     'parse_run',
     'Campaign',

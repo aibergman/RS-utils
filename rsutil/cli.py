@@ -22,6 +22,7 @@ Existing functionality (flags):
 New subcommand functionality:
     rsutil setup bulk [options]      # Single-run bulk setup
     rsutil setup surface [options]   # Single-run surface setup
+    rsutil setup impurity [options]  # Impurity in a converged bulk/surface host
     rsutil bands [options]          # Band structure calculation
     rsutil dos [options]            # DOS calculation
     rsutil moments [options]        # DOS moments analysis
@@ -1576,6 +1577,36 @@ def run_surface_prepare(args):
     return 0
 
 
+def run_impurity_prepare(args):
+    """Prepare an embedded impurity calculation from a converged host run."""
+    from .impurity import ImpuritySpec, prepare_impurity
+
+    try:
+        manifest = prepare_impurity(
+            args.host,
+            args.output,
+            ImpuritySpec(
+                xyz=args.xyz,
+                scf_radius=args.scf_radius,
+                self_steps=args.self_steps,
+                mixing_beta=args.mixing_beta,
+            ),
+        )
+    except (FileNotFoundError, FileExistsError, ValueError, RuntimeError, OSError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+
+    print(f"Prepared impurity setup: {args.output}")
+    print(f"  Host type:             {manifest['host_type']}")
+    print(f"  Impurity sites:        {manifest['impurity_sites']}")
+    print(f"  Grown host sites:      {manifest['grown_host_sites']}")
+    print(f"  Self-consistent sites: {manifest['nclu']}")
+    print(f"  SCF growth radius:     {manifest['scf_radius_angstrom']:.3f} Å")
+    print(f"  Fixed Fermi level:     {manifest['fermi']:.8f}")
+    print(f"  Preprocessing:         {manifest['pre_processing']}")
+    return 0
+
+
 def add_bulk_setup_arguments(parser):
     """Add the single-run bulk setup controls to a parser."""
     parser.add_argument("--cluster", choices=["periodic", "free"], default="periodic")
@@ -1624,9 +1655,19 @@ def add_surface_setup_arguments(parser):
     parser.add_argument("--mixing-beta", type=float, default=0.01, help="Surface mixing beta (default: 0.01)")
 
 
+def add_impurity_setup_arguments(parser):
+    """Add bulk/surface impurity preparation options."""
+    parser.add_argument("--host", required=True, help="Converged bulk or surface calculation directory")
+    parser.add_argument("--xyz", required=True, help="Standard XYZ file listing impurity element symbols and positions in Å")
+    parser.add_argument("--output", required=True, help="New impurity calculation directory")
+    parser.add_argument("--scf-radius", type=float, default=0.0, help="Also make host sites within this radius (Å) self-consistent; default 0 adds no surrounding sites")
+    parser.add_argument("--self-steps", type=int, default=100, help="Impurity SCF steps (default: 100)")
+    parser.add_argument("--mixing-beta", type=float, default=0.1, help="Impurity mixing beta (default: 0.1)")
+
+
 def create_setup_parser(subparsers):
     """Add one-off setup workflows; campaign generation remains separate."""
-    parser = subparsers.add_parser("setup", help="Set up one bulk or surface calculation")
+    parser = subparsers.add_parser("setup", help="Set up one bulk, surface, or impurity calculation")
     commands = parser.add_subparsers(dest="setup_command", required=True)
 
     bulk = commands.add_parser("bulk", help="Set up one bulk calculation from local input files")
@@ -1636,6 +1677,10 @@ def create_setup_parser(subparsers):
     surface = commands.add_parser("surface", help="Prepare a surface from a converged bulk run")
     add_surface_setup_arguments(surface)
     surface.set_defaults(func=run_surface_prepare)
+
+    impurity = commands.add_parser("impurity", help="Prepare an embedded impurity in a converged bulk or surface host")
+    add_impurity_setup_arguments(impurity)
+    impurity.set_defaults(func=run_impurity_prepare)
     return parser
 
 
@@ -2675,6 +2720,7 @@ Examples:
   # Single-run setup subcommands
   rsutil setup bulk                         # Process bulk lattice inputs
   rsutil setup surface --bulk bulk --output surface
+  rsutil setup impurity --host bulk --xyz impurity.xyz --output impurity
 
   # Existing functionality (flags)
   rsutil -S                                 # Legacy bulk setup shortcut

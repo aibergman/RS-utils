@@ -19,6 +19,8 @@ high-throughput services and analysis packages:
   mapping, ASE conversion, and UppASD/LMTO47 export.
 - **Surface preparation**: :func:`rsutil.prepare_surface` builds an RS-LMTO
   ``buildsurf`` input bundle from a converged bulk calculation.
+- **Impurity preparation**: :func:`rsutil.prepare_impurity` builds an embedded
+  impurity input bundle from a converged bulk or surface host.
 
 Core Functions
 ~~~~~~~~~~~~~~
@@ -45,6 +47,11 @@ directory and returns a manifest describing the staged files and settings:
    :members:
 
 .. autofunction:: rsutil.prepare_surface
+
+.. autoclass:: rsutil.ImpuritySpec
+   :members:
+
+.. autofunction:: rsutil.prepare_impurity
 
 Submodules
 ~~~~~~~~~~
