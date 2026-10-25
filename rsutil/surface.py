@@ -43,6 +43,8 @@ class SurfaceSpec:
     charge_sigma: float = 0.5
     crystal_sym: str | None = None
     orientation: str = "preserve"
+    align_bond: tuple[float, float, float] | None = None
+    align_bond_to: tuple[float, float, float] | None = None
     n1: int | None = 32
     n2: int | None = 32
     n3: int | None = 32
@@ -67,6 +69,18 @@ class SurfaceSpec:
             raise ValueError("crystal_sym must be fcc, bcc, hcp, or file")
         if self.orientation not in {"preserve", "global-z"}:
             raise ValueError("orientation must be 'preserve' or 'global-z'")
+        if (self.align_bond is None) != (self.align_bond_to is None):
+            raise ValueError("align_bond and align_bond_to must be supplied together")
+        if self.align_bond is not None:
+            if self.orientation != "global-z":
+                raise ValueError("in-plane bond alignment requires orientation='global-z'")
+            for name, vector in (("align_bond", self.align_bond), ("align_bond_to", self.align_bond_to)):
+                if len(vector) != 3 or not all(math.isfinite(float(value)) for value in vector):
+                    raise ValueError(f"{name} must contain three finite values")
+            if np.linalg.norm(self.align_bond) == 0 or np.linalg.norm(self.align_bond_to) == 0:
+                raise ValueError("alignment vectors must be nonzero")
+            if abs(float(self.align_bond_to[2])) > 1.0e-10 * np.linalg.norm(self.align_bond_to):
+                raise ValueError("align_bond_to must lie in the global XY plane")
         for name in ("n1", "n2", "n3"):
             value = getattr(self, name)
             if value is not None and value < 1:
@@ -169,6 +183,27 @@ def _rotation_to_global_z(normal: np.ndarray) -> np.ndarray:
     return np.eye(3) + skew + skew @ skew * ((1.0 - cosine) / (sine * sine))
 
 
+def _align_inplane_bond(
+    rotation: np.ndarray,
+    normal: np.ndarray,
+    bond: tuple[float, float, float],
+    target: tuple[float, float, float],
+) -> np.ndarray:
+    """Add a global-Z roll that maps a source in-plane bond to its target."""
+    normal = np.asarray(normal, dtype=float)
+    normal /= np.linalg.norm(normal)
+    source = np.asarray(bond, dtype=float)
+    source_norm = np.linalg.norm(source)
+    if abs(float(np.dot(source, normal))) > 1.0e-8 * source_norm:
+        raise ValueError("align_bond must lie in the requested surface plane")
+    rotated = rotation @ source
+    destination = np.asarray(target, dtype=float)
+    angle = math.atan2(destination[1], destination[0]) - math.atan2(rotated[1], rotated[0])
+    cosine, sine = math.cos(angle), math.sin(angle)
+    roll = np.array([[cosine, -sine, 0.0], [sine, cosine, 0.0], [0.0, 0.0, 1.0]])
+    return roll @ rotation
+
+
 def _builtin_cell(symmetry: str, c_over_a: float) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Return RS-LMTO primitive cell, basis sites, and site type indices."""
     if symmetry == "fcc":
@@ -188,7 +223,9 @@ def _rotate_file_lattice(
     c_over_a: float,
     hkl: tuple[int, ...],
     bulk_ntype: int,
-) -> tuple[f90nml.Namelist, np.ndarray]:
+    align_bond: tuple[float, float, float] | None = None,
+    align_bond_to: tuple[float, float, float] | None = None,
+) -> tuple[f90nml.Namelist, np.ndarray, np.ndarray]:
     """Read or build a bulk lattice and rewrite it in a surface-aligned basis."""
     if source_file is not None and source_file.is_file():
         lattice_doc = f90nml.read(source_file)
@@ -239,11 +276,13 @@ def _rotate_file_lattice(
     else:
         normal = np.asarray(hkl, dtype=float)
     rotation = _rotation_to_global_z(normal)
+    if align_bond is not None and align_bond_to is not None:
+        rotation = _align_inplane_bond(rotation, normal, align_bond, align_bond_to)
     rotated_cell = cell @ rotation.T
     rotated_basis = basis @ rotation.T
     lattice_group["a"] = rotated_cell.T.tolist()
     lattice_group["crd"] = rotated_basis.T.tolist()
-    return lattice_doc, rotated_basis
+    return lattice_doc, rotated_basis, rotation
 
 
 def _surface_labels(bulk_labels: list[str], nlay: int, empty_spheres: int) -> list[str]:
@@ -643,6 +682,7 @@ def prepare_surface(
 
     surface_lattice = surface_input[lattice_key]
     output_symmetry = "file" if spec.orientation == "global-z" else crystal_sym
+    rotation_matrix: np.ndarray | None = None
     hkl = tuple(spec.miller)
     if crystal_sym == "hcp" and len(hkl) == 3:
         hkl = (hkl[0], hkl[1], -hkl[0] - hkl[1], hkl[2])
@@ -698,12 +738,14 @@ def prepare_surface(
             alat_key = _find_key(lattice, "alat")
             if alat_key is None:
                 raise ValueError("bulk &lattice must define alat for global-z orientation")
-            oriented, oriented_basis = _rotate_file_lattice(
+            oriented, oriented_basis, rotation_matrix = _rotate_file_lattice(
                 lattice_file if crystal_sym == "file" else None,
                 crystal_sym,
                 float(lattice.get(_find_key(lattice, "celldm") or "celldm", 1.633) or 1.633),
                 hkl,
                 bulk_ntype,
+                spec.align_bond,
+                spec.align_bond_to,
             )
             _write_lattice_namelist(temporary / "lattice.nml", oriented, oriented_basis)
         elif crystal_sym == "file":
@@ -730,6 +772,11 @@ def prepare_surface(
             "miller_requested": list(spec.miller),
             "miller_reduced": list(hkl),
             "orientation": spec.orientation,
+            "rotation_matrix_cartesian": None if rotation_matrix is None else rotation_matrix.tolist(),
+            "inplane_bond_alignment": None if spec.align_bond is None else {
+                "source_cartesian": list(spec.align_bond),
+                "target_cartesian": list(spec.align_bond_to),
+            },
             "nlay": spec.nlay,
             "empty_spheres": spec.empty_spheres,
             "empty_sphere_initial_occupancy": spec.empty_sphere_charge,

@@ -1551,6 +1551,8 @@ def run_surface_prepare(args):
             charge_sigma=args.charge_sigma,
             crystal_sym=args.crystal_sym,
             orientation=args.orientation,
+            align_bond=None if args.align_bond is None else tuple(args.align_bond),
+            align_bond_to=None if args.align_bond_to is None else tuple(args.align_bond_to),
             n1=args.n1,
             n2=args.n2,
             n3=args.n3,
@@ -1647,6 +1649,8 @@ def add_surface_setup_arguments(parser):
     parser.add_argument("--charge-sigma", type=float, default=0.5, help="Width of the erf-derived charge-transfer profile in layer spacings (default: 0.5)")
     parser.add_argument("--crystal-sym", choices=("fcc", "bcc", "hcp", "file"), help="Override bulk crystal_sym (file requires bulk/lattice.nml)")
     parser.add_argument("--orientation", choices=("preserve", "global-z"), default="preserve", help="Requested orientation convention")
+    parser.add_argument("--align-bond", nargs=3, type=float, metavar=("X", "Y", "Z"), help="Source Cartesian in-plane bond vector for a global-z rotation")
+    parser.add_argument("--align-bond-to", nargs=3, type=float, metavar=("X", "Y", "Z"), help="Direction in the rotated global XY plane to align --align-bond with")
     parser.add_argument("--n1", type=int, default=32, help="Surface input n1 (default: 32)")
     parser.add_argument("--n2", type=int, default=32, help="Surface input n2 (default: 32)")
     parser.add_argument("--n3", type=int, default=32, help="Surface input n3 (default: 32)")

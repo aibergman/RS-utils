@@ -48,6 +48,16 @@ directory and returns a manifest describing the staged files and settings:
 
 .. autofunction:: rsutil.prepare_surface
 
+For ``SurfaceSpec``, ``orientation="global-z"`` rotates the requested surface
+normal onto global Z and writes a file-based lattice. The optional
+``align_bond`` and ``align_bond_to`` vectors select the remaining in-plane
+rotation: ``align_bond`` is a Cartesian bond direction in the original bulk
+frame, and ``align_bond_to`` is its target direction in the rotated XY plane.
+Both vectors must be supplied together; the source must lie in the requested
+surface plane. The Cartesian rotation matrix and alignment vectors are included
+in the returned manifest and ``surface_setup.json``. With either vector
+omitted, the existing minimal normal-to-Z rotation is retained.
+
 .. autoclass:: rsutil.ImpuritySpec
    :members:
 

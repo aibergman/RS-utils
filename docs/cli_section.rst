@@ -96,6 +96,16 @@ Options:
   requested normal to ``surftype``. ``--orientation global-z`` rigidly rotates
   the lattice and basis so the normal is global Z, writes ``lattice.nml``, and
   sets ``crystal_sym='file'`` and ``surftype='0 0 1'``.
+* With ``--orientation global-z``, ``--align-bond X Y Z`` and
+  ``--align-bond-to U V W`` remove the remaining in-plane rotation ambiguity.
+  The first vector is a Cartesian bond direction in the original bulk frame
+  (the units do not matter); the second is its desired Cartesian direction in
+  the rotated frame and must lie in global XY. The source bond must lie in the
+  selected surface plane. For example, for fcc(111),
+  ``--align-bond 0 0.5 -0.5 --align-bond-to 1 -1 0`` aligns that bond with the
+  global ``(1,-1,0)`` direction. The resulting Cartesian rotation matrix and
+  alignment are recorded in ``surface_setup.json``. If omitted, the existing
+  minimal normal-to-Z rotation is used.
 * ``--n1``, ``--n2``, ``--n3``, ``--rc``, ``--self-steps``, and
   ``--mixing-beta`` set surface calculation controls. Defaults are 32, 32, 32,
   100, 15, and 0.01 respectively.
