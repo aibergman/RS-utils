@@ -12,6 +12,7 @@ Examples:
 """
 import argparse
 import glob
+import math
 import os
 import sys
 
@@ -29,6 +30,32 @@ def smooth(y, n):
     return np.convolve(y, k, mode="same")
 
 
+def read_fermi_energy(folder):
+    """Read the Fermi energy in Ry from ``folder/input.nml`` if available."""
+    input_path = os.path.join(folder, "input.nml")
+    if not os.path.isfile(input_path):
+        return None
+
+    try:
+        import f90nml
+
+        document = f90nml.read(input_path)
+    except (OSError, ValueError) as exc:
+        raise ValueError(f"could not read Fermi energy from {input_path}: {exc}") from exc
+
+    energy = document.get("energy", {})
+    fermi = energy.get("fermi") if hasattr(energy, "get") else None
+    if fermi is None:
+        return None
+    try:
+        fermi = float(fermi)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{input_path} has a non-numeric &energy fermi value") from exc
+    if not math.isfinite(fermi):
+        raise ValueError(f"{input_path} has a non-finite &energy fermi value")
+    return fermi
+
+
 def find_species_files(folder, names=None):
     files = sorted(
         f for f in glob.glob(os.path.join(folder, "*_dos.out"))
@@ -40,6 +67,37 @@ def find_species_files(folder, names=None):
         if names is None or name in names:
             out.append((name, f))
     return out
+
+
+def enable_overlay_legend_toggle(fig, legend, groups):
+    """Make each overlay legend entry toggle all artists for that DOS file."""
+    legend_artists = {}
+    legend_lines = legend.get_lines()
+    legend_texts = legend.get_texts()
+
+    for legend_line, legend_text in zip(legend_lines, legend_texts):
+        group = groups.get(legend_text.get_text())
+        if group is None:
+            continue
+        legend_line.set_picker(5)
+        legend_text.set_picker(True)
+        legend_artists[legend_line] = (group, legend_line, legend_text)
+        legend_artists[legend_text] = (group, legend_line, legend_text)
+
+    def on_pick(event):
+        picked = legend_artists.get(event.artist)
+        if picked is None:
+            return
+        group, legend_line, legend_text = picked
+        visible = not any(artist.get_visible() for artist in group)
+        for artist in group:
+            artist.set_visible(visible)
+        alpha = 1.0 if visible else 0.2
+        legend_line.set_alpha(alpha)
+        legend_text.set_alpha(alpha)
+        fig.canvas.draw_idle()
+
+    fig.canvas.mpl_connect("pick_event", on_pick)
 
 
 def get_curves(name, path, spin):
@@ -65,7 +123,8 @@ def add_plot_dos_arguments(parser):
     parser.add_argument("--no-species", action="store_true", help="skip species DOS")
     parser.add_argument("--layout", choices=["stack", "overlay"], default="overlay",
                         help="stack: one panel per curve set; overlay: all in one axes (default: overlay)")
-    parser.add_argument("--fermi", type=float, default=0.0, help="Fermi energy subtracted from energy axis")
+    parser.add_argument("--fermi", type=float, default=None,
+                        help="Fermi energy in Ry (default: read &energy fermi from input.nml)")
     parser.add_argument("--xlim", nargs=2, type=float, metavar=("MIN", "MAX"))
     parser.add_argument("--ylim", nargs=2, type=float, metavar=("MIN", "MAX"))
     parser.add_argument("--smooth", type=int, default=1, help="moving-average window in points")
@@ -83,6 +142,20 @@ def plot_dos(args):
     """Plot DOS files using parsed arguments and return a process-style status."""
     if args.smooth < 1:
         raise ValueError("--smooth must be at least 1")
+
+    if args.fermi is None:
+        fermi = read_fermi_energy(args.folder)
+        has_fermi_reference = fermi is not None
+        if fermi is None:
+            print(
+                f"warning: no &energy fermi found in {os.path.join(args.folder, 'input.nml')}; "
+                "using zero energy shift",
+                file=sys.stderr,
+            )
+            fermi = 0.0
+    else:
+        fermi = args.fermi
+        has_fermi_reference = True
 
     spin = not args.no_spin
     entries = []
@@ -108,17 +181,21 @@ def plot_dos(args):
         axes = [ax] * n
 
     colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    artist_groups = {}
     for i, (name, path) in enumerate(entries):
         e, curves = get_curves(name, path, spin)
-        e = e - args.fermi
+        e = e - fermi
         ax = axes[i]
         c = colors[i % len(colors)]
+        group = artist_groups.setdefault(name, [])
         for label, y in curves.items():
             y = smooth(y, args.smooth)
             ls = "--" if label == "dw" and args.layout == "overlay" else "-"
-            ax.plot(e, y, color=c, ls=ls, lw=1.2, label=name if label in ("up", "total") else None)
+            (line,) = ax.plot(e, y, color=c, ls=ls, lw=1.2, label=name if label in ("up", "total") else None)
+            group.append(line)
             if args.fill:
-                ax.fill_between(e, 0, y, color=c, alpha=0.25)
+                fill = ax.fill_between(e, 0, y, color=c, alpha=0.25)
+                group.append(fill)
         if args.layout == "stack":
             ax.set_title(name, fontsize=9, loc="right")
             ax.set_ylabel("DOS (states/Ry)")
@@ -132,8 +209,11 @@ def plot_dos(args):
 
     if args.layout == "overlay":
         axes[0].set_ylabel("DOS (states/Ry)")
-        axes[0].legend(frameon=False)
-    axes[-1].set_xlabel(args.xlabel or ("E - E$_F$ (Ry)" if args.fermi else "Energy (Ry)"))
+        legend = axes[0].legend(frameon=False)
+        if args.output is None:
+            legend.set_title("Click to toggle")
+            enable_overlay_legend_toggle(fig, legend, artist_groups)
+    axes[-1].set_xlabel(args.xlabel or ("E - E$_F$ (Ry)" if has_fermi_reference else "Energy (Ry)"))
     fig.tight_layout()
     if args.output:
         fig.savefig(args.output, dpi=args.dpi)

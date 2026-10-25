@@ -166,6 +166,10 @@ rsutil --clust --data .
 DOS output files already present in a calculation directory. DOS plotting
 requires the ``bands`` extra (``pip install 'rsutil[bands]'``); interactive
 structure viewing requires the ``visualization`` extra.
+The plotter reads ``&energy fermi`` from ``input.nml`` in the calculation
+folder by default; ``--fermi`` overrides it.
+In interactive overlay plots, click a legend entry to hide or show that
+species' curves.
 
 ### Exchange mapping workflow (`--exchange`)
 

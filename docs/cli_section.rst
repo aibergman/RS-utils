@@ -425,8 +425,10 @@ The ``viz`` command group provides DOS plotting and structure visualization.
 
 DOS plotting defaults to a filled overlay plot. Use ``--layout stack`` for one
 panel per DOS file, or ``--no-fill`` to turn off curve filling. The energy
-values are in Ry; ``--fermi`` shifts the energy axis by the supplied Fermi
-energy.
+values are in Ry. By default, ``--fermi`` is read from ``&energy fermi`` in
+``FOLDER/input.nml``; supplying ``--fermi VALUE`` overrides it. In an
+interactive overlay plot, click a legend entry to hide or show that DOS
+file's curves. This interaction is unavailable in saved images.
 
 **DOS plotting examples:**
 
