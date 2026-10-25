@@ -19,7 +19,7 @@ Getting Started
 .. code-block:: bash
 
     # 1) Setup lattice and initial atomic parameters
-    rsutil --setup --empty_spheres
+    rsutil setup bulk --empty_spheres
 
     # 2) Build exchange interactions (J_ij)
     rsutil --exchange --cutoff 2.5 --unique --shell-width 0.1
@@ -28,14 +28,14 @@ Getting Started
     rsutil --export --data . --jij jijso.out --out uppasd_out
 
     # Optional: all-site SQS on supercell before setup
-    rsutil --setup --supercell 2 2 2 --sqs "Fe=0.5,Ni=0.5" \
+    rsutil setup bulk --supercell 2 2 2 --sqs "Fe=0.5,Ni=0.5" \
         --sqs-shells 3 --sqs-steps 5000 --sqs-seed 1234
 
     # Optional: 2D slab mode
-    rsutil --setup --2d --z-iso-factor 0.5
+    rsutil setup bulk --2d --z-iso-factor 0.5
 
     # Optional: recursion control overrides
-    rsutil --setup --rec-method chebyshev
+    rsutil setup bulk --rec-method chebyshev
 
 **Band structure & DOS workflow:**
 

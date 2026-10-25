@@ -3,15 +3,15 @@
 Command-Line Interface (CLI)
 =============================
 
-The **RS-utils CLI** provides subcommands for surface preparation, band/DOS
-analysis, and campaign workflows, plus legacy flags for lattice, exchange,
-export, and visualization.
+The **RS-utils CLI** provides single-run ``setup`` workflows, band/DOS
+analysis, visualization, and campaign workflows, plus legacy flags for bulk
+setup, exchange, and export.
 
 Top-level usage:
 
 .. code-block:: bash
 
-    rsutil {surface,bands,dos,campaign} [options]
+    rsutil {setup,bands,dos,campaign,viz} [options]
     rsutil [--setup|--exchange|--export|--lmto47|--lattice|--clust] [options]
 
 Common Tasks
@@ -24,15 +24,15 @@ Common Tasks
    * - Task
      - Command
    * - Setup from ``input.nml`` + ``lattice.nml``
-     - ``rsutil --setup``
+     - ``rsutil setup bulk``
    * - Setup and validate generated files
-     - ``rsutil --setup --validate --summary``
+     - ``rsutil setup bulk --validate --summary``
    * - Supercell setup (non-destructive default)
-     - ``rsutil --setup --supercell 2 2 2``
+     - ``rsutil setup bulk --supercell 2 2 2``
    * - 2D slab setup with isotropic margin
-     - ``rsutil --setup --2d --z-iso-factor 0.5``
+     - ``rsutil setup bulk --2d --z-iso-factor 0.5``
    * - Override recursion controls in ``&control``
-     - ``rsutil --setup --rec-method chebyshev --rec-steps 200``
+     - ``rsutil setup bulk --rec-method chebyshev --rec-steps 200``
    * - Build exchange map
      - ``rsutil --exchange --cutoff 2.5 --unique``
    * - Export UppASD input set
@@ -42,7 +42,7 @@ Common Tasks
    * - Plot band structure
      - ``rsutil bands --lattice lattice.nml --hamiltonian rs2txt.dat --nk 100 --output bands.png``
    * - Prepare a surface setup from converged bulk files
-     - ``rsutil surface prepare --bulk bulk_run --output surface_run``
+     - ``rsutil setup surface --bulk bulk_run --output surface_run``
    * - Compute DOS + moments
      - ``rsutil dos --lattice lattice.nml --hamiltonian rs2txt.dat --mesh 6 6 6 --electrons 16 --moments``
 
@@ -54,7 +54,7 @@ bulk directory:
 
 .. code-block:: bash
 
-    rsutil surface prepare --bulk tmp/fccCu --output tmp/fccCu001 \
+    rsutil setup surface --bulk tmp/fccCu --output tmp/fccCu001 \
         --hkl 0 0 1 --layers 6 --empty-spheres 1
 
 The command creates a new output directory, copies the bulk host potential and
@@ -277,11 +277,14 @@ Option                             Values                                       
 Lattice Processing
 -------------------
 
-The ``--setup`` flag processes lattice structures and calculates optimal Wigner-Seitz radii and starting parameters.
+The ``setup bulk`` command processes lattice structures and calculates
+Wigner-Seitz radii and starting parameters. It reads ``lattice.nml`` and
+``input.nml`` from the current directory. ``rsutil -S`` and ``rsutil --setup``
+remain as compatibility shortcuts for this command.
 
 **Flags:**
 
-- ``--setup, -S``: Process lattice and generate optimized atomic parameters.
+- ``rsutil setup bulk``: Process lattice and generate optimized atomic parameters.
 - ``--cluster``: Cluster type: ``periodic`` (default) or ``free``.
 - ``--empty_spheres``: Enable empty sphere calculations.
 - ``--min_empty_radius``: Minimum empty sphere radius (default: 1.2).
@@ -314,38 +317,38 @@ Generated ``input_new.nml`` uses ``strux_backend = 'strux_lib'`` in its
 .. code-block:: bash
 
     # Basic lattice processing
-    rsutil --setup
+    rsutil setup bulk
 
     # Enable the KS setup preset
-    rsutil -S --preset KS
+    rsutil setup bulk --preset KS
 
     # With empty spheres
-    rsutil --setup --empty_spheres --min_empty_radius 1.0 --max_empty_radius 3.0
+    rsutil setup bulk --empty_spheres --min_empty_radius 1.0 --max_empty_radius 3.0
 
     # Free cluster calculation
-    rsutil --setup --cluster free
+    rsutil setup bulk --cluster free
 
     # Create a 1x1x2 supercell with broken symmetry labels
-    rsutil --setup --supercell 1 1 2
+    rsutil setup bulk --supercell 1 1 2
 
     # Supercell plus empty spheres (use in-place updates and validation)
-    rsutil --setup --supercell 1 1 2 --empty_spheres --in-place --validate
+    rsutil setup bulk --supercell 1 1 2 --empty_spheres --in-place --validate
 
     # Distort lattice/basis vectors reproducibly and scale alat
-    rsutil --setup --lattice-dist 0.01 --basis-dist 0.02 --alat-scale 1.01 --seed 1234
+    rsutil setup bulk --lattice-dist 0.01 --basis-dist 0.02 --alat-scale 1.01 --seed 1234
 
     # 2D mode with simple z-rule
-    rsutil --setup --2d
+    rsutil setup bulk --2d
 
     # 2D mode with isotropic-density margins
-    rsutil --setup --2d --z-iso-factor 0.5
+    rsutil setup bulk --2d --z-iso-factor 0.5
 
     # Override recursion controls in &control
-    rsutil --setup --rec-method chebyshev
-    rsutil --setup --rec-method lanczos --rec-steps 64
+    rsutil setup bulk --rec-method chebyshev
+    rsutil setup bulk --rec-method lanczos --rec-steps 64
 
     # SQS on all supercell sites
-    rsutil --setup --supercell 2 2 2 --sqs "Fe=0.5,Ni=0.3,Co=0.2" \
+    rsutil setup bulk --supercell 2 2 2 --sqs "Fe=0.5,Ni=0.3,Co=0.2" \
            --sqs-shells 3 --sqs-steps 5000 --sqs-seed 1234
 
 Supercell Notes
@@ -392,10 +395,10 @@ For robust setup runs, prefer:
 .. code-block:: bash
 
     # dry-style run with checks
-    rsutil --setup --validate --summary
+    rsutil setup bulk --validate --summary
 
     # if happy with output, replace files and keep backups
-    rsutil --setup --in-place --backup
+    rsutil setup bulk --in-place --backup
 
 Extended Lattice Key Compatibility
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -647,6 +650,6 @@ Quick Reference
     rsutil --help
 
     # Typical workflow: setup → exchange → export
-    rsutil --setup --empty_spheres
+    rsutil setup bulk --empty_spheres
     rsutil --exchange --unique --cutoff 2.5
     rsutil --export --jij jijso.out

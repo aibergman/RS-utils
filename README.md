@@ -83,39 +83,43 @@ The installed CLI entrypoint is:
 rsutil --help
 ```
 
-### Setup workflows (`--setup`)
+### Single-run setup workflows (`setup`)
 
 ```bash
-# Basic setup
-rsutil --setup
+# Basic bulk setup (reads lattice.nml and input.nml in the current directory)
+rsutil setup bulk
 
 # Supercell setup
-rsutil --setup --supercell 1 1 2
+rsutil setup bulk --supercell 1 1 2
 
 # In-place replacement (otherwise setup is non-destructive)
-rsutil --setup --supercell 1 1 2 --in-place
+rsutil setup bulk --supercell 1 1 2 --in-place
 
 # 2D mode (default c-axis rule)
-rsutil --setup --2d
+rsutil setup bulk --2d
 
 # 2D mode with isotropic-density margins
-rsutil --setup --2d --z-iso-factor 0.5
+rsutil setup bulk --2d --z-iso-factor 0.5
 
 # SQS on all supercell sites (requires --supercell)
-rsutil --setup --supercell 2 2 2 --sqs "Fe=0.5,Ni=0.3,Co=0.2" \
+rsutil setup bulk --supercell 2 2 2 --sqs "Fe=0.5,Ni=0.3,Co=0.2" \
        --sqs-shells 3 --sqs-steps 5000 --sqs-seed 1234
 
 # Recursion control override in &control
-rsutil --setup --rec-method chebyshev           # default rec-steps becomes 200
-rsutil --setup --rec-method lanczos --rec-steps 64
+rsutil setup bulk --rec-method chebyshev           # default rec-steps becomes 200
+rsutil setup bulk --rec-method lanczos --rec-steps 64
 
 # Prepare an RS-LMTO-ASA surface from a converged bulk calculation
-rsutil surface prepare --bulk tmp/fccCu --output tmp/fccCu001 \
+rsutil setup surface --bulk tmp/fccCu --output tmp/fccCu001 \
        --hkl 0 0 1 --layers 6 --empty-spheres 1
 
 # Reproducible distortions and scaling
-rsutil --setup --lattice-dist 0.01 --basis-dist 0.02 --alat-scale 1.01 --seed 1234
+rsutil setup bulk --lattice-dist 0.01 --basis-dist 0.02 --alat-scale 1.01 --seed 1234
 ```
+
+``rsutil -S`` and ``rsutil --setup`` remain supported as shortcuts for
+``rsutil setup bulk``. The campaign workflow is separate and creates multiple
+setup directories from a campaign specification.
 
 ### Export workflows (`--export`, `--lmto47`)
 
@@ -177,7 +181,7 @@ runs. For reproducible batch preparation, validate and generate a versioned
 campaign first, then render a site-specific Slurm array for review:
 
 ```bash
-rsutil -S --validate --summary                 # non-destructive legacy setup
+rsutil setup bulk --validate --summary
 rsutil -J --cutoff 3.0 --unique                # legacy exchange jobs
 
 rsutil campaign validate examples/campaigns/ht18_pilot.json
@@ -275,7 +279,7 @@ Caveats:
 Surface preparation
 -------------------
 
-``rsutil surface prepare`` creates a new surface input directory from a
+``rsutil setup surface`` creates a new surface input directory from a
 converged bulk calculation. It stages the host ``*_out.nml`` potential files,
 host radial ground-state data, and the bulk ``lattice.nml`` when
 ``crystal_sym='file'``. The generated ``input.nml`` uses
@@ -330,10 +334,10 @@ Recommended workflow for destructive or batch updates:
 
 ```bash
 # 1) Generate outputs and validate
-rsutil --setup --validate --summary
+rsutil setup bulk --validate --summary
 
 # 2) Optional automatic replacement with backups
-rsutil --setup --in-place --backup
+rsutil setup bulk --in-place --backup
 ```
 
 SQS workflow (all-site substitution)
@@ -342,7 +346,7 @@ SQS workflow (all-site substitution)
 SQS can be applied to all sites in a generated supercell:
 
 ```bash
-rsutil --setup --supercell 2 2 2 \
+rsutil setup bulk --supercell 2 2 2 \
        --sqs "Fe=0.5,Ni=0.3,Co=0.2" \
        --sqs-shells 3 --sqs-steps 5000 --sqs-seed 1234
 ```

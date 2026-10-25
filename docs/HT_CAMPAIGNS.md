@@ -65,7 +65,8 @@ contain `lattice.nml` and `input.nml`; an explicit source mapping can provide
 `setup_template`. `exchange` is retained as optional metadata for later
 post-SCF job generation and is not executed by HT-16.
 
-Setup options are the same `SetupSpec` values used by `rsutil -S`; add
+Setup options are the same `SetupSpec` values used by `rsutil setup bulk`
+(also available through the legacy `rsutil -S` shortcut); add
 `"preset": "KS"` to `setup_template` or an entry's `setup` to set
 `use_kspace = .true.` in the generated `&self` namelist. Because setup values
 contribute to scientific identity, changing the preset changes the entry ID.

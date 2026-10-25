@@ -32,7 +32,7 @@ For the familiar command-line workflow, run from a directory containing
 `lattice.nml` and `input.nml`:
 
 ```bash
-rsutil -S --validate --json-report rsutil-setup-report.json
+rsutil setup bulk --validate --json-report rsutil-setup-report.json
 ```
 
 The optional `--preset KS` flag enables `use_kspace = .true.` in the

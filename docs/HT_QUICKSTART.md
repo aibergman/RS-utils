@@ -48,7 +48,7 @@ See [HT testing](HT_TESTING) for detailed build, wheel, and test requirements.
 The established entry points remain available for individual runs:
 
 ```bash
-rsutil -S                         # setup in the current working directory
+rsutil setup bulk                 # setup in the current working directory
 rsutil -J --cutoff 3.0 --unique  # generate exchange jobs
 ```
 

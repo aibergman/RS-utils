@@ -33,12 +33,12 @@ Notes:
 - ``process_lattice`` supports recursion overrides via ``rec_method`` and ``rec_steps`` (written to ``&control`` as ``recur`` and ``lld``).
 - Current backend support in this repository is ``0 <= lmax <= 3``.
 - Extended lattice keys ``strux_backend``, ``strux_want_sdot``, and ``strux_solve_scale`` are preserved when present.
-- CLI-level SQS controls (``--sqs``, ``--sqs-shells``, ``--sqs-steps``, ``--sqs-seed``) can be combined with ``--supercell`` for both ``--setup`` and ``--lmto47`` workflows.
+- CLI-level SQS controls (``--sqs``, ``--sqs-shells``, ``--sqs-steps``, ``--sqs-seed``) can be combined with ``--supercell`` for ``setup bulk`` and ``--lmto47`` workflows.
 
 Surface Preparation API
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-The Python API mirrors ``rsutil surface prepare``. It writes to a new output
+The Python API mirrors ``rsutil setup surface``. It writes to a new output
 directory and returns a manifest describing the staged files and settings:
 
 .. autoclass:: rsutil.SurfaceSpec

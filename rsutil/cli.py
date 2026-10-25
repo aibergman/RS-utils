@@ -13,13 +13,15 @@ main()
 Usage
 -----
 Existing functionality (flags):
-    rsutil --setup
+    rsutil -S                         # Legacy bulk setup shortcut
     rsutil --lattice --data <data_directory>
     rsutil --clust --data <data_directory>
     rsutil --exchange
     rsutil --export
 
 New subcommand functionality:
+    rsutil setup bulk [options]      # Single-run bulk setup
+    rsutil setup surface [options]   # Single-run surface setup
     rsutil bands [options]          # Band structure calculation
     rsutil dos [options]            # DOS calculation
     rsutil moments [options]        # DOS moments analysis
@@ -1574,27 +1576,67 @@ def run_surface_prepare(args):
     return 0
 
 
-def create_surface_parser(subparsers):
-    """Add the separate surface preparation workflow."""
-    parser = subparsers.add_parser("surface", help="Prepare RS-LMTO-ASA surface calculations")
-    commands = parser.add_subparsers(dest="surface_command", required=True)
-    prepare = commands.add_parser("prepare", help="Prepare a surface directory from a converged bulk run")
-    prepare.add_argument("--bulk", required=True, help="Converged bulk calculation directory")
-    prepare.add_argument("--output", required=True, help="New surface setup directory")
-    prepare.add_argument("--hkl", nargs="+", type=int, default=(0, 0, 1), metavar="INDEX", help="Surface normal as H K L; hcp also accepts Miller-Bravais H K I L")
-    prepare.add_argument("--layers", type=int, default=6, help="Number of added surface/interface types (nlay)")
-    prepare.add_argument("--empty-spheres", type=int, default=1, help="Number of empty-sphere types among the nlay added types")
-    prepare.add_argument("--empty-sphere-charge", type=float, default=0.2, help="Initial occupancy per empty-sphere type (electrons; default 0.2)")
-    prepare.add_argument("--charge-sigma", type=float, default=0.5, help="Width of the erf-derived charge-transfer profile in layer spacings (default: 0.5)")
-    prepare.add_argument("--crystal-sym", choices=("fcc", "bcc", "hcp", "file"), help="Override bulk crystal_sym (file requires bulk/lattice.nml)")
-    prepare.add_argument("--orientation", choices=("preserve", "global-z"), default="preserve", help="Requested orientation convention")
-    prepare.add_argument("--n1", type=int, default=32, help="Surface input n1 (default: 32)")
-    prepare.add_argument("--n2", type=int, default=32, help="Surface input n2 (default: 32)")
-    prepare.add_argument("--n3", type=int, default=32, help="Surface input n3 (default: 32)")
-    prepare.add_argument("--rc", type=int, default=100, help="Surface radius cutoff rc (default: 100)")
-    prepare.add_argument("--self-steps", type=int, default=15, help="Surface SCF steps (default: 15)")
-    prepare.add_argument("--mixing-beta", type=float, default=0.01, help="Surface mixing beta (default: 0.01)")
-    prepare.set_defaults(func=run_surface_prepare)
+def add_bulk_setup_arguments(parser):
+    """Add the single-run bulk setup controls to a parser."""
+    parser.add_argument("--cluster", choices=["periodic", "free"], default="periodic")
+    parser.add_argument("--empty_spheres", action="store_true", help="Enable empty sphere calculations")
+    parser.add_argument("--min_empty_radius", type=float, default=1.2)
+    parser.add_argument("--max_empty_radius", type=float, default=2.5)
+    parser.add_argument("--lmx", type=int, default=2, help="Maximum l-channel used in setup (default: 2)")
+    parser.add_argument("--preset", type=str.upper, choices=["KS"])
+    parser.add_argument("--rec-method", choices=["block", "chebyshev", "lanczos"], default="block")
+    parser.add_argument("--rec-steps", type=int, default=None)
+    parser.add_argument("--lattice-dist", type=float, default=0.0)
+    parser.add_argument("--basis-dist", type=float, default=0.0)
+    parser.add_argument("--alat-scale", type=float, default=1.0)
+    parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument("--2d", dest="mode_2d", action="store_true")
+    parser.add_argument("--z-iso-factor", type=float, default=None)
+    parser.add_argument("--sqs", type=str, default=None)
+    parser.add_argument("--sqs-shells", type=int, default=3)
+    parser.add_argument("--sqs-steps", type=int, default=5000)
+    parser.add_argument("--sqs-seed", type=int, default=None)
+    parser.add_argument("--verbose", "-v", action="store_true")
+    parser.add_argument("--summary", action="store_true")
+    parser.add_argument("--validate", action="store_true")
+    parser.add_argument("--json-report", type=str, default=None, metavar="PATH")
+    parser.add_argument("--backup", action="store_true")
+    parser.add_argument("--in-place", action="store_true")
+    parser.add_argument("--supercell", nargs=3, type=int, metavar=("NX", "NY", "NZ"))
+
+
+def add_surface_setup_arguments(parser):
+    """Add the converged-bulk surface setup controls to a parser."""
+    parser.add_argument("--bulk", required=True, help="Converged bulk calculation directory")
+    parser.add_argument("--output", required=True, help="New surface setup directory")
+    parser.add_argument("--hkl", nargs="+", type=int, default=(0, 0, 1), metavar="INDEX", help="Surface normal as H K L; hcp also accepts Miller-Bravais H K I L")
+    parser.add_argument("--layers", type=int, default=6, help="Number of added surface/interface types (nlay)")
+    parser.add_argument("--empty-spheres", type=int, default=1, help="Number of empty-sphere types among the nlay added types")
+    parser.add_argument("--empty-sphere-charge", type=float, default=0.2, help="Initial occupancy per empty-sphere type (electrons; default 0.2)")
+    parser.add_argument("--charge-sigma", type=float, default=0.5, help="Width of the erf-derived charge-transfer profile in layer spacings (default: 0.5)")
+    parser.add_argument("--crystal-sym", choices=("fcc", "bcc", "hcp", "file"), help="Override bulk crystal_sym (file requires bulk/lattice.nml)")
+    parser.add_argument("--orientation", choices=("preserve", "global-z"), default="preserve", help="Requested orientation convention")
+    parser.add_argument("--n1", type=int, default=32, help="Surface input n1 (default: 32)")
+    parser.add_argument("--n2", type=int, default=32, help="Surface input n2 (default: 32)")
+    parser.add_argument("--n3", type=int, default=32, help="Surface input n3 (default: 32)")
+    parser.add_argument("--rc", type=int, default=100, help="Surface radius cutoff rc (default: 100)")
+    parser.add_argument("--self-steps", type=int, default=15, help="Surface SCF steps (default: 15)")
+    parser.add_argument("--mixing-beta", type=float, default=0.01, help="Surface mixing beta (default: 0.01)")
+
+
+def create_setup_parser(subparsers):
+    """Add one-off setup workflows; campaign generation remains separate."""
+    parser = subparsers.add_parser("setup", help="Set up one bulk or surface calculation")
+    commands = parser.add_subparsers(dest="setup_command", required=True)
+
+    bulk = commands.add_parser("bulk", help="Set up one bulk calculation from local input files")
+    add_bulk_setup_arguments(bulk)
+    bulk.set_defaults(func=_run_setup_cli)
+
+    surface = commands.add_parser("surface", help="Prepare a surface from a converged bulk run")
+    add_surface_setup_arguments(surface)
+    surface.set_defaults(func=run_surface_prepare)
+    return parser
 
 
 def run_viz_dos(args):
@@ -2630,8 +2672,12 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+  # Single-run setup subcommands
+  rsutil setup bulk                         # Process bulk lattice inputs
+  rsutil setup surface --bulk bulk --output surface
+
   # Existing functionality (flags)
-  rsutil --setup                            # Process lattice
+  rsutil -S                                 # Legacy bulk setup shortcut
   rsutil --lattice --data examples/bccFe    # Visualize lattice
   rsutil --exchange --cutoff 1.5            # Create exchange maps
   rsutil --export --jij jijso.out           # Export to UppASD
@@ -2660,7 +2706,7 @@ Examples:
     create_dos_parser(subparsers)
     create_exchange_parser(subparsers)
     create_campaign_parser(subparsers)
-    create_surface_parser(subparsers)
+    create_setup_parser(subparsers)
     create_viz_parser(subparsers)
 
     # Existing flags for backward compatibility
