@@ -12,15 +12,15 @@ locations rather than intended future behavior.
 | Baseline git SHA | `e4a536d9660e3172ee5e6b4168eacf7b58331b4b` |
 | Latest commit | `Updated docs` |
 | External RS-LMTO reference | branch `fable_v4` (not modified) |
-| Python used for source probe | `/Users/andersb/envs/p311/bin/python`, Python 3.11.16 |
-| Source shared library | loaded: `/Users/andersb/Jobb/RS-utils/build/lib.macosx-14.0-arm64-cpython-311/rsutil/rsutil.so` |
+| Python used for source probe | `<venv>/bin/python`, Python 3.11.16 |
+| Source shared library | loaded: `<checkout>/build/lib.<platform>/rsutil/rsutil.so` |
 
 Version and loading probe:
 
 ```text
 version= 0.10.0
 lib_filename= rsutil.so
-lib_path= /Users/andersb/Jobb/RS-utils/build/lib.macosx-14.0-arm64-cpython-311/rsutil/rsutil.so
+lib_path= <checkout>/build/lib.<platform>/rsutil/rsutil.so
 shared_library_loaded= True
 ```
 
@@ -33,7 +33,7 @@ the package importable with `_rsutil = None` if loading fails
 ## CLI baseline
 
 The installed `rsutil` launcher is `/opt/homebrew/bin/rsutil` and points at a
-different checkout, `/Users/andersb/Jobb/RS_tools`. Therefore the direct
+different checkout, `<other checkout>`. Therefore the direct
 probe failed before CLI parsing:
 
 ```text

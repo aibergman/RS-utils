@@ -25,7 +25,7 @@ from .visualizer import Visualizer
 # ----------------------------
 def rs_visualizer(data_dir: str = ".", clust: bool = False) -> None:
     """
-    Visualize a structure from RS_tools_python.
+    Visualize a structure from RS-utils.
 
     Parameters
     ----------
