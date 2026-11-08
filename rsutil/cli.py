@@ -1706,6 +1706,59 @@ def add_impurity_setup_arguments(parser):
     parser.add_argument("--mixing-beta", type=float, default=0.1, help="Impurity mixing beta (default: 0.1)")
 
 
+def run_cif_convert(args):
+    """Convert a CIF file into RS-LMTO lattice.nml/input.nml."""
+    from .cif import CifConversionError, convert_cif
+
+    try:
+        files, conversion = convert_cif(
+            args.cif,
+            args.output,
+            ct=args.ct,
+            alat=args.alat,
+            supercell=tuple(args.supercell),
+            primitive=args.primitive,
+            r2=args.r2,
+            rc=args.rc,
+            wav=args.wav,
+            template=args.template,
+            overwrite=args.overwrite,
+        )
+    except (CifConversionError, FileExistsError, OSError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+
+    structure = conversion.structure
+    elements = {}
+    for site in structure.sites:
+        elements[site.element] = elements.get(site.element, 0) + 1
+    print(f"Converted {args.cif}")
+    print(f"  Atoms:        {len(structure.sites)} ({', '.join(f'{k}{v}' for k, v in elements.items())})")
+    print(f"  Space group:  {structure.metadata.get('spacegroup', 'unknown')}")
+    print(f"  alat:         {conversion.alat:.6f} Å")
+    for message in conversion.warnings:
+        print(f"  WARNING: {message}", file=sys.stderr)
+    print(f"  Wrote:        {files.lattice}")
+    print(f"                {files.input}")
+    print("  Review ct, r2 and the non-structural input.nml groups before running.")
+    return 0
+
+
+def add_cif_setup_arguments(parser):
+    """Add CIF-to-RS-LMTO conversion options."""
+    parser.add_argument("cif", help="Input CIF file (ordered structures only)")
+    parser.add_argument("--output", "-o", default=".", help="Directory for lattice.nml and input.nml (default: current directory)")
+    parser.add_argument("--ct", type=float, required=True, help="Cluster cutoff written to ct(:) in input.nml (no structure-derived default)")
+    parser.add_argument("--r2", type=float, default=None, help="r2 value (default: ct squared)")
+    parser.add_argument("--rc", type=float, default=50, help="Cluster radius rc (default: 50)")
+    parser.add_argument("--alat", type=float, default=None, help="alat in Å (default: length of the first lattice vector)")
+    parser.add_argument("--wav", type=float, default=None, help="Wigner-Seitz radius wav in Å (omitted if not given)")
+    parser.add_argument("--supercell", type=int, nargs=3, default=[1, 1, 1], metavar=("N1", "N2", "N3"), help="Ordered supercell replication (default: 1 1 1)")
+    parser.add_argument("--primitive", action="store_true", help="Reduce to the primitive cell instead of keeping the CIF cell")
+    parser.add_argument("--template", default=None, help="Existing input.nml whose other namelist groups (&self, &control, ...) are reused")
+    parser.add_argument("--overwrite", action="store_true", help="Replace existing lattice.nml/input.nml")
+
+
 def create_setup_parser(subparsers):
     """Add one-off setup workflows; campaign generation remains separate."""
     parser = subparsers.add_parser("setup", help="Set up one bulk, surface, or impurity calculation")
@@ -1722,6 +1775,10 @@ def create_setup_parser(subparsers):
     impurity = commands.add_parser("impurity", help="Prepare an embedded impurity in a converged bulk or surface host")
     add_impurity_setup_arguments(impurity)
     impurity.set_defaults(func=run_impurity_prepare)
+
+    cif = commands.add_parser("cif", help="Convert a CIF file into RS-LMTO lattice.nml and input.nml")
+    add_cif_setup_arguments(cif)
+    cif.set_defaults(func=run_cif_convert)
     return parser
 
 
@@ -2760,6 +2817,7 @@ def main():
 Examples:
   # Single-run setup subcommands
   rsutil setup bulk                         # Process bulk lattice inputs
+  rsutil setup cif structure.cif --ct 4.3 -o run   # CIF -> lattice.nml/input.nml
   rsutil setup surface --bulk bulk --output surface
   rsutil setup impurity --host bulk --xyz impurity.xyz --output impurity
 

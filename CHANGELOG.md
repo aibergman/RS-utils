@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `rsutil setup cif` / `rsutil.cif`: convert ordered CIF files to RS-LMTO `lattice.nml` and `input.nml` (pymatgen-based, one RS type per atom), validated against `cif2cell` output. See `docs/HT_CIF.md`.
+
 ## 0.11.0rc1 — 2026-08-31
 
 Release candidate for controlled high-throughput (HT) RS-LMTO pilot use.
