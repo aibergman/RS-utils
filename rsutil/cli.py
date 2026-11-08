@@ -1676,7 +1676,7 @@ def add_bulk_setup_arguments(parser):
     parser.add_argument("--rc", type=float, default=50, help="With --cif: cluster radius rc (default: 50)")
     parser.add_argument("--alat", type=float, default=None, help="With --cif: alat in Å (default: length of the first lattice vector)")
     parser.add_argument("--wav", type=float, default=None, help="With --cif: Wigner-Seitz radius wav in Å (omitted if not given)")
-    parser.add_argument("--primitive", action="store_true", help="With --cif: reduce to the primitive cell")
+    parser.add_argument("--cell", choices=["primitive", "conventional"], default="primitive", help="With --cif: primitive (default, as cif2cell) or the conventional CIF cell")
     parser.add_argument("--template", default=None, help="With --cif: input.nml whose other namelist groups are reused")
     parser.add_argument("--overwrite-source", action="store_true", help="With --cif: replace an existing lattice.nml/input.nml")
 
@@ -1726,7 +1726,7 @@ def run_cif_convert(args):
             ct_neighbors=args.ct_neighbors,
             alat=args.alat,
             supercell=tuple(args.supercell),
-            primitive=args.primitive,
+            cell=args.cell,
             r2=args.r2,
             rc=args.rc,
             wav=args.wav,
@@ -1781,7 +1781,7 @@ def add_cif_setup_arguments(parser):
     parser.add_argument("--alat", type=float, default=None, help="alat in Å (default: length of the first lattice vector)")
     parser.add_argument("--wav", type=float, default=None, help="Wigner-Seitz radius wav in Å (omitted if not given)")
     parser.add_argument("--supercell", type=int, nargs=3, default=[1, 1, 1], metavar=("N1", "N2", "N3"), help="Ordered supercell replication (default: 1 1 1)")
-    parser.add_argument("--primitive", action="store_true", help="Reduce to the primitive cell instead of keeping the CIF cell")
+    parser.add_argument("--cell", choices=["primitive", "conventional"], default="primitive", help="primitive (default, as cif2cell) or the conventional CIF cell")
     parser.add_argument("--template", default=None, help="Existing input.nml whose other namelist groups (&self, &control, ...) are reused")
     parser.add_argument("--overwrite", action="store_true", help="Replace existing lattice.nml/input.nml")
 
@@ -2676,7 +2676,7 @@ def _convert_cif_into_cwd(args):
             ct=args.ct,
             ct_neighbors=args.ct_neighbors,
             alat=args.alat,
-            primitive=args.primitive,
+            cell=args.cell,
             r2=args.r2,
             rc=args.rc,
             wav=args.wav,
