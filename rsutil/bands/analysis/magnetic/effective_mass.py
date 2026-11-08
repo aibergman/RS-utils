@@ -8,6 +8,7 @@ Supports both scalar and tensor effective masses.
 
 import numpy as np
 from typing import Tuple, Optional, Dict, List
+import warnings
 from scipy.optimize import curve_fit
 from scipy.interpolate import UnivariateSpline
 
@@ -101,7 +102,13 @@ class EffectiveMassCalculator:
             r2 = 1.0 - (ss_res / ss_tot) if ss_tot > 0 else 0.0
 
             return e0, curv, r2
-        except:
+        except (RuntimeError, ValueError, TypeError) as exc:
+            warnings.warn(
+                f"Quadratic band fit failed ({type(exc).__name__}: {exc}); "
+                "returning NaN",
+                RuntimeWarning,
+                stacklevel=2,
+            )
             return np.nan, np.nan, 0.0
 
     def calculate_effective_mass_at_extremum(
@@ -208,7 +215,13 @@ class EffectiveMassCalculator:
                 # Only include if fit is good
                 if result["goodness_of_fit"] > 0.9:
                     results.append(result)
-            except:
+            except (ValueError, IndexError, KeyError, RuntimeError) as exc:
+                warnings.warn(
+                    f"Skipping extremum {ext_idx}: effective-mass calculation "
+                    f"failed ({type(exc).__name__}: {exc})",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
                 continue
 
         return results
@@ -266,7 +279,12 @@ class EffectiveMassCalculator:
                 vbm_k_idx, k_range
             )
             me_hole = vb_mass_result["effective_mass"]
-        except:
+        except (ValueError, IndexError, KeyError, RuntimeError) as exc:
+            warnings.warn(
+                f"Hole effective mass unavailable ({type(exc).__name__}: {exc})",
+                RuntimeWarning,
+                stacklevel=2,
+            )
             me_hole = np.nan
 
         try:
@@ -277,7 +295,12 @@ class EffectiveMassCalculator:
                 cbm_k_idx, k_range
             )
             me_electron = cb_mass_result["effective_mass"]
-        except:
+        except (ValueError, IndexError, KeyError, RuntimeError) as exc:
+            warnings.warn(
+                f"Electron effective mass unavailable ({type(exc).__name__}: {exc})",
+                RuntimeWarning,
+                stacklevel=2,
+            )
             me_electron = np.nan
 
         return {

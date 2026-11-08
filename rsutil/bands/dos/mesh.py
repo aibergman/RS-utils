@@ -19,6 +19,7 @@ except ImportError:
 from ..readers import LatticeReader, HamiltonianReader
 from ..projections import ProjectedBandCalculator
 import time
+import warnings
 
 
 class FullBZCalculator:
@@ -142,9 +143,14 @@ class FullBZCalculator:
             from scipy.spatial import Delaunay
             tri = Delaunay(kpoints)
             return tri.simplices
-        except:
+        except Exception as exc:  # ImportError or a Qhull/degenerate-input failure
             # Fallback: simple tetrahedra for small meshes
-            print("Warning: Using simplified tetrahedra")
+            warnings.warn(
+                f"Delaunay tetrahedralisation failed ({type(exc).__name__}: {exc}); "
+                "using simplified tetrahedra",
+                RuntimeWarning,
+                stacklevel=2,
+            )
             return self._generate_simple_tetrahedra(len(kpoints))
     
     def _generate_tetrahedra_uniform(self, mesh_size: Tuple[int, int, int]) -> np.ndarray:
