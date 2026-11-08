@@ -67,6 +67,16 @@ class CMakeBuild(build_ext):
         if os.environ.get("RSUTIL_DEBUG_CMAKE_VERBOSE"):
             cmake_args.append("-DCMAKE_VERBOSE_MAKEFILE=ON")
 
+        # Wheel builds on macOS set this so that only *this* extension links the
+        # Fortran runtime statically (Homebrew's libgfortran dylibs demand the
+        # build machine's own macOS version). A global LDFLAGS would leak into
+        # every other package built in the same environment.
+        if os.environ.get("RSUTIL_STATIC_FORTRAN_RUNTIME"):
+            cmake_args.append(
+                "-DCMAKE_MODULE_LINKER_FLAGS="
+                "-static-libgfortran -static-libgcc -static-libquadmath"
+            )
+
         build_args = ["--config", "Release"]
 
         build_temp = Path(self.build_temp)

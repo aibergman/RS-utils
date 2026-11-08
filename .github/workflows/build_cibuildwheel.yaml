@@ -60,12 +60,23 @@ jobs:
           CIBW_BUILD: ${{ inputs.quick && 'cp312-*' || 'cp311-* cp312-* cp313-* cp314-*' }}
           # Homebrew's libgfortran/libquadmath require the runner's own macOS
           # version, which would make the wheels uninstallable on older systems,
-          # so the Fortran runtime is linked statically instead.
+          # so setup.py links the Fortran runtime statically into our library.
           CIBW_ENVIRONMENT_MACOS: >-
             FC=gfortran
             MACOSX_DEPLOYMENT_TARGET=${{ matrix.macos_target }}
-            LDFLAGS="-static-libgfortran -static-libgcc -static-libquadmath"
+            RSUTIL_STATIC_FORTRAN_RUNTIME=1
         run: python -m cibuildwheel --output-dir wheelhouse
+
+      - name: Inspect the macOS native library
+        if: runner.os == 'macOS'
+        run: |
+          rm -rf inspect && mkdir inspect
+          for wheel in wheelhouse/*cp312*.whl; do unzip -q "$wheel" -d inspect; done
+          so=$(find inspect -name 'rsutil*.so' | head -1)
+          echo "== $so"; echo "-- linked libraries:"; otool -L "$so"
+          echo "-- minimum macOS:"; otool -l "$so" | grep -A4 LC_BUILD_VERSION
+          echo "-- bundled dylibs (expect none):"; find inspect -name '*.dylib' || true
+          echo "-- undefined symbols:"; nm -u "$so" | sort -u
 
       - name: Upload built wheels
         uses: actions/upload-artifact@v4
