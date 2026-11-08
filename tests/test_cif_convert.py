@@ -127,8 +127,10 @@ def _write(tmp_path: Path, text: str, name: str = "x.cif") -> Path:
     return path
 
 
-def test_bcc_unit_cell(tmp_path):
-    files, conversion = convert_cif(_write(tmp_path, BCC_FE), tmp_path / "o", ct=3.3)
+def test_bcc_conventional_cell(tmp_path):
+    files, conversion = convert_cif(
+        _write(tmp_path, BCC_FE), tmp_path / "o", ct=3.3, cell="conventional"
+    )
     lattice = f90nml.read(str(files.lattice))["lattice"]
     assert lattice["ntot"] == 2
     assert np.allclose(np.asarray(lattice["a"]).reshape(3, 3), np.eye(3))
@@ -138,9 +140,13 @@ def test_bcc_unit_cell(tmp_path):
     assert conversion.alat == pytest.approx(2.87)
 
 
-def test_supercell_keeps_primitive_alat(tmp_path):
+def test_supercell_keeps_conventional_alat(tmp_path):
     files, conversion = convert_cif(
-        _write(tmp_path, BCC_FE), tmp_path / "o", ct=3.3, supercell=(2, 1, 1)
+        _write(tmp_path, BCC_FE),
+        tmp_path / "o",
+        ct=3.3,
+        supercell=(2, 1, 1),
+        cell="conventional",
     )
     lattice = f90nml.read(str(files.lattice))["lattice"]
     assert lattice["ntot"] == 4
@@ -254,7 +260,7 @@ def test_suggest_ct_rejects_bad_min_atoms(bad):
 
 
 def test_ct_defaults_automatically_and_is_reported(tmp_path):
-    files, _ = convert_cif(_write(tmp_path, BCC_FE), tmp_path / "o")
+    files, _ = convert_cif(_write(tmp_path, BCC_FE), tmp_path / "o", cell="conventional")
     assert files.ct_auto and files.neighbors_min == files.neighbors_max == 15
     nml = f90nml.read(str(files.input))["lattice"]
     assert list(nml["ct"]) == [pytest.approx(files.ct, abs=0.005)] * 2
@@ -283,7 +289,12 @@ def test_setup_bulk_cif_writes_sources_before_setup(tmp_path):
     # conversion step must have happened and been reported either way.
     assert "Converted" in result.stdout and "chosen automatically" in result.stdout
     assert (work / "lattice.nml").is_file() and (work / "input.nml").is_file()
-    assert f90nml.read(str(work / "lattice.nml"))["lattice"]["ntot"] == 2
+    # body-centred Fe: the default is the 1-atom primitive cell
+    assert f90nml.read(str(work / "lattice.nml"))["lattice"]["ntot"] == 1
+    conventional = tmp_path / "conv"
+    conventional.mkdir()
+    result = _run_bulk(conventional, "--cif", str(cif), "--cell", "conventional")
+    assert f90nml.read(str(conventional / "lattice.nml"))["lattice"]["ntot"] == 2
 
 
 def test_setup_bulk_cif_refuses_to_overwrite_sources(tmp_path):
@@ -311,3 +322,151 @@ def test_setup_bulk_without_cif_is_unchanged(tmp_path):
     result = _run_bulk(work)  # no sources, no --cif: old missing-input error
     assert result.returncode == 1
     assert "Converted" not in result.stdout
+
+
+# --- primitive vs conventional cell ----------------------------------------
+
+FEN = DATA / "FeN_zincblende.cif"
+
+
+def _a_crd(path):
+    lattice = f90nml.read(str(path))["lattice"]
+    a = np.asarray(lattice["a"], dtype=float)
+    crd = np.asarray(lattice["crd"], dtype=float)
+    return lattice, a, (crd if crd.shape[1] == 3 else crd.T)
+
+
+def test_fcc_primitive_is_default_and_matches_cif2cell(tmp_path):
+    # Zinc-blende FeN: the CIF holds the 8-atom cubic cell; cif2cell gives the
+    # 2-atom primitive cell with these vectors and positions (units of alat).
+    files, conversion = convert_cif(FEN, tmp_path / "o", ct=3.0)
+    lattice, a, crd = _a_crd(files.lattice)
+    assert lattice["ntot"] == lattice["nbulk_bulk"] == lattice["nbas"] == lattice["nrec"] == 2
+    assert conversion.alat == pytest.approx(4.307)  # conventional length, not |a1|
+    assert np.allclose(a, [[0.5, 0.5, 0.0], [0.5, 0.0, 0.5], [0.0, 0.5, 0.5]])
+    assert np.allclose(crd, [[0, 0, 0], [0.25, 0.25, 0.25]])
+    assert list(lattice["izp"]) == [1, 2]
+    assert conversion.structure.metadata["centering"] == "F"
+    assert conversion.structure.metadata["cell"] == "primitive"
+    assert [site.element for site in conversion.structure.sites] == ["Fe", "N"]
+
+
+def test_conventional_cell_option_keeps_cubic_cell(tmp_path):
+    files, conversion = convert_cif(FEN, tmp_path / "o", ct=3.0, cell="conventional")
+    lattice, a, crd = _a_crd(files.lattice)
+    assert lattice["ntot"] == 8
+    assert np.allclose(a, np.eye(3))
+    assert conversion.structure.metadata["cell"] == "conventional"
+    assert [site.element for site in conversion.structure.sites] == ["Fe"] * 4 + ["N"] * 4
+
+
+def test_primitive_and_conventional_describe_the_same_crystal(tmp_path):
+    """Same density and same neighbour environment, whichever cell is written."""
+    prim = read_cif(FEN, cell="primitive").structure
+    conv = read_cif(FEN, cell="conventional").structure
+    volume = lambda s: abs(np.linalg.det(np.asarray(s.lattice_vectors)))  # noqa: E731
+    assert volume(conv) / volume(prim) == pytest.approx(4.0)
+    for ct in (3.0, 4.5):
+        assert sorted(set(neighbor_counts(prim, ct))) == sorted(set(neighbor_counts(conv, ct)))
+
+
+def test_primitive_default_leaves_primitive_lattices_untouched(converted):
+    # Ni2MnGa is a P lattice: the default must not alter or rotate it.
+    _, conversion = converted
+    assert conversion.structure.metadata["centering"] == "P"
+    assert len(conversion.structure.sites) == 24
+    assert np.allclose(
+        np.asarray(conversion.structure.lattice_vectors) / conversion.alat,
+        np.diag([1.0, 12.35 / 4.116, 5.822 / 4.116]),
+    )
+
+
+CENTERED = """data_x
+_cell_length_a {a}
+_cell_length_b {b}
+_cell_length_c {c}
+_cell_angle_alpha 90
+_cell_angle_beta 90
+_cell_angle_gamma {gamma}
+_symmetry_space_group_name_H-M '{sg}'
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_occupancy
+Fe1 Fe 0 0 0 1.0
+"""
+
+
+@pytest.mark.parametrize(
+    "sg, a, b, c, gamma, letter, conv_atoms",
+    [
+        ("C 1 2 1", 3.0, 4.0, 5.0, 90, "C", 2),   # base-centred
+        ("I 4/m m m", 3.0, 3.0, 5.0, 90, "I", 2),  # body-centred tetragonal
+        ("F m m m", 3.0, 4.0, 5.0, 90, "F", 4),   # face-centred orthorhombic
+        ("P m m m", 3.0, 4.0, 5.0, 90, "P", 1),   # primitive: unchanged
+    ],
+)
+def test_centering_types_reduce_to_one_atom(tmp_path, sg, a, b, c, gamma, letter, conv_atoms):
+    cif = _write(tmp_path, CENTERED.format(sg=sg, a=a, b=b, c=c, gamma=gamma), "c.cif")
+    conventional = read_cif(cif, cell="conventional")
+    primitive = read_cif(cif, cell="primitive")
+    assert len(conventional.structure.sites) == conv_atoms
+    assert len(primitive.structure.sites) == 1
+    assert primitive.structure.metadata["centering"] == letter
+    assert not primitive.warnings or all("primitive" not in w for w in primitive.warnings)
+    volume = lambda s: abs(np.linalg.det(np.asarray(s.lattice_vectors)))  # noqa: E731
+    assert volume(conventional.structure) / volume(primitive.structure) == pytest.approx(conv_atoms)
+    assert primitive.alat == pytest.approx(conventional.alat)
+
+
+def test_rejects_unknown_cell_choice(tmp_path):
+    with pytest.raises(CifConversionError, match="cell"):
+        read_cif(_write(tmp_path, BCC_FE), cell="niggli")
+
+
+def test_cli_cell_option(tmp_path):
+    out_p, out_c = tmp_path / "p", tmp_path / "c"
+    base = [sys.executable, "-m", "rsutil.cli", "setup", "cif", str(FEN), "--ct", "3.0"]
+    assert subprocess.run(base + ["-o", str(out_p)], capture_output=True, text=True).returncode == 0
+    assert subprocess.run(
+        base + ["-o", str(out_c), "--cell", "conventional"], capture_output=True, text=True
+    ).returncode == 0
+    assert f90nml.read(str(out_p / "lattice.nml"))["lattice"]["ntot"] == 2
+    assert f90nml.read(str(out_c / "lattice.nml"))["lattice"]["ntot"] == 8
+
+
+RHOMBOHEDRAL = """data_r
+_cell_length_a 3.0
+_cell_length_b 3.0
+_cell_length_c 8.0
+_cell_angle_alpha 90
+_cell_angle_beta 90
+_cell_angle_gamma 120
+loop_
+_symmetry_equiv_pos_as_xyz
+'x, y, z'
+'x+2/3, y+1/3, z+1/3'
+'x+1/3, y+2/3, z+2/3'
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_occupancy
+Fe1 Fe 0 0 0 1.0
+"""
+
+
+def test_rhombohedral_centering_reduces_to_one_atom(tmp_path):
+    cif = _write(tmp_path, RHOMBOHEDRAL, "r.cif")
+    conventional = read_cif(cif, cell="conventional")
+    primitive = read_cif(cif, cell="primitive")
+    assert len(conventional.structure.sites) == 3
+    assert len(primitive.structure.sites) == 1
+    assert primitive.structure.metadata["centering"] == "R"
+    volume = lambda s: abs(np.linalg.det(np.asarray(s.lattice_vectors)))  # noqa: E731
+    assert volume(conventional.structure) / volume(primitive.structure) == pytest.approx(3.0)

@@ -38,9 +38,18 @@ legacy `-S` flag is unchanged.
 - Fractional coordinates are wrapped into `[0, 1)`. pymatgen rounds values
   such as `0.3333` to `1/3`; this matches `cif2cell` and is reported as a
   warning.
-- `--supercell N1 N2 N3` replicates the cell as an ordered supercell;
-  `alat` keeps the unreplicated cell length. `--primitive` reduces to the
-  primitive cell.
+- **Cell choice.** By default a centred CIF cell (F, I, A, B, C, R) is reduced
+  to its **standard primitive cell**, as `cif2cell` does: for example the
+  8-atom cubic zinc-blende FeN cell becomes 2 atoms with
+  `a = (½,½,0), (½,0,½), (0,½,½)`. `--cell conventional` keeps the cell stored
+  in the CIF. Primitive lattices (P) are never changed. `alat` is the
+  conventional cell length in both cases. The F reduction is checked against
+  `cif2cell`; the I, A, B, C and R reductions use the usual crystallographic
+  primitive vectors and have not been compared with `cif2cell` output.
+  If the standard reduction cannot be applied, pymatgen's primitive cell is
+  used and a warning says that the vector orientation may differ.
+- `--supercell N1 N2 N3` replicates the (primitive or conventional) cell as an
+  ordered supercell; `alat` keeps the unreplicated length.
 
 ## Neighbour cutoff `ct`
 

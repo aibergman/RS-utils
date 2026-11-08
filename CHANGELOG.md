@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- CIF conversion now reduces centred cells to the standard primitive cell by default, matching `cif2cell` (e.g. 2 atoms for zinc-blende FeN instead of the 8-atom cubic cell). Use `--cell conventional` to keep the CIF cell; this replaces the `--primitive` flag of the unreleased converter.
 - `rsutil setup cif` / `rsutil.cif`: convert ordered CIF files to RS-LMTO `lattice.nml` and `input.nml` (pymatgen-based, one RS type per atom), validated against `cif2cell` output. See `docs/HT_CIF.md`.
 - `rsutil setup bulk --cif FILE` converts a CIF into the working directory and then runs the normal setup; `ct` is chosen automatically from a target neighbour count (`--ct-neighbors`, default 15) unless `--ct` is given.
 

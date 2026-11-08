@@ -11,6 +11,8 @@ structure onto the RS-LMTO source-namelist conventions:
 * symmetry is **not** used by RS-LMTO here, so every atom of the cell is its
   own electronic type: ``izp = no = iu = ib = irec = atom index``, and
   ``ntot = nbas = nrec = nbulk_bulk = ntype = number of atoms``;
+* centred cells (F, I, A, B, C, R) are reduced to the standard primitive cell by
+  default, as cif2cell does; ``cell="conventional"`` keeps the CIF cell;
 * atoms are ordered by descending atomic number, then by CIF site label,
   and labelled ``<Element><running count>`` (``Ga1``, ``Ga2``, ... ``Ni1``).
 
@@ -86,7 +88,7 @@ def _natural_key(text: str) -> tuple[Any, ...]:
     return tuple(int(part) if part.isdigit() else part for part in re.split(r"(\d+)", text))
 
 
-def _parse_structure(path: Path, *, primitive: bool, site_tolerance: float):
+def _parse_structure(path: Path, *, site_tolerance: float):
     try:
         from pymatgen.io.cif import CifParser
     except ImportError as exc:  # pragma: no cover - pymatgen is a core dependency
@@ -96,7 +98,7 @@ def _parse_structure(path: Path, *, primitive: bool, site_tolerance: float):
         warnings.simplefilter("always")
         try:
             parser = CifParser(str(path), site_tolerance=site_tolerance)
-            structures = parser.parse_structures(primitive=primitive, on_error="raise")
+            structures = parser.parse_structures(primitive=False, on_error="raise")
         except Exception as exc:  # pymatgen raises many exception types
             raise CifConversionError(f"could not parse CIF {path}: {exc}") from exc
     if not structures:
@@ -105,12 +107,124 @@ def _parse_structure(path: Path, *, primitive: bool, site_tolerance: float):
     return structures[0], messages
 
 
+# Centring translations (fractions of the conventional cell) and the standard
+# primitive vectors, as rows in conventional-cell units.  F matches cif2cell
+# ((1/2,1/2,0), (1/2,0,1/2), (0,1/2,1/2)); the others follow the usual
+# crystallographic (ITA-style) choices.
+_FACE_TRANSLATIONS = ((0.0, 0.5, 0.5), (0.5, 0.0, 0.5), (0.5, 0.5, 0.0))
+_BODY_TRANSLATION = (0.5, 0.5, 0.5)
+_RHOMBOHEDRAL_TRANSLATIONS = ((2 / 3, 1 / 3, 1 / 3), (1 / 3, 2 / 3, 2 / 3))
+_PRIMITIVE_VECTORS: dict[str, tuple[tuple[float, float, float], ...]] = {
+    "F": ((0.5, 0.5, 0.0), (0.5, 0.0, 0.5), (0.0, 0.5, 0.5)),
+    "I": ((-0.5, 0.5, 0.5), (0.5, -0.5, 0.5), (0.5, 0.5, -0.5)),
+    "A": ((1.0, 0.0, 0.0), (0.0, 0.5, -0.5), (0.0, 0.5, 0.5)),
+    "B": ((0.5, 0.0, -0.5), (0.0, 1.0, 0.0), (0.5, 0.0, 0.5)),
+    "C": ((0.5, -0.5, 0.0), (0.5, 0.5, 0.0), (0.0, 0.0, 1.0)),
+    "R": ((2 / 3, 1 / 3, 1 / 3), (-1 / 3, 1 / 3, 1 / 3), (-1 / 3, -2 / 3, 1 / 3)),
+}
+
+
+def _is_lattice_translation(pmg, shift, tolerance: float) -> bool:
+    """True if translating every site by ``shift`` (fractional) maps the cell onto itself."""
+
+    frac = np.asarray(pmg.frac_coords, dtype=float)
+    species = [site.species_string for site in pmg]
+    lattice = np.asarray(pmg.lattice.matrix, dtype=float)
+    moved = frac + np.asarray(shift, dtype=float)
+    for index, position in enumerate(moved):
+        delta = frac - position
+        delta -= np.round(delta)
+        distance = np.linalg.norm(delta @ lattice, axis=1)
+        same = [i for i, name in enumerate(species) if name == species[index]]
+        if not np.any(distance[same] < tolerance):
+            return False
+    return True
+
+
+def _detect_centering(pmg, tolerance: float = 0.02) -> str:
+    """Return the Bravais centring letter of the cell (``P`` if primitive)."""
+
+    faces = [_is_lattice_translation(pmg, t, tolerance) for t in _FACE_TRANSLATIONS]
+    if all(faces):
+        return "F"
+    if _is_lattice_translation(pmg, _BODY_TRANSLATION, tolerance):
+        return "I"
+    if faces[2]:
+        return "C"
+    if faces[0]:
+        return "A"
+    if faces[1]:
+        return "B"
+    if all(_is_lattice_translation(pmg, t, tolerance) for t in _RHOMBOHEDRAL_TRANSLATIONS):
+        return "R"
+    return "P"
+
+
+def _to_primitive(pmg, tolerance: float = 0.02):
+    """Reduce a conventional cell to its standard primitive cell.
+
+    Returns ``(structure, centering, note)``.  ``note`` is non-empty when the
+    standard reduction could not be applied and pymatgen's own primitive-cell
+    search was used instead (its vector orientation may differ).
+    """
+
+    from pymatgen.core import Lattice, Structure
+
+    centering = _detect_centering(pmg, tolerance)
+    if centering == "P":
+        return pmg, "P", ""
+
+    transform = np.asarray(_PRIMITIVE_VECTORS[centering], dtype=float)
+    lattice = Lattice(transform @ np.asarray(pmg.lattice.matrix, dtype=float))
+    expected = int(round(len(pmg) * abs(np.linalg.det(transform))))
+    inverse = np.linalg.inv(transform)
+
+    kept_frac: list[np.ndarray] = []
+    kept_species: list[Any] = []
+    kept_labels: list[str | None] = []
+    for site in pmg:
+        frac = np.mod(np.asarray(site.frac_coords, dtype=float) @ inverse, 1.0)
+        frac[np.isclose(frac, 1.0, atol=1e-9, rtol=0.0)] = 0.0
+        duplicate = False
+        for other, name in zip(kept_frac, kept_species):
+            if name != site.species_string:
+                continue
+            delta = frac - other
+            delta -= np.round(delta)
+            if np.linalg.norm(delta @ lattice.matrix) < tolerance:
+                duplicate = True
+                break
+        if not duplicate:
+            kept_frac.append(frac)
+            kept_species.append(site.species_string)
+            kept_labels.append(getattr(site, "label", None))
+
+    if len(kept_frac) != expected:
+        reduced = pmg.get_primitive_structure()
+        return (
+            reduced,
+            centering,
+            f"standard {centering}-centred primitive reduction found {len(kept_frac)} "
+            f"atoms instead of {expected}; used pymatgen's primitive cell "
+            "(lattice-vector orientation may differ from the standard one)",
+        )
+
+    by_name = {site.species_string: site.species for site in pmg}
+    structure = Structure(
+        lattice,
+        [by_name[name] for name in kept_species],
+        kept_frac,
+        labels=kept_labels,
+    )
+    return structure, centering, ""
+
+
 def read_cif(
     path: str | Path,
     *,
     alat: float | None = None,
     supercell: Sequence[int] = (1, 1, 1),
-    primitive: bool = False,
+    cell: str = "primitive",
     site_tolerance: float = 1e-4,
 ) -> CifConversion:
     """Read ``path`` and return a canonical :class:`RSStructure` in angstrom.
@@ -119,11 +233,13 @@ def read_cif(
     ----------
     alat:
         Length unit in angstrom for the written namelists.  Defaults to the
-        length of the first lattice vector of the (pre-supercell) cell.
+        length of the first lattice vector of the CIF (conventional) cell.
     supercell:
         Ordered replication ``(n1, n2, n3)`` applied after parsing.
-    primitive:
-        Reduce to the primitive cell instead of keeping the CIF cell.
+    cell:
+        ``"primitive"`` (default, as cif2cell) reduces a centred CIF cell to
+        its standard primitive cell; ``"conventional"`` keeps the CIF cell.
+        ``alat`` always refers to the conventional cell length unless given.
     site_tolerance:
         Fractional distance below which pymatgen merges duplicate sites.
     """
@@ -138,9 +254,10 @@ def read_cif(
     if len(repeat) != 3 or any(n < 1 for n in repeat):
         raise CifConversionError("supercell must be three positive integers")
 
-    pmg, parse_warnings = _parse_structure(
-        cif_path, primitive=primitive, site_tolerance=site_tolerance
-    )
+    if cell not in {"primitive", "conventional"}:
+        raise CifConversionError("cell must be 'primitive' or 'conventional'")
+
+    pmg, parse_warnings = _parse_structure(cif_path, site_tolerance=site_tolerance)
 
     if not pmg.is_ordered:
         disordered = sorted(
@@ -160,6 +277,20 @@ def read_cif(
     alat_value = unit_alat if alat is None else float(alat)
     if not np.isfinite(alat_value) or alat_value <= 0:
         raise CifConversionError("alat must be a positive, finite length in angstrom")
+
+    spacegroup = None
+    try:
+        from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
+
+        spacegroup = SpacegroupAnalyzer(pmg, symprec=1e-3).get_space_group_symbol()
+    except Exception:  # pragma: no cover - informational only
+        pass
+
+    centering = _detect_centering(pmg)
+    if cell == "primitive":
+        pmg, centering, note = _to_primitive(pmg)
+        if note:
+            parse_warnings = (*parse_warnings, note)
 
     if repeat != (1, 1, 1):
         pmg = pmg.copy()
@@ -203,14 +334,11 @@ def read_cif(
         "source_cif": cif_path.name,
         "alat_angstrom": alat_value,
         "supercell": list(repeat),
-        "primitive": bool(primitive),
+        "cell": cell,
+        "centering": centering,
     }
-    try:
-        from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
-
-        metadata["spacegroup"] = SpacegroupAnalyzer(pmg, symprec=1e-3).get_space_group_symbol()
-    except Exception:  # pragma: no cover - informational only
-        pass
+    if spacegroup:
+        metadata["spacegroup"] = spacegroup
 
     try:
         structure = RSStructure(
@@ -508,7 +636,7 @@ def convert_cif(
     ct_neighbors: int = 15,
     alat: float | None = None,
     supercell: Sequence[int] = (1, 1, 1),
-    primitive: bool = False,
+    cell: str = "primitive",
     r2: float | None = None,
     rc: float = 50,
     wav: float | None = None,
@@ -517,7 +645,7 @@ def convert_cif(
 ) -> tuple[RSInputFiles, CifConversion]:
     """Convenience wrapper: :func:`read_cif` then :func:`write_rs_input`."""
 
-    conversion = read_cif(cif, alat=alat, supercell=supercell, primitive=primitive)
+    conversion = read_cif(cif, alat=alat, supercell=supercell, cell=cell)
     files = write_rs_input(
         conversion,
         directory,
