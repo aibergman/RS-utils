@@ -89,6 +89,9 @@ rsutil --help
 # Basic bulk setup (reads lattice.nml and input.nml in the current directory)
 rsutil setup bulk
 
+# Empty-sphere setup with the optional Questaal FINDES backend
+rsutil setup bulk --empty_spheres --empty-sphere-backend questaal
+
 # Supercell setup
 rsutil setup bulk --supercell 1 1 2
 
@@ -127,6 +130,10 @@ rsutil setup bulk --lattice-dist 0.01 --basis-dist 0.02 --alat-scale 1.01 --seed
 ``rsutil -S`` and ``rsutil --setup`` remain supported as shortcuts for
 ``rsutil setup bulk``. The campaign workflow is separate and creates multiple
 setup directories from a campaign specification.
+
+The empty-sphere backend can also be selected through the Python setup API
+with ``SetupSpec(empty_spheres=True, empty_sphere_backend="questaal")``.
+The default backend remains ``xband``.
 
 ### Export workflows (`--export`, `--lmto47`)
 

@@ -3184,7 +3184,7 @@ Examples:
         "--empty-sphere-backend",
         choices=["xband", "questaal"],
         default="xband",
-        help="Empty-sphere algorithm (default: xband)",
+        help="Empty-sphere backend; requires --empty_spheres (default: xband; questaal uses FINDES)",
     )
     parser.add_argument(
         "--min_empty_radius",

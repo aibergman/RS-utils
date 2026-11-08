@@ -21,7 +21,9 @@ Setup features
 
 * periodic or free clusters and optional empty spheres, using the default
   ``xband`` backend or the revisioned ``questaal`` FINDES backend
-  (``empty_sphere_backend="questaal"`` / ``--empty-sphere-backend questaal``);
+  (``empty_sphere_backend="questaal"`` / ``--empty-sphere-backend questaal``).
+  The selection is used when ``empty_spheres=True`` / ``--empty_spheres``;
+  otherwise the backend setting has no effect;
 * supercell generation and seeded all-site SQS assignment;
 * reproducible lattice/basis Gaussian distortions and ``alat`` scaling;
 * 2D slab geometry with fixed or density-aware z margins;

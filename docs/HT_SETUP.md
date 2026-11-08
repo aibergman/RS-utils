@@ -14,7 +14,13 @@ from rsutil.setup import SetupService, write_setup_report
 
 source = Path("examples/bccFe")
 destination = Path("runs/bccFe-setup")
-spec = SetupSpec(seed=42, rec_method="block", rec_steps=20)
+spec = SetupSpec(
+    seed=42,
+    rec_method="block",
+    rec_steps=20,
+    empty_spheres=True,
+    empty_sphere_backend="questaal",
+)
 
 result = SetupService().run(
     source,
@@ -39,6 +45,10 @@ The optional `--preset KS` flag enables `use_kspace = .true.` in the
 `&self` namelist of the generated `input_new.nml`. Generated input also
 defaults `strux_backend` to `'strux_lib'` unless a backend is specified
 in the source `input.nml`.
+
+For empty-sphere calculations, `SetupSpec.empty_sphere_backend` accepts
+`"xband"` (the default) or `"questaal"`. The CLI equivalent is
+`--empty-sphere-backend questaal`, used together with `--empty_spheres`.
 
 The report is optional and does not change the ordinary human-readable
 console output. Its top-level schemas are `rsutil-setup-report-v1` and

@@ -26,7 +26,9 @@ _rsutil : ctypes.CDLL
 Functions
 ---------
 process_lattice() -> None
-    Python wrapper for the `process_lattice` Fortran routine.
+    Python wrapper for the `process_lattice` Fortran routine. Set
+    `empty_sphere_backend='questaal'` to use the Questaal FINDES backend;
+    the default is `xband`.
 
 Examples
 --------
@@ -34,6 +36,7 @@ Process a lattice structure:
 
     >>> from rsutil import process_lattice
     >>> process_lattice(cluster_type='periodic', empty_spheres=True)
+    >>> process_lattice(empty_spheres=True, empty_sphere_backend='questaal')
 
 Calculate band structure:
 
@@ -208,7 +211,11 @@ def process_lattice(cluster_type: str = "periodic", empty_spheres: bool = False,
                    mode_2d: bool = False, z_iso_factor: Optional[float] = None,
                    rec_steps: int = 20, rec_method: str = "block",
                    empty_sphere_backend: str = "xband") -> None:
-    """Compatibility wrapper for the historical in-process setup call."""
+    """Compatibility wrapper for the historical in-process setup call.
+
+    ``empty_sphere_backend`` accepts ``"xband"`` (default) or ``"questaal"``.
+    The Questaal FINDES backend is selected only when ``empty_spheres=True``.
+    """
     if cluster_type not in ["periodic", "free"]:
         raise ValueError(f"cluster_type must be 'periodic' or 'free', got '{cluster_type}'")
     _process_lattice_unsafe(

@@ -347,6 +347,9 @@ remain as compatibility shortcuts for this command.
 - ``rsutil setup bulk``: Process lattice and generate optimized atomic parameters.
 - ``--cluster``: Cluster type: ``periodic`` (default) or ``free``.
 - ``--empty_spheres``: Enable empty sphere calculations.
+- ``--empty-sphere-backend``: Choose ``xband`` (default) or ``questaal`` (the
+  revisioned Questaal FINDES implementation). This option only has an effect
+  when ``--empty_spheres`` is enabled.
 - ``--min_empty_radius``: Minimum empty sphere radius (default: 1.2).
 - ``--max_empty_radius``: Maximum empty sphere radius (default: 2.5).
 - ``--supercell NX NY NZ``: Repeat the input unit cell along the lattice vectors.
@@ -384,6 +387,9 @@ Generated ``input_new.nml`` uses ``strux_backend = 'strux_lib'`` in its
 
     # With empty spheres
     rsutil setup bulk --empty_spheres --min_empty_radius 1.0 --max_empty_radius 3.0
+
+    # Use the Questaal FINDES backend instead of the default XBand backend
+    rsutil setup bulk --empty_spheres --empty-sphere-backend questaal
 
     # Free cluster calculation
     rsutil setup bulk --cluster free
