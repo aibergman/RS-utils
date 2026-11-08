@@ -1,7 +1,8 @@
 # Reproducible HT testing
 
-The supported test environment is Python 3.9 or newer. CI exercises a
-Python 3.9 runtime import lane and the complete Python 3.11 suite on Linux.
+The supported test environment is Python 3.11 or newer. CI exercises the
+complete Python 3.11 suite on Linux, from both an editable install and an
+installed wheel.
 The HT test extra contains pytest, ASE, and the optional
 band-analysis dependencies used by the complete checked-in suite; the core
 runtime does not require ASE or PyVista.

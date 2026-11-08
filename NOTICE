@@ -1,0 +1,45 @@
+RS-utils
+Copyright (C) 2025-2026 Anders Bergman
+
+RS-utils is licensed under the GNU General Public License, version 3 only
+(see the LICENSE file). The Python code, tests, documentation and build files
+are original work of the author and its contributors.
+
+THIRD-PARTY AND DERIVED SOURCES
+===============================
+
+The Fortran sources under source/ include code adapted from earlier programs.
+Their origin and status are recorded here. This file is a statement of what is
+currently known; it will be updated as provenance is confirmed.
+
+1. source/spheres/defmtr.f90, empty.f90, radii.f90, utils.f90
+
+   Fortran 90 adaptations of the sphere routines (EMPTYSPHERES, EMPTY, GETEPOS,
+   REGET_RE, DEFMTR, RADII, ...) of the SPR-KKR/xband package (H. Ebert and
+   co-workers; the sources carry SPAG headers dated 26 March 2020). Those
+   routines in turn build on the LMTO47 program (the Stuttgart LMTO lineage of
+   O. K. Andersen, O. Jepsen and co-workers).
+
+   STATUS: written permission from the copyright holders to redistribute these
+   files under the GNU GPL v3 has NOT yet been confirmed. They must not be
+   published or distributed under this licence until it has been.
+
+2. source/spheres/utils.f90 (additionally)
+
+   Contains auxiliary routines originating from the netlib reference
+   LAPACK (version 2.0) and BLAS libraries (DLAMC1-DLAMC5, LSAME, IDAMAX,
+   DCOPY, DSCAL and related helpers), and an atomic Dirac-equation solver
+   (RHFDS and its helpers) of the same xband/LMTO47 lineage as item 1.
+
+3. source/potpars/lmto_lib.f90, source/potpars/potpar_wrapper.f90,
+   source/io/atom_io.f90
+
+   Default potential-parameter tables and formulas (DEFPP, DEFMOM, DEFCNF,
+   screening constants) follow the LMTO47 conventions; source comments cite
+   "Kampur notes" (Eq. 3.94) and the screening constants of O. Jepsen.
+   STATUS: a routine-by-routine provenance audit has not been completed.
+
+An independent comparison with the Questaal package found no evidence that
+these routines were copied from Questaal (whose empty-sphere finder, FINDES,
+is a separate implementation); Questaal's licence therefore does not apply to
+them.

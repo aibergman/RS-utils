@@ -6,4 +6,4 @@ import rsutil.export
 import rsutil.viz.glyphs
 
 
-print("Python 3.9 import smoke test passed")
+print("Import smoke test passed")
