@@ -8,6 +8,19 @@ module rsutil_c_interface
 
 contains
 
+subroutine rsutil_set_empty_sphere_backend(backend_str) bind(c,name='rsutil_set_empty_sphere_backend')
+   use iso_c_binding, only: c_char, c_null_char
+   implicit none
+   character(kind=c_char), intent(in) :: backend_str(*)
+   integer :: i
+   empty_sphere_backend = ' '
+   i = 1
+   do while (backend_str(i) /= c_null_char .and. i <= len(empty_sphere_backend))
+      empty_sphere_backend(i:i) = backend_str(i)
+      i = i + 1
+   end do
+end subroutine rsutil_set_empty_sphere_backend
+
 subroutine process_lattice(cluster_type_str, empty_spheres_flag, min_radius, max_radius, &
                            lmax_flag, lattice_dist, basis_dist, alat_scale, &
                            seed_flag, seed_value, mode_2d_flag, z_iso_factor_in, &

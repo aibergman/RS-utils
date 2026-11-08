@@ -289,6 +289,7 @@ class SetupSpec:
     sqs_steps: int = 5000
     sqs_seed: int | None = None
     preset: str | None = None
+    empty_sphere_backend: str = "xband"
 
     def __post_init__(self) -> None:
         if not isinstance(self.cluster_type, str) or self.cluster_type not in {"periodic", "free"}:
@@ -299,6 +300,8 @@ class SetupSpec:
             "lanczos",
         }:
             raise ValidationError("rec_method must be block, chebyshev, or lanczos")
+        if self.empty_sphere_backend not in {"xband", "questaal"}:
+            raise ValidationError("empty_sphere_backend must be 'xband' or 'questaal'")
         if not 0 <= self.lmx <= 3:
             raise ValidationError("lmx must be in [0, 3]")
         for field_name in ("min_empty_radius", "max_empty_radius", "lattice_dist", "basis_dist", "alat_scale"):
@@ -344,6 +347,7 @@ class SetupSpec:
         values = {
             "cluster_type": self.cluster_type,
             "empty_spheres": self.empty_spheres,
+            "empty_sphere_backend": self.empty_sphere_backend,
             "min_empty_radius": self.min_empty_radius,
             "max_empty_radius": self.max_empty_radius,
             "lmx": self.lmx,

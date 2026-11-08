@@ -129,6 +129,9 @@ if lib_path is not None:
             ctypes.c_int, ctypes.c_double, ctypes.c_int, ctypes.c_int
         ]
         _rsutil.process_lattice.restype = None
+        if hasattr(_rsutil, "rsutil_set_empty_sphere_backend"):
+            _rsutil.rsutil_set_empty_sphere_backend.argtypes = [ctypes.c_char_p]
+            _rsutil.rsutil_set_empty_sphere_backend.restype = None
     except Exception as e:
         import warnings
         warnings.warn(f"Could not load rsutil shared library: {e}. Some Fortran functionality will be unavailable.")
@@ -144,7 +147,8 @@ def _process_lattice_unsafe(cluster_type: str = "periodic", empty_spheres: bool 
                             lmx: int = 2, lattice_dist: float = 0.0, basis_dist: float = 0.0,
                             alat_scale: float = 1.0, seed: Optional[int] = None,
                             mode_2d: bool = False, z_iso_factor: Optional[float] = None,
-                            rec_steps: int = 20, rec_method: str = "block") -> None:
+                            rec_steps: int = 20, rec_method: str = "block",
+                            empty_sphere_backend: str = "xband") -> None:
     """Invoke the legacy ctypes entry point in the current process.
 
     This function is deliberately explicit about being unsafe: the Fortran
@@ -155,6 +159,12 @@ def _process_lattice_unsafe(cluster_type: str = "periodic", empty_spheres: bool 
     """
     if _rsutil is None:
         raise RuntimeError("The rsutil shared library is not available. Please rebuild the package with: pip install .")
+    if empty_sphere_backend not in {"xband", "questaal"}:
+        raise ValueError("empty_sphere_backend must be 'xband' or 'questaal'")
+    if empty_sphere_backend == "questaal" and not hasattr(_rsutil, "rsutil_set_empty_sphere_backend"):
+        raise RuntimeError("The loaded rsutil library lacks the Questaal FINDES backend; rebuild RS-utils")
+    if hasattr(_rsutil, "rsutil_set_empty_sphere_backend"):
+        _rsutil.rsutil_set_empty_sphere_backend(empty_sphere_backend.encode("ascii"))
 
     # Convert empty_spheres boolean to integer (0 or 1)
     empty_spheres_int = ctypes.c_int(1 if empty_spheres else 0)
@@ -196,13 +206,15 @@ def process_lattice(cluster_type: str = "periodic", empty_spheres: bool = False,
                    lmx: int = 2, lattice_dist: float = 0.0, basis_dist: float = 0.0,
                    alat_scale: float = 1.0, seed: Optional[int] = None,
                    mode_2d: bool = False, z_iso_factor: Optional[float] = None,
-                   rec_steps: int = 20, rec_method: str = "block") -> None:
+                   rec_steps: int = 20, rec_method: str = "block",
+                   empty_sphere_backend: str = "xband") -> None:
     """Compatibility wrapper for the historical in-process setup call."""
     if cluster_type not in ["periodic", "free"]:
         raise ValueError(f"cluster_type must be 'periodic' or 'free', got '{cluster_type}'")
     _process_lattice_unsafe(
         cluster_type=cluster_type,
         empty_spheres=empty_spheres,
+        empty_sphere_backend=empty_sphere_backend,
         min_empty_radius=min_empty_radius,
         max_empty_radius=max_empty_radius,
         lmx=lmx,

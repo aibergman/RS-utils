@@ -24,10 +24,21 @@ set(LIB_SOURCES
     ${SOURCE_DIR}/potpars/potpar_wrapper.f90
     ${SOURCE_DIR}/spheres/defmtr.f90
     ${SOURCE_DIR}/spheres/empty.f90
+    ${SOURCE_DIR}/spheres/questaal_sphere_resize.f90
     ${SOURCE_DIR}/spheres/radii.f90
+    ${SOURCE_DIR}/spheres/questaal_findes_backend.f90
     ${SOURCE_DIR}/spheres/sphere.f90
     ${SOURCE_DIR}/spheres/utils.f90
+    ${CMAKE_CURRENT_SOURCE_DIR}/vendor/questaal_findes/structures.f90
+    ${CMAKE_CURRENT_SOURCE_DIR}/vendor/questaal_findes/findes_resize_bridge.f90
+    ${CMAKE_CURRENT_SOURCE_DIR}/vendor/questaal_findes/legacy_runtime.f90
+    ${CMAKE_CURRENT_SOURCE_DIR}/vendor/questaal_findes/findes.f
 )
+
+if(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+    set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/vendor/questaal_findes/findes.f PROPERTIES
+        COMPILE_OPTIONS "-std=legacy;-ffixed-line-length-none;-fallow-argument-mismatch")
+endif()
 
 # Create the static library named rsutil_lib
 add_library(rsutil_lib STATIC ${LIB_SOURCES})

@@ -2710,6 +2710,7 @@ def _run_setup_cli(args):
         spec = SetupSpec(
             cluster_type=args.cluster,
             empty_spheres=args.empty_spheres,
+            empty_sphere_backend=args.empty_sphere_backend,
             min_empty_radius=args.min_empty_radius,
             max_empty_radius=args.max_empty_radius,
             lmx=args.lmx,
@@ -2755,6 +2756,7 @@ def _run_setup_cli(args):
     print(f"  Cluster type:      {spec.cluster_type}")
     print(f"  Empty spheres:     {'enabled' if spec.empty_spheres else 'disabled'}")
     if spec.empty_spheres:
+        print(f"  Sphere backend:    {spec.empty_sphere_backend}")
         print(f"  Min radius:        {spec.min_empty_radius}")
         print(f"  Max radius:        {spec.max_empty_radius}")
     print(f"  LMAX override:     {spec.lmx}")
@@ -3177,6 +3179,12 @@ Examples:
         action="store_true",
         default=False,
         help="Enable empty sphere calculations",
+    )
+    parser.add_argument(
+        "--empty-sphere-backend",
+        choices=["xband", "questaal"],
+        default="xband",
+        help="Empty-sphere algorithm (default: xband)",
     )
     parser.add_argument(
         "--min_empty_radius",

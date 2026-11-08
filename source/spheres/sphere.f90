@@ -151,7 +151,8 @@ contains
 
 
     subroutine perform_calculations()
-        use rsutil_config, only: enable_empty_spheres
+        use rsutil_config, only: enable_empty_spheres, empty_sphere_backend, min_empty_sphere_radius, max_empty_sphere_radius
+        use questaal_findes_backend, only: add_questaal_empty_spheres
         implicit none
 
         ! Local variables
@@ -169,6 +170,9 @@ contains
         real*8 :: ZN, ZZ(MAX2SORT)
 
         real*8 :: DNEVMOD
+        real*8, allocatable :: quest_basis(:,:), quest_radii(:)
+        integer, allocatable :: quest_species(:)
+        integer :: quest_status
         open(unit=16, file='spheres.log', status='unknown', action='write')
         call WKINIT(MAXDIM)
         call GETGBASIS()
@@ -239,11 +243,27 @@ contains
         NATOMNEW = NATOM
         
         if (NEED_ES == 0 .and. enable_empty_spheres) then
-            call EMPTYSPHERES(AV, BV, CV, BAS, IMQ, ALAT, NATOM, NSORT, RWS, NSORTES, TAUES, SES, MAX2SORT, ITOP, IQA, NG, &
-               ISNEW, BASNEW, NATOMNEW)
-            do I = NATOM+1, NATOMNEW
-                RWS(I) = SES(ISNEW(I)-NM)
-            end do
+            if (trim(empty_sphere_backend) == "questaal") then
+                call add_questaal_empty_spheres(reshape([AV,BV,CV],[3,3]), ALAT, BAS(:,1:NATOM), Z(1:NATOM), &
+                    RWS(1:NATOM), RMINES, RMAXES, quest_basis, quest_species, quest_radii, quest_status)
+                if (quest_status /= 0) error stop 'Questaal FINDES backend rejected this lattice'
+                NATOMNEW = size(quest_radii)
+                BASNEW(:,1:NATOMNEW) = quest_basis
+                ISNEW(1:NATOMNEW) = quest_species
+                do I = 1, NATOMNEW
+                    IMQ(I) = quest_species(I)
+                    RWS(I) = quest_radii(I)
+                end do
+                NSORTES = NATOMNEW-NATOM
+                if (NSORTES > 0) SES(1:NSORTES) = quest_radii(NATOM+1:NATOMNEW)
+                deallocate(quest_basis, quest_species, quest_radii)
+            else
+                call EMPTYSPHERES(AV, BV, CV, BAS, IMQ, ALAT, NATOM, NSORT, RWS, NSORTES, TAUES, SES, MAX2SORT, ITOP, IQA, NG, &
+                   ISNEW, BASNEW, NATOMNEW)
+                do I = NATOM+1, NATOMNEW
+                    RWS(I) = SES(ISNEW(I)-NM)
+                end do
+            end if
         else
             do IATOM = 1, NATOM
                 ISNEW(IATOM) = IMQ(IATOM)
@@ -256,6 +276,7 @@ contains
     end subroutine perform_calculations
 
     subroutine export_structure(basis, radii)
+        use rsutil_config, only: empty_sphere_backend
         implicit none
 
         ! Arguments
@@ -271,12 +292,17 @@ contains
 
         do I = 1, NATOMNEW
             basis(:, I) = BASNEW(:, I)
-            radii(I) = RWS(IMQ(I))
+            if (trim(empty_sphere_backend) == "questaal") then
+                radii(I) = RWS(I)
+            else
+                radii(I) = RWS(IMQ(I))
+            end if
         end do
 
     end subroutine export_structure
 
     subroutine write_output()
+        use rsutil_config, only: empty_sphere_backend
         implicit none
 
         ! Local variables
@@ -288,7 +314,13 @@ contains
         do I = 1, NATOMNEW
             ISR = ISNEW(I)
             if (I <= NATOM) then
-                write (22, 99001) ISNEW(I), (BASNEW(J, I), J=1, 3), RWS(IMQ(I)), ' / A/'
+                if (trim(empty_sphere_backend) == "questaal") then
+                    write (22, 99001) ISNEW(I), (BASNEW(J, I), J=1, 3), RWS(I), ' / A/'
+                else
+                    write (22, 99001) ISNEW(I), (BASNEW(J, I), J=1, 3), RWS(IMQ(I)), ' / A/'
+                end if
+            else if (trim(empty_sphere_backend) == "questaal") then
+                write (22, 99001) ISR, (BASNEW(J, I), J=1, 3), RWS(I), ' / E/'
             else
                 write (22, 99001) ISR, (BASNEW(J, I), J=1, 3), SES(ISR - NM), ' / E/'
             end if

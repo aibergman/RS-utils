@@ -27,6 +27,7 @@ from .setup_validation import validate_setup_outputs
 _WORKER_PARAMETERS = (
     "cluster_type",
     "empty_spheres",
+    "empty_sphere_backend",
     "min_empty_radius",
     "max_empty_radius",
     "lmx",

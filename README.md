@@ -416,4 +416,5 @@ described.
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the GNU Affero General Public License, version 3 or later.
+See [LICENSE](LICENSE) for the license identifier and official license text link.

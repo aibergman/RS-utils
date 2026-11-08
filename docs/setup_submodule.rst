@@ -19,7 +19,9 @@ Setup features
 
 ``SetupSpec`` and the CLI support:
 
-* periodic or free clusters and optional empty spheres;
+* periodic or free clusters and optional empty spheres, using the default
+  ``xband`` backend or the revisioned ``questaal`` FINDES backend
+  (``empty_sphere_backend="questaal"`` / ``--empty-sphere-backend questaal``);
 * supercell generation and seeded all-site SQS assignment;
 * reproducible lattice/basis Gaussian distortions and ``alat`` scaling;
 * 2D slab geometry with fixed or density-aware z margins;
@@ -47,6 +49,11 @@ Typical service use
 The setup manifest records input/output hashes, normalized parameters,
 structure identity, software/environment metadata, timestamps, and stochastic
 provenance.  It is an evidence record and should be retained with a run.
+
+The Questaal adapter uses identity symmetry, matching the symmetry information
+currently passed by RS-utils' xband path.  The vendored source revision,
+adaptation boundary, and AGPL provenance are recorded in
+``vendor/questaal_findes/README.md``.
 
 Validation API
 --------------

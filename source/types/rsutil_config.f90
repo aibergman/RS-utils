@@ -6,6 +6,7 @@ module rsutil_config
 
   character(len=20) :: cluster_type = "periodic"
   logical :: enable_empty_spheres = .false.
+  character(len=16) :: empty_sphere_backend = "xband"
   real(rp) :: min_empty_sphere_radius = 1.2_rp
   real(rp) :: max_empty_sphere_radius = 2.5_rp
   integer :: lmax_override = -1
