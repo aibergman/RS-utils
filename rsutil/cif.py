@@ -17,7 +17,9 @@ structure onto the RS-LMTO source-namelist conventions:
 Partially occupied (disordered) CIFs are rejected rather than silently
 collapsed to the majority species.
 
-The cutoff ``ct`` has no safe structure-derived default and must be given.
+The cutoff ``ct`` is the neighbour cutoff (angstrom).  Unless given, it is
+chosen by :func:`suggest_ct` so every atom has at least ``ct_neighbors`` atoms
+(itself included) inside the cutoff, typically 15 for bcc and 19 for fcc.
 """
 
 from __future__ import annotations
@@ -55,6 +57,11 @@ class RSInputFiles:
     directory: Path
     lattice: Path
     input: Path
+    ct: float = 0.0
+    r2: float = 0.0
+    ct_auto: bool = False
+    neighbors_min: int = 0
+    neighbors_max: int = 0
 
 
 # Groups written verbatim after &lattice/&atoms when no template is supplied.
@@ -217,6 +224,76 @@ def read_cif(
     return CifConversion(structure=structure, alat=alat_value, warnings=parse_warnings)
 
 
+def _pymatgen_structure(structure: RSStructure):
+    from pymatgen.core import Lattice, Structure
+
+    return Structure(
+        Lattice(np.asarray(structure.lattice_vectors, dtype=float)),
+        [site.element for site in structure.sites],
+        [site.position for site in structure.sites],
+        coords_are_cartesian=True,
+    )
+
+
+def neighbor_counts(structure: RSStructure, ct: float) -> tuple[int, ...]:
+    """Atoms within ``ct`` angstrom of each site, counting the site itself."""
+
+    if structure.length_unit.lower() not in {"angstrom", "å"}:
+        raise CifConversionError("structure lengths must be in angstrom")
+    centers, _, _, _ = _pymatgen_structure(structure).get_neighbor_list(float(ct))
+    counts = np.bincount(centers, minlength=len(structure.sites)) + 1
+    return tuple(int(c) for c in counts)
+
+
+def suggest_ct(
+    structure: RSStructure,
+    *,
+    min_atoms: int = 15,
+    margin: float = 0.3,
+    shell_tol: float = 0.1,
+) -> float:
+    """Pick a neighbour cutoff ``ct`` (angstrom) for ``structure``.
+
+    The cutoff is the smallest radius at which **every** atom has at least
+    ``min_atoms`` atoms within it (itself included), extended to the end of
+    that neighbour shell (distances within ``shell_tol`` of each other form
+    one shell, so a split shell is never cut through) and then placed
+    ``margin`` beyond it, or half the gap to the next shell if that is
+    smaller.  This gives 15 atoms for bcc and 19 for fcc.
+    """
+
+    if not isinstance(min_atoms, int) or isinstance(min_atoms, bool) or min_atoms < 2:
+        raise CifConversionError("ct_neighbors must be an integer >= 2")
+    if structure.length_unit.lower() not in {"angstrom", "å"}:
+        raise CifConversionError("structure lengths must be in angstrom")
+    if len(structure.sites) == 0:
+        raise CifConversionError("cannot choose ct for a structure without sites")
+    pmg = _pymatgen_structure(structure)
+    n_sites = len(structure.sites)
+    radius = max(3.0, float(np.cbrt(pmg.volume / n_sites)) * 1.6)
+    for _ in range(12):
+        centers, _, _, dist = pmg.get_neighbor_list(radius)
+        per_site = [np.sort(dist[centers == i]) for i in range(n_sites)]
+        if all(len(d) >= min_atoms - 1 for d in per_site):
+            reach = max(float(d[min_atoms - 2]) for d in per_site)
+            all_d = np.unique(np.round(dist, 6))
+            end = reach
+            while True:
+                later = all_d[all_d > end + 1e-9]
+                if later.size and later[0] - end < shell_tol:
+                    end = float(later[0])
+                    continue
+                break
+            later = all_d[all_d > end + 1e-9]
+            if later.size:  # next shell is inside the search radius: gap is known
+                gap = float(later[0]) - end
+                return round(end + min(margin, gap / 2.0), 2)
+        radius *= 1.5
+    raise CifConversionError(
+        f"could not choose ct for {min_atoms} neighbours; pass ct explicitly"
+    )
+
+
 def _fmt(value: float) -> str:
     # 10 decimals like cif2cell; normalise negative zero.
     text = f"{value:.10f}"
@@ -298,7 +375,7 @@ def format_input_nml(
     wav: float | None = None,
     template: str | Path | Mapping[str, Any] | None = None,
     header: str = "",
-) -> str:
+) -> str:  # ``ct`` is resolved by the caller (see write_rs_input)
     """Return ``input.nml`` text.
 
     ``&lattice`` and ``&atoms`` are generated from the structure; every other
@@ -360,14 +437,19 @@ def write_rs_input(
     conversion: CifConversion,
     directory: str | Path,
     *,
-    ct: float,
+    ct: float | None = None,
+    ct_neighbors: int = 15,
     r2: float | None = None,
     rc: float = 50,
     wav: float | None = None,
     template: str | Path | Mapping[str, Any] | None = None,
     overwrite: bool = False,
 ) -> RSInputFiles:
-    """Write ``lattice.nml`` and ``input.nml`` into ``directory``."""
+    """Write ``lattice.nml`` and ``input.nml`` into ``directory``.
+
+    If ``ct`` is omitted it is chosen by :func:`suggest_ct` with
+    ``ct_neighbors`` atoms per site.
+    """
 
     destination = Path(directory).expanduser()
     lattice_path = destination / "lattice.nml"
@@ -378,6 +460,12 @@ def write_rs_input(
             "pass overwrite=True to replace them"
         )
     structure = conversion.structure
+    ct_auto = ct is None
+    if ct is None:
+        ct = suggest_ct(structure, min_atoms=ct_neighbors)
+    elif not np.isfinite(ct) or ct <= 0:
+        raise CifConversionError("ct must be a positive, finite cutoff")
+    counts = neighbor_counts(structure, float(ct))
     source = structure.metadata.get("source_cif", "CIF")
     header = (
         f"! Generated by rsutil.cif from {source}\n"
@@ -400,14 +488,24 @@ def write_rs_input(
     destination.mkdir(parents=True, exist_ok=True)
     lattice_path.write_text(lattice_text, encoding="utf-8")
     input_path.write_text(input_text, encoding="utf-8")
-    return RSInputFiles(destination, lattice_path, input_path)
+    return RSInputFiles(
+        destination,
+        lattice_path,
+        input_path,
+        ct=float(ct),
+        r2=float(ct) ** 2 if r2 is None else float(r2),
+        ct_auto=ct_auto,
+        neighbors_min=min(counts),
+        neighbors_max=max(counts),
+    )
 
 
 def convert_cif(
     cif: str | Path,
     directory: str | Path,
     *,
-    ct: float,
+    ct: float | None = None,
+    ct_neighbors: int = 15,
     alat: float | None = None,
     supercell: Sequence[int] = (1, 1, 1),
     primitive: bool = False,
@@ -424,6 +522,7 @@ def convert_cif(
         conversion,
         directory,
         ct=ct,
+        ct_neighbors=ct_neighbors,
         r2=r2,
         rc=rc,
         wav=wav,
@@ -441,6 +540,8 @@ __all__ = [
     "convert_cif",
     "format_input_nml",
     "format_lattice_nml",
+    "neighbor_counts",
     "read_cif",
+    "suggest_ct",
     "write_rs_input",
 ]

@@ -6,14 +6,25 @@
 already a core dependency.
 
 ```bash
-rsutil setup cif Ni2MnGa.cif --ct 4.3 -o runs/Ni2MnGa
+# convert only
+rsutil setup cif Ni2MnGa.cif -o runs/Ni2MnGa
+
+# convert into the current directory, then run the normal validated setup
+rsutil setup bulk --cif Ni2MnGa.cif
 ```
 
 ```python
 from rsutil.cif import convert_cif
 
-files, conversion = convert_cif("Ni2MnGa.cif", "runs/Ni2MnGa", ct=4.3)
+files, conversion = convert_cif("Ni2MnGa.cif", "runs/Ni2MnGa")
+print(files.ct, files.neighbors_min)
 ```
+
+`setup bulk --cif` writes `lattice.nml` and `input.nml` into the working
+directory and refuses to replace existing ones unless `--overwrite-source` is
+given. The CIF is converted as one unit cell; the setup's own `--supercell`
+and `--sqs` then apply as usual, so the cell is never replicated twice. The
+legacy `-S` flag is unchanged.
 
 ## Conventions
 
@@ -31,12 +42,27 @@ files, conversion = convert_cif("Ni2MnGa.cif", "runs/Ni2MnGa", ct=4.3)
   `alat` keeps the unreplicated cell length. `--primitive` reduces to the
   primitive cell.
 
+## Neighbour cutoff `ct`
+
+`ct` is the neighbour cutoff in Å. Unless `--ct` is given it is chosen so that
+**every** atom has at least `--ct-neighbors` atoms within it, the atom itself
+included (default 15, which is the bcc value; fcc gives 19):
+
+1. take the smallest radius at which every atom has that many atoms;
+2. extend it to the end of that neighbour shell, treating distances within
+   0.1 Å as one shell so a distorted, split shell is never cut through;
+3. place `ct` 0.3 Å beyond it, or half the gap to the next shell if smaller.
+
+For a bcc cell this encloses 8 + 6 neighbours plus the atom (15); for fcc
+12 + 6 plus the atom (19); for B2 FeCo with `alat = 3.0` it gives `ct = 3.3`.
+The chosen `ct` and the atoms per site are printed. Use `--ct-neighbors 19`
+(or an explicit `--ct`) for a larger cluster; complex or distorted structures
+are often run with more than 15. `r2` defaults to `ct**2`.
+
 ## What is *not* derived from the CIF
 
-`ct` has no safe structure-derived default and must be supplied; `r2`
-defaults to `ct**2`. `rc`, `wav`, and the `&calculation`, `&self`,
-`&energy`, `&control`, `&mix`, and `&hamiltonian` groups are settings to
-review. Pass `--template input.nml` to reuse the non-structural groups from an
+`rc`, `wav`, and the `&calculation`, `&self`, `&energy`, `&control`, `&mix`,
+and `&hamiltonian` groups are settings to review. Pass `--template input.nml` to reuse the non-structural groups from an
 existing input instead of the built-in defaults.
 
 ## Limitations

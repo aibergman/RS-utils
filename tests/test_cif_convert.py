@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -195,3 +196,118 @@ def test_cli_setup_cif(tmp_path):
 
     again = subprocess.run(cmd, capture_output=True, text=True)
     assert again.returncode == 1 and "overwrite" in again.stderr
+
+
+# --- automatic ct ----------------------------------------------------------
+
+from rsutil.cif import neighbor_counts, suggest_ct
+from rsutil.core import RSStructure, StructureSite
+
+
+def _structure(cell, positions, element="Fe"):
+    return RSStructure(
+        lattice_vectors=np.asarray(cell, dtype=float),
+        length_unit="angstrom",
+        sites=tuple(
+            StructureSite(index=i, position=tuple(p), element=element)
+            for i, p in enumerate(positions)
+        ),
+    )
+
+
+def test_suggest_ct_bcc_gives_15_atoms():
+    a = 2.87
+    bcc = _structure(np.eye(3) * a, [(0, 0, 0), (a / 2, a / 2, a / 2)])
+    ct = suggest_ct(bcc)
+    assert set(neighbor_counts(bcc, ct)) == {15}
+    assert a < ct < a * np.sqrt(2)  # between the 2nd and 3rd shells
+
+
+def test_suggest_ct_fcc_gives_19_atoms():
+    a = 3.6
+    fcc = _structure(
+        np.eye(3) * a, [(0, 0, 0), (a / 2, a / 2, 0), (a / 2, 0, a / 2), (0, a / 2, a / 2)], "Cu"
+    )
+    assert set(neighbor_counts(fcc, suggest_ct(fcc))) == {19}
+
+
+def test_suggest_ct_reproduces_feco_reference_cutoff():
+    feco = _structure(np.eye(3) * 3.0, [(0, 0, 0), (1.5, 1.5, 1.5)])
+    assert suggest_ct(feco) == pytest.approx(3.3)
+
+
+def test_suggest_ct_respects_min_atoms_and_shell_splitting(converted):
+    _, conversion = converted
+    structure = conversion.structure  # distorted, shells split by ~0.05 A
+    for wanted in (15, 19, 27):
+        ct = suggest_ct(structure, min_atoms=wanted)
+        counts = neighbor_counts(structure, ct)
+        assert min(counts) >= wanted
+        # no site may gain an atom from a split shell: counts are uniform
+        assert len(set(counts)) == 1
+
+
+@pytest.mark.parametrize("bad", [1, 0, -3, True])
+def test_suggest_ct_rejects_bad_min_atoms(bad):
+    with pytest.raises(CifConversionError, match="ct_neighbors"):
+        suggest_ct(_structure(np.eye(3) * 2.87, [(0, 0, 0)]), min_atoms=bad)
+
+
+def test_ct_defaults_automatically_and_is_reported(tmp_path):
+    files, _ = convert_cif(_write(tmp_path, BCC_FE), tmp_path / "o")
+    assert files.ct_auto and files.neighbors_min == files.neighbors_max == 15
+    nml = f90nml.read(str(files.input))["lattice"]
+    assert list(nml["ct"]) == [pytest.approx(files.ct, abs=0.005)] * 2
+    assert nml["r2"] == pytest.approx(files.ct**2)
+    explicit, _ = convert_cif(_write(tmp_path, BCC_FE), tmp_path / "p", ct=3.3)
+    assert not explicit.ct_auto and explicit.ct == 3.3
+
+
+# --- setup bulk --cif ------------------------------------------------------
+
+
+def _run_bulk(cwd, *extra):
+    cmd = [sys.executable, "-m", "rsutil.cli", "setup", "bulk", *extra]
+    # setup bulk works in the current directory, so run there and make the
+    # (possibly uninstalled) package importable from the repository root.
+    env = {**os.environ, "PYTHONPATH": str(Path(__file__).resolve().parents[1])}
+    return subprocess.run(cmd, capture_output=True, text=True, cwd=cwd, env=env)
+
+
+def test_setup_bulk_cif_writes_sources_before_setup(tmp_path):
+    cif = _write(tmp_path, BCC_FE, "fe.cif")
+    work = tmp_path / "work"
+    work.mkdir()
+    result = _run_bulk(work, "--cif", str(cif))
+    # Whether the Fortran kernel is available decides the exit status; the
+    # conversion step must have happened and been reported either way.
+    assert "Converted" in result.stdout and "chosen automatically" in result.stdout
+    assert (work / "lattice.nml").is_file() and (work / "input.nml").is_file()
+    assert f90nml.read(str(work / "lattice.nml"))["lattice"]["ntot"] == 2
+
+
+def test_setup_bulk_cif_refuses_to_overwrite_sources(tmp_path):
+    cif = _write(tmp_path, BCC_FE, "fe.cif")
+    work = tmp_path / "work"
+    work.mkdir()
+    (work / "lattice.nml").write_text("&lattice\n/\n")
+    result = _run_bulk(work, "--cif", str(cif))
+    assert result.returncode == 1 and "--overwrite-source" in result.stderr
+    assert (work / "lattice.nml").read_text() == "&lattice\n/\n"  # untouched
+
+
+def test_setup_bulk_cif_rejects_disorder(tmp_path):
+    cif = _write(tmp_path, DISORDERED, "alloy.cif")
+    work = tmp_path / "work"
+    work.mkdir()
+    result = _run_bulk(work, "--cif", str(cif))
+    assert result.returncode == 1 and "partially occupied" in result.stderr
+    assert not (work / "lattice.nml").exists()
+
+
+def test_setup_bulk_without_cif_is_unchanged(tmp_path):
+    work = tmp_path / "work"
+    work.mkdir()
+    result = _run_bulk(work)  # no sources, no --cif: old missing-input error
+    assert result.returncode == 1
+    assert "Converted" not in result.stdout
