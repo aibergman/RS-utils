@@ -59,6 +59,9 @@ def _make_source_derived_unequal_count_fixture(destination: Path) -> None:
     lattice_path.write_text(lattice_text, encoding="utf-8")
 
 
+@pytest.mark.native
+
+
 def test_setup_simple_magnetic_metal_and_reports(tmp_path: Path) -> None:
     _copy_setup_fixture(tmp_path)
     original_inputs = {
@@ -78,6 +81,9 @@ def test_setup_simple_magnetic_metal_and_reports(tmp_path: Path) -> None:
     assert input_nml["control"]["lld"] == 21
     assert input_nml["lattice"]["strux_backend"] == "strux_lib"
     assert {name: (tmp_path / name).read_bytes() for name in original_inputs} == original_inputs
+
+
+@pytest.mark.native
 
 
 def test_setup_ks_preset_and_explicit_strux_backend(tmp_path: Path) -> None:
@@ -101,6 +107,9 @@ def test_setup_ks_preset_and_explicit_strux_backend(tmp_path: Path) -> None:
     assert input_path.read_bytes() == original_input
 
 
+@pytest.mark.native
+
+
 def test_setup_multisite_multispecies_fixture(tmp_path: Path) -> None:
     _copy_setup_fixture(tmp_path, "FeN")
 
@@ -114,6 +123,9 @@ def test_setup_multisite_multispecies_fixture(tmp_path: Path) -> None:
     assert input_nml["lattice"]["ntype"] == 2
     assert (tmp_path / "Fe1.nml").is_file()
     assert (tmp_path / "N1.nml").is_file()
+
+
+@pytest.mark.native
 
 
 def test_setup_supercell_is_non_destructive_and_semantic(tmp_path: Path) -> None:
@@ -135,6 +147,9 @@ def test_setup_supercell_is_non_destructive_and_semantic(tmp_path: Path) -> None
     assert {name: (tmp_path / name).read_bytes() for name in original_inputs} == original_inputs
 
 
+@pytest.mark.native
+
+
 def test_setup_in_place_preserves_cli_backups(tmp_path: Path) -> None:
     _copy_setup_fixture(tmp_path)
     original_inputs = {
@@ -148,6 +163,9 @@ def test_setup_in_place_preserves_cli_backups(tmp_path: Path) -> None:
     assert (tmp_path / "input.nml.bak").read_bytes() == original_inputs["input.nml"]
     assert not (tmp_path / "lattice_new.nml").exists()
     assert not (tmp_path / "input_new.nml").exists()
+
+
+@pytest.mark.native
 
 
 def test_seeded_sqs_setup_is_reproducible_in_isolated_runs(tmp_path: Path) -> None:
@@ -184,6 +202,7 @@ def test_seeded_sqs_setup_is_reproducible_in_isolated_runs(tmp_path: Path) -> No
 
 
 @pytest.mark.parametrize("example", ["bccFe", "FeN"])
+@pytest.mark.native
 def test_identical_setup_is_a_semantic_fixed_point_after_promoting_outputs(
     tmp_path: Path, example: str
 ) -> None:
@@ -210,6 +229,9 @@ def test_identical_setup_is_a_semantic_fixed_point_after_promoting_outputs(
     assert set(second_generated) == set(first_generated)
     for name in first_generated:
         _assert_semantically_equal(first_generated[name], second_generated[name], path=name)
+
+
+@pytest.mark.native
 
 
 def test_legacy_setup_accepts_source_derived_unequal_counts(tmp_path: Path) -> None:
