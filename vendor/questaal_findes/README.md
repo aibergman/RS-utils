@@ -17,7 +17,10 @@ the resize call so its outer loop can add spheres when that fraction is not
 reachable with the current sites. The original `sclwsr` reports its achieved
 fraction through the same argument, which would make FINDES' next target
 comparison tautological. This is an adapter fix at the call boundary; the
-pinned `findes.f` source remains byte-for-byte intact.
+pinned `findes.f` source remains byte-for-byte intact. The RS-utils adapter
+sets the overlap limits to 0.14 of center distance and 0.26 of sphere radius;
+zero limits caused FINDES to stop at tangent spheres and leave the FeN
+XBand-style sphere-volume target underfilled.
 
 The source file documents that the finder was adapted from the Stuttgart
 package and records Questaal updates from 2011 through 2017. The Questaal

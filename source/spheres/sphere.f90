@@ -170,10 +170,12 @@ contains
         real*8 :: ZN, ZZ(MAX2SORT)
 
         real*8 :: DNEVMOD
+        real*8 :: final_cell_volume, final_sphere_volume, final_radius
+        character(1) :: final_kind
         real*8, allocatable :: quest_basis(:,:), quest_radii(:)
         integer, allocatable :: quest_species(:)
         integer :: quest_status
-        open(unit=16, file='spheres.log', status='unknown', action='write')
+        open(unit=16, file='spheres.log', status='replace', action='write')
         call WKINIT(MAXDIM)
         call GETGBASIS()
 
@@ -238,6 +240,7 @@ contains
             print*, 'dpas,alat,natom,nsort:', DPAS, ALAT, NATOM, NSORT
         end if
 
+        write(16,*) 'DEFMTR initial atomic radii (before empty-sphere processing)'
         call DEFMTR(W, NRAD1, AV, BV, CV, IMQ, BAS, RHOSITE, R0SITE, DPAS, ALAT, NATOM, NSORT, ZZ, RWS, NEED_ES, NRAD1, WSREST)
 
         NATOMNEW = NATOM
@@ -272,6 +275,32 @@ contains
                 end do
             end do
         end if
+        ! Record the final radii and volume fraction used by write_output.
+        ! DEFMTR also writes an intermediate BLOWUP report to this file; this
+        ! final section makes the distinction explicit and keeps the log
+        ! consistent with radii.out and the generated *_out.nml files.
+        final_cell_volume = abs(AV(1)*(BV(2)*CV(3)-BV(3)*CV(2)) + &
+                                AV(2)*(BV(3)*CV(1)-BV(1)*CV(3)) + &
+                                AV(3)*(BV(1)*CV(2)-BV(2)*CV(1)))*ALAT**3
+        final_sphere_volume = 0.0d0
+        write(16,'(/,A)') 'Final sphere radii used in output (radius units match radii.out):'
+        do I = 1, NATOMNEW
+            if (trim(empty_sphere_backend) == "questaal" .or. I > NATOM) then
+                final_radius = RWS(I)
+            else
+                final_radius = RWS(IMQ(I))
+            end if
+            final_sphere_volume = final_sphere_volume + 4.1887902047863909846d0*final_radius**3
+            if (I <= NATOM) then
+                final_kind = 'A'
+            else
+                final_kind = 'E'
+            end if
+            write(16,'(I5,2X,I5,2X,3F18.10,2X,F14.8,2X,A)') &
+                I, ISNEW(I), BASNEW(:,I), final_radius, final_kind
+        end do
+        if (final_cell_volume > 0.0d0) &
+            write(16,'(A,F12.6)') 'Final sphere-volume fraction: ', final_sphere_volume/final_cell_volume
         close(16)
     end subroutine perform_calculations
 

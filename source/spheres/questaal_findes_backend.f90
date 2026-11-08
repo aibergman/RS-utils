@@ -54,8 +54,11 @@ contains
     ctrl%rmines = min_radius
     ctrl%rmaxes = max_radius
     ctrl%sclwsr = 1.0_real64
-    ctrl%omax1 = 0.0_real64
-    ctrl%omax2 = 0.0_real64
+    ! Match the overlapping-sphere packing used by the XBand finder. With
+    ! both limits at zero, FINDES shrinks the atomic spheres to tangency and
+    ! can leave a large part of the cell unfilled even after adding ES.
+    ctrl%omax1 = 0.14_real64
+    ctrl%omax2 = 0.26_real64
     ctrl%wsrmax = 0.0_real64
     lat%plat = lattice
     lat%plat0 = lattice

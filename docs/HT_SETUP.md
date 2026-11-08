@@ -49,6 +49,10 @@ in the source `input.nml`.
 For empty-sphere calculations, `SetupSpec.empty_sphere_backend` accepts
 `"xband"` (the default) or `"questaal"`. The CLI equivalent is
 `--empty-sphere-backend questaal`, used together with `--empty_spheres`.
+The Questaal adapter permits up to 0.14 overlap relative to center distance
+and 0.26 relative to sphere radius so its final sphere-volume fraction can
+match the XBand space-filling convention. `spheres.log` records the final
+radii and volume fraction used in the output files.
 
 The report is optional and does not change the ordinary human-readable
 console output. Its top-level schemas are `rsutil-setup-report-v1` and
