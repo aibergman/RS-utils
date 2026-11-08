@@ -1671,6 +1671,14 @@ def add_bulk_setup_arguments(parser):
     parser.add_argument("--backup", action="store_true")
     parser.add_argument("--in-place", action="store_true")
     parser.add_argument("--supercell", nargs=3, type=int, metavar=("NX", "NY", "NZ"))
+    parser.add_argument("--cif", default=None, metavar="FILE", help="Convert this CIF into lattice.nml/input.nml in the current directory, then run setup")
+    add_cif_cutoff_arguments(parser)
+    parser.add_argument("--rc", type=float, default=50, help="With --cif: cluster radius rc (default: 50)")
+    parser.add_argument("--alat", type=float, default=None, help="With --cif: alat in Å (default: length of the first lattice vector)")
+    parser.add_argument("--wav", type=float, default=None, help="With --cif: Wigner-Seitz radius wav in Å (omitted if not given)")
+    parser.add_argument("--primitive", action="store_true", help="With --cif: reduce to the primitive cell")
+    parser.add_argument("--template", default=None, help="With --cif: input.nml whose other namelist groups are reused")
+    parser.add_argument("--overwrite-source", action="store_true", help="With --cif: replace an existing lattice.nml/input.nml")
 
 
 def add_surface_setup_arguments(parser):
@@ -1706,6 +1714,78 @@ def add_impurity_setup_arguments(parser):
     parser.add_argument("--mixing-beta", type=float, default=0.1, help="Impurity mixing beta (default: 0.1)")
 
 
+def run_cif_convert(args):
+    """Convert a CIF file into RS-LMTO lattice.nml/input.nml."""
+    from .cif import CifConversionError, convert_cif
+
+    try:
+        files, conversion = convert_cif(
+            args.cif,
+            args.output,
+            ct=args.ct,
+            ct_neighbors=args.ct_neighbors,
+            alat=args.alat,
+            supercell=tuple(args.supercell),
+            primitive=args.primitive,
+            r2=args.r2,
+            rc=args.rc,
+            wav=args.wav,
+            template=args.template,
+            overwrite=args.overwrite,
+        )
+    except (CifConversionError, FileExistsError, OSError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+
+    structure = conversion.structure
+    elements = {}
+    for site in structure.sites:
+        elements[site.element] = elements.get(site.element, 0) + 1
+    print(f"Converted {args.cif}")
+    print(f"  Atoms:        {len(structure.sites)} ({', '.join(f'{k}{v}' for k, v in elements.items())})")
+    print(f"  Space group:  {structure.metadata.get('spacegroup', 'unknown')}")
+    print(f"  alat:         {conversion.alat:.6f} Å")
+    print(_describe_ct(files))
+    for message in conversion.warnings:
+        print(f"  WARNING: {message}", file=sys.stderr)
+    print(f"  Wrote:        {files.lattice}")
+    print(f"                {files.input}")
+    print("  Review ct, r2 and the non-structural input.nml groups before running.")
+    return 0
+
+
+def _describe_ct(files):
+    """One-line summary of the cutoff written to input.nml."""
+    how = "chosen automatically" if files.ct_auto else "given"
+    counts = (
+        str(files.neighbors_min)
+        if files.neighbors_min == files.neighbors_max
+        else f"{files.neighbors_min}-{files.neighbors_max}"
+    )
+    return f"  ct:           {files.ct:.2f} Å ({how}; {counts} atoms per site incl. itself)"
+
+
+def add_cif_cutoff_arguments(parser):
+    """Options shared by ``setup cif`` and ``setup bulk --cif``."""
+    parser.add_argument("--ct", type=float, default=None, help="Neighbour cutoff in Å written to ct(:) in input.nml (default: chosen so every atom has --ct-neighbors atoms within it)")
+    parser.add_argument("--ct-neighbors", type=int, default=15, metavar="N", help="Atoms per site, itself included, the automatic ct must enclose (default: 15, as for bcc; 19 for fcc)")
+    parser.add_argument("--r2", type=float, default=None, help="r2 value (default: ct squared)")
+
+
+def add_cif_setup_arguments(parser):
+    """Add CIF-to-RS-LMTO conversion options."""
+    parser.add_argument("cif", help="Input CIF file (ordered structures only)")
+    parser.add_argument("--output", "-o", default=".", help="Directory for lattice.nml and input.nml (default: current directory)")
+    add_cif_cutoff_arguments(parser)
+    parser.add_argument("--rc", type=float, default=50, help="Cluster radius rc (default: 50)")
+    parser.add_argument("--alat", type=float, default=None, help="alat in Å (default: length of the first lattice vector)")
+    parser.add_argument("--wav", type=float, default=None, help="Wigner-Seitz radius wav in Å (omitted if not given)")
+    parser.add_argument("--supercell", type=int, nargs=3, default=[1, 1, 1], metavar=("N1", "N2", "N3"), help="Ordered supercell replication (default: 1 1 1)")
+    parser.add_argument("--primitive", action="store_true", help="Reduce to the primitive cell instead of keeping the CIF cell")
+    parser.add_argument("--template", default=None, help="Existing input.nml whose other namelist groups (&self, &control, ...) are reused")
+    parser.add_argument("--overwrite", action="store_true", help="Replace existing lattice.nml/input.nml")
+
+
 def create_setup_parser(subparsers):
     """Add one-off setup workflows; campaign generation remains separate."""
     parser = subparsers.add_parser("setup", help="Set up one bulk, surface, or impurity calculation")
@@ -1722,6 +1802,10 @@ def create_setup_parser(subparsers):
     impurity = commands.add_parser("impurity", help="Prepare an embedded impurity in a converged bulk or surface host")
     add_impurity_setup_arguments(impurity)
     impurity.set_defaults(func=run_impurity_prepare)
+
+    cif = commands.add_parser("cif", help="Convert a CIF file into RS-LMTO lattice.nml and input.nml")
+    add_cif_setup_arguments(cif)
+    cif.set_defaults(func=run_cif_convert)
     return parser
 
 
@@ -2577,6 +2661,43 @@ def print_summary_diff():
     print("=" * 70)
 
 
+def _convert_cif_into_cwd(args):
+    """``setup bulk --cif``: write lattice.nml/input.nml before the normal setup.
+
+    The CIF is converted as a single unit cell; ``--supercell`` is applied by
+    the setup itself, so it is not applied twice.
+    """
+    from .cif import CifConversionError, convert_cif
+
+    try:
+        files, conversion = convert_cif(
+            args.cif,
+            Path.cwd(),
+            ct=args.ct,
+            ct_neighbors=args.ct_neighbors,
+            alat=args.alat,
+            primitive=args.primitive,
+            r2=args.r2,
+            rc=args.rc,
+            wav=args.wav,
+            template=args.template,
+            overwrite=args.overwrite_source,
+        )
+    except FileExistsError as exc:
+        raise ValueError(f"{exc}; use --overwrite-source to replace them") from exc
+    except CifConversionError:
+        raise
+    except OSError as exc:
+        raise ValueError(f"CIF conversion failed: {exc}") from exc
+    structure = conversion.structure
+    print(f"\nConverted {args.cif}: {len(structure.sites)} atoms, "
+          f"space group {structure.metadata.get('spacegroup', 'unknown')}, alat {conversion.alat:.6f} Å")
+    print(_describe_ct(files))
+    for message in conversion.warnings:
+        print(f"  WARNING: {message}", file=sys.stderr)
+    print("  Wrote lattice.nml and input.nml; review ct, r2 and the non-structural groups.")
+
+
 def _run_setup_cli(args):
     """Translate legacy ``-S`` arguments, present results, and call the service."""
     print("=" * 70)
@@ -2608,6 +2729,8 @@ def _run_setup_cli(args):
             preset=args.preset,
         )
         service_validate_setup_parameters(spec)
+        if getattr(args, "cif", None):
+            _convert_cif_into_cwd(args)
         service_validate_setup_inputs(Path.cwd())
     except (FileNotFoundError, ValueError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
@@ -2760,6 +2883,8 @@ def main():
 Examples:
   # Single-run setup subcommands
   rsutil setup bulk                         # Process bulk lattice inputs
+  rsutil setup cif structure.cif -o run            # CIF -> lattice.nml/input.nml
+  rsutil setup bulk --cif structure.cif            # CIF -> input files -> setup
   rsutil setup surface --bulk bulk --output surface
   rsutil setup impurity --host bulk --xyz impurity.xyz --output impurity
 

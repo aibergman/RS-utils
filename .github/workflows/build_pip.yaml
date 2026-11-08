@@ -6,7 +6,10 @@ on:
 
 jobs:
   python39_import:
-    runs-on: ubuntu-latest
+    # Python 3.9 is not published for newer ubuntu-latest images (26.04+).
+    # Pin to an image that still provides it; drop this job together with
+    # python_requires>=3.9 when 3.9 support ends.
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout repository
