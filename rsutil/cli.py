@@ -1648,6 +1648,12 @@ def add_bulk_setup_arguments(parser):
     """Add the single-run bulk setup controls to a parser."""
     parser.add_argument("--cluster", choices=["periodic", "free"], default="periodic")
     parser.add_argument("--empty_spheres", action="store_true", help="Enable empty sphere calculations")
+    parser.add_argument(
+        "--empty-sphere-backend",
+        choices=["xband", "questaal"],
+        default="xband",
+        help="Empty-sphere backend; requires --empty_spheres (default: xband; questaal uses FINDES)",
+    )
     parser.add_argument("--min_empty_radius", type=float, default=1.2)
     parser.add_argument("--max_empty_radius", type=float, default=2.5)
     parser.add_argument("--lmx", type=int, default=2, help="Maximum l-channel used in setup (default: 2)")
