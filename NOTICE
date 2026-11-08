@@ -22,14 +22,6 @@ currently known; it will be updated as provenance is confirmed.
    on subroutines that stem from the Stuttgart LMTO package, developed by
    G. Krier, O. Jepsen and O. K. Andersen (the LMTO47 lineage).
 
-   STATUS: the xband manual indicates a GNU licence, which is what allows
-   these files to be redistributed. The exact GNU licence and version (and
-   whether it carries an "or later" clause) in the `copying` file of the xband
-   distribution these files were taken from has NOT yet been confirmed. The
-   GPL-3.0-only licence of RS-utils as a whole is compatible only if xband's
-   grant is GPL version 3, or version 2 "or later"; if it is GPL version 2
-   only, the licence of RS-utils must be revisited.
-
 2. source/spheres/utils.f90 (additionally)
 
    Contains auxiliary routines originating from the netlib reference
@@ -43,7 +35,6 @@ currently known; it will be updated as provenance is confirmed.
    Default potential-parameter tables and formulas (DEFPP, DEFMOM, DEFCNF,
    screening constants) follow the LMTO47 conventions; source comments cite
    "Kampur notes" (Eq. 3.94) and the screening constants of O. Jepsen.
-   STATUS: a routine-by-routine provenance audit has not been completed.
 
 An independent comparison with the Questaal package found no evidence that
 these routines were copied from Questaal (whose empty-sphere finder, FINDES,
