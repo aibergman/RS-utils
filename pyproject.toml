@@ -93,9 +93,11 @@ exclude = ["tests", "tests.*"]
 rsutil = ["viz/cpk_colors.json"]
 
 [tool.cibuildwheel]
-skip = "pp* *-musllinux* cp36* cp37* cp38* cp39* cp310* cp314t-*"  # Skip PyPy, musl Linux, end-of-life Pythons and free-threaded builds
+build = "cp311-* cp312-* cp313-* cp314-*"
+skip = "*-musllinux* cp314t-*"  # musl Linux and free-threaded builds are not supported
+build-verbosity = 1
 before-build = "python -m pip install --upgrade 'numpy>1.19' ninja scipy"
-test-requires = ["pytest>=7", "ase>=3.22", "matplotlib>=3.5", "scipy>=1.7", "spglib>=2.0"]
+test-extras = ["test"]
 test-sources = ["tests", "examples"]
 test-command = [
     "python tests/import_smoke.py",
@@ -104,6 +106,12 @@ test-command = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["native: needs the compiled Fortran setup kernel (skipped when it is missing)"]
 
 [tool.cibuildwheel.linux]
 before-all = "yum clean packages && yum install -y gcc-gfortran cmake ninja-build"
+
+[tool.cibuildwheel.macos]
+# gfortran comes from Homebrew (installed by the workflow); the deployment
+# target is set per runner in the workflow environment.
+environment = { FC = "gfortran" }
