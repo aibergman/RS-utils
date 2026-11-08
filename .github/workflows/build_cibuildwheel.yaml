@@ -10,6 +10,11 @@ on:
       - main
       - HT
   workflow_dispatch:
+    inputs:
+      quick:
+        description: "Debug: build only CPython 3.12"
+        type: boolean
+        default: false
   # Reused by release.yaml, which publishes what this builds.
   workflow_call:
 
@@ -52,7 +57,14 @@ jobs:
 
       - name: Build wheels
         env:
-          CIBW_ENVIRONMENT_MACOS: FC=gfortran MACOSX_DEPLOYMENT_TARGET=${{ matrix.macos_target }}
+          CIBW_BUILD: ${{ inputs.quick && 'cp312-*' || 'cp311-* cp312-* cp313-* cp314-*' }}
+          # Homebrew's libgfortran/libquadmath require the runner's own macOS
+          # version, which would make the wheels uninstallable on older systems,
+          # so the Fortran runtime is linked statically instead.
+          CIBW_ENVIRONMENT_MACOS: >-
+            FC=gfortran
+            MACOSX_DEPLOYMENT_TARGET=${{ matrix.macos_target }}
+            LDFLAGS="-static-libgfortran -static-libgcc -static-libquadmath"
         run: python -m cibuildwheel --output-dir wheelhouse
 
       - name: Upload built wheels
