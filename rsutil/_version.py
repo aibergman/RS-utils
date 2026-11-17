@@ -1,3 +1,3 @@
 """Package version for RS-utils."""
 
-__version__ = "0.11.0rc1"
+__version__ = "1.0.0"

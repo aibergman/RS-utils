@@ -1,15 +1,18 @@
 # HT Quick Start
 
-This page is the shortest path from an installed RS-utils release candidate to
+This page is the shortest path from an installed RS-utils release to
 a controlled high-throughput (HT) pilot. Read the support matrix before
 scaling a campaign.
 
 > **Pilot qualification**
 >
-> **RS-utils 0.11.0rc1 is ready for controlled pilot high-throughput RS-LMTO
-> workflows within the explicitly documented support matrix.** It is a
-> release candidate: some workflows remain `RESTRICTED`, `EXPERIMENTAL`, or
-> `UNSUPPORTED` according to the [HT readiness report](HT_READINESS_REPORT).
+> **Controlled pilot high-throughput RS-LMTO workflows are supported within
+> the explicitly documented support matrix.** Some workflows remain
+> `RESTRICTED`, `EXPERIMENTAL`, or `UNSUPPORTED` according to the
+> [HT readiness report](HT_READINESS_REPORT). That report's qualification
+> evidence was gathered on the 0.11.0rc1 candidate; the
+> [changelog](https://github.com/aibergman/RS-utils/blob/main/CHANGELOG.md)
+> lists what changed in 1.0.0.
 
 ## 1. Install a release wheel
 
@@ -18,17 +21,17 @@ install it into a dedicated environment. Do not use an editable source
 checkout as the normal deployment artifact.
 
 ```bash
-python -m venv rsutil-0.11rc1
-source rsutil-0.11rc1/bin/activate
+python -m venv rsutil-env
+source rsutil-env/bin/activate
 
-# from PyPI (add --pre while the version is a release candidate) ...
-python -m pip install --pre rslmto-utils
+# from PyPI ...
+python -m pip install rslmto-utils
 # ... or from a downloaded wheel
-python -m pip install /path/to/rslmto_utils-0.11.0rc1-<python>-<abi>-<platform>.whl
+python -m pip install /path/to/rslmto_utils-1.0.0-<python>-<abi>-<platform>.whl
 python -c "import rsutil; print(rsutil.__version__)"
 ```
 
-The version check must print `0.11.0rc1`. Developers working on the source
+The version check must print `1.0.0`. Developers working on the source
 tree can use `python -m pip install -e '.[test]'`; the reproducible build and
 test procedure is documented in [HT testing](HT_TESTING).
 
@@ -236,7 +239,7 @@ large pair sets.
 
 ## 7. Pilot recommendation
 
-> **Start small.** `0.11.0rc1` is a release candidate. Begin with a
+> **Start small.** Begin with a
 > representative pilot campaign and inspect convergence, manifests, and
 > parsed results before scaling to a large production database.
 
@@ -272,6 +275,6 @@ support matrix. Its labels mean:
 - `UNSUPPORTED`: not a validated workflow or deliberately fail-closed.
 
 Existing UppASD export functionality remains available, but automated UppASD
-integration is not currently part of the validated `0.11.0rc1` HT campaign
+integration is not currently part of the validated HT campaign
 workflow. In particular, this release does not claim an automatic
 `SCF -> exchange -> UppASD` pipeline.
