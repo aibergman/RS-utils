@@ -23,6 +23,10 @@ Common Tasks
 
    * - Task
      - Command
+   * - Convert a CIF into ``lattice.nml`` + ``input.nml``
+     - ``rsutil setup cif structure.cif -o run``
+   * - Convert a CIF and run the setup in one step
+     - ``rsutil setup bulk --cif structure.cif``
    * - Setup from ``input.nml`` + ``lattice.nml``
      - ``rsutil setup bulk``
    * - Setup and validate generated files
@@ -333,6 +337,47 @@ Option                             Values                                       
 ``--plot-bz``                      flag                                          Plot Brillouin zone polyhedron (requires pymatgen)
 ``--export-kpath``                 filename                                      Export k-path to file for reproducibility
 =================================  ============================================  ================================================================
+
+CIF conversion
+--------------
+
+``rsutil setup cif`` converts an ordered CIF file into the ``lattice.nml`` and
+``input.nml`` pair used by ``setup bulk``; it replaces the external
+``cif2cell`` step. ``rsutil setup bulk --cif FILE`` does the conversion in the
+current directory and then runs the normal validated setup.
+
+.. code-block:: bash
+
+    # Convert only (writes lattice.nml and input.nml into run/)
+    rsutil setup cif Ni2MnGa.cif -o run
+
+    # Convert, then set up, in the current directory
+    rsutil setup bulk --cif Ni2MnGa.cif --validate --summary
+
+    # Keep the conventional (cubic) cell instead of the primitive cell
+    rsutil setup cif FeN.cif -o run --cell conventional
+
+    # Larger neighbour cluster, or an explicit cutoff
+    rsutil setup cif Ni2MnGa.cif -o run --ct-neighbors 19
+    rsutil setup cif Ni2MnGa.cif -o run --ct 4.3
+
+**Flags:**
+
+- ``--cell {primitive,conventional}``: centred cells are reduced to the standard
+  primitive cell by default, as ``cif2cell`` does; ``conventional`` keeps the CIF cell.
+- ``--ct``: neighbour cutoff in Å. By default it is chosen so that every atom has at
+  least ``--ct-neighbors`` atoms (itself included, default 15) within it.
+- ``--r2``, ``--rc``, ``--alat``, ``--wav``: override ``r2`` (default ``ct**2``),
+  ``rc`` (default 50), ``alat`` (default: conventional cell length, in Å) and ``wav``.
+- ``--template input.nml``: reuse the non-structural namelist groups of an existing input.
+- ``--supercell N1 N2 N3`` (``setup cif`` only): ordered supercell. With
+  ``setup bulk --cif`` use setup's own ``--supercell``.
+- ``--overwrite`` (``setup cif``) / ``--overwrite-source`` (``setup bulk --cif``):
+  replace existing ``lattice.nml``/``input.nml``.
+
+Every atom of the cell becomes its own RS electronic type. Partially occupied
+(disordered) CIFs are rejected. See :doc:`HT_CIF` for the conventions, the
+cutoff rule, and the cif2cell comparison.
 
 Lattice Processing
 -------------------

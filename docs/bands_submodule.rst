@@ -773,7 +773,7 @@ Installation Requirements
 .. code-block:: bash
 
     git clone <repo>
-    cd RS_tools
+    cd RS-utils
     pip install -e . [seekpath,pymatgen]
 
 See Also

@@ -71,6 +71,9 @@ class _FakeRunner:
         )
 
 
+@pytest.mark.native
+
+
 def test_setup_service_does_not_use_process_cwd(tmp_path: Path) -> None:
     source = tmp_path / "source"
     destination = tmp_path / "destination"
@@ -96,6 +99,9 @@ def test_setup_service_does_not_use_process_cwd(tmp_path: Path) -> None:
     assert {name: (source / name).read_bytes() for name in original} == original
 
 
+@pytest.mark.native
+
+
 def test_setup_service_supports_source_and_destination_paths_with_spaces(tmp_path: Path) -> None:
     source = tmp_path / "source with spaces"
     destination = tmp_path / "destination with spaces"
@@ -108,6 +114,9 @@ def test_setup_service_supports_source_and_destination_paths_with_spaces(tmp_pat
     assert (destination / "lattice_new.nml").is_file()
     assert (destination / "input_new.nml").is_file()
     assert result.provenance["destination_dir"] == str(destination.resolve())
+
+
+@pytest.mark.native
 
 
 def test_setup_service_preserves_seeded_supercell_sqs(tmp_path: Path) -> None:
@@ -133,6 +142,9 @@ def test_setup_service_preserves_seeded_supercell_sqs(tmp_path: Path) -> None:
     assert f90nml.read(first / "input_new.nml") == f90nml.read(second / "input_new.nml")
     assert not (first / ".rsutil_supercell_lattice.nml").exists()
     assert not (first / ".rsutil_supercell_input.nml").exists()
+
+
+@pytest.mark.native
 
 
 def test_seeded_setup_outputs_have_identical_content_hashes(tmp_path: Path) -> None:

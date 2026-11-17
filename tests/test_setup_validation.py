@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 import json
 from datetime import datetime
 from pathlib import Path
@@ -233,6 +235,9 @@ def test_deterministic_setup_without_seed_is_reproducible(tmp_path: Path) -> Non
     }
 
 
+@pytest.mark.native
+
+
 def test_generated_recursion_and_sphere_records_are_checked(tmp_path: Path) -> None:
     _fixture(tmp_path)
     result = SetupService().run(tmp_path, tmp_path, SetupSpec(seed=42))
@@ -246,6 +251,9 @@ def test_generated_recursion_and_sphere_records_are_checked(tmp_path: Path) -> N
     validation = validate_setup_outputs(tmp_path, spec=SetupSpec(seed=42))
     assert not validation.valid
     assert ErrorCode.RECURSION_INVALID.value in _codes(validation)
+
+
+@pytest.mark.native
 
 
 def test_report_schema_and_scientific_hash_are_stable(tmp_path: Path) -> None:
@@ -276,6 +284,9 @@ def test_report_schema_and_scientific_hash_are_stable(tmp_path: Path) -> None:
     report_path = tmp_path / "report.json"
     write_setup_report(first_report, report_path)
     assert json.loads(report_path.read_text(encoding="utf-8"))["schema_version"] == "rsutil-setup-report-v1"
+
+
+@pytest.mark.native
 
 
 def test_legacy_cli_can_optionally_write_json_report(tmp_path: Path) -> None:

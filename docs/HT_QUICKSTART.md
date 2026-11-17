@@ -21,7 +21,10 @@ checkout as the normal deployment artifact.
 python -m venv rsutil-0.11rc1
 source rsutil-0.11rc1/bin/activate
 
-python -m pip install /path/to/rsutil-0.11.0rc1-<python>-<abi>-<platform>.whl
+# from PyPI (add --pre while the version is a release candidate) ...
+python -m pip install --pre rslmto-utils
+# ... or from a downloaded wheel
+python -m pip install /path/to/rslmto_utils-0.11.0rc1-<python>-<abi>-<platform>.whl
 python -c "import rsutil; print(rsutil.__version__)"
 ```
 
@@ -31,7 +34,7 @@ test procedure is documented in [HT testing](HT_TESTING).
 
 ## 2. Requirements
 
-- Python 3.9 or newer is supported.
+- Python 3.11 or newer is supported.
 - The wheel includes the compiled Fortran component. A build from source
   needs a working CMake and Fortran compiler/runtime; the cluster runtime
   must be compatible with the wheel’s platform and compiler runtime.

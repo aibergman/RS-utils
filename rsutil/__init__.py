@@ -117,9 +117,18 @@ if native_candidates:
     lib_filename = native_path.name
     lib_path = str(native_path)
 
-# Load the shared library if found, but don't fail if not available
+# Load the shared library if found, but don't fail (or warn) if it is not
+# available: the pure-Python parts (bands/DOS, CIF conversion, campaigns, ...)
+# do not need it.  The reason is kept in ``_native_error`` and reported only
+# when a Fortran-backed function is actually called.
 _rsutil = None
-if lib_path is not None:
+_native_error: Optional[str] = None
+if lib_path is None:
+    _native_error = (
+        "the native Fortran library was not found next to the package "
+        "(rsutil/rsutil*.so|dylib|pyd)"
+    )
+else:
     try:
         _rsutil: ctypes.CDLL = ctypes.CDLL(lib_path)
         # Define process_lattice() signature with multiple arguments
@@ -130,13 +139,14 @@ if lib_path is not None:
         ]
         _rsutil.process_lattice.restype = None
     except Exception as e:
-        import warnings
-        warnings.warn(f"Could not load rsutil shared library: {e}. Some Fortran functionality will be unavailable.")
+        _native_error = f"could not load {lib_path}: {e}"
         _rsutil = None
-else:
-    import warnings
-    warnings.warn("Could not find the rsutil shared library. Building from source or ensure the package was compiled correctly.")
-    _rsutil = None
+
+
+def native_library_available() -> bool:
+    """Return True if the Fortran setup kernel was loaded successfully."""
+
+    return _rsutil is not None
 
 
 def _process_lattice_unsafe(cluster_type: str = "periodic", empty_spheres: bool = False,
@@ -154,7 +164,11 @@ def _process_lattice_unsafe(cluster_type: str = "periodic", empty_spheres: bool 
     historical public wrapper.
     """
     if _rsutil is None:
-        raise RuntimeError("The rsutil shared library is not available. Please rebuild the package with: pip install .")
+        raise RuntimeError(
+            f"The Fortran setup kernel is not available: {_native_error}. "
+            "Install a binary wheel, or build from source (needs CMake and a Fortran "
+            "compiler such as gfortran): pip install ."
+        )
 
     # Convert empty_spheres boolean to integer (0 or 1)
     empty_spheres_int = ctypes.c_int(1 if empty_spheres else 0)

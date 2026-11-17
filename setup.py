@@ -1,48 +1,46 @@
+"""Build script for the native Fortran setup kernel.
+
+Package metadata (name, version, dependencies, ...) lives in ``pyproject.toml``.
+This file only builds the CMake/Fortran extension that is loaded through ctypes.
+"""
+
 import os
-import re
-import sys
+import shutil
 import subprocess
+import sys
 from pathlib import Path
-import setuptools
-from setuptools import setup, Extension
+
+from setuptools import Extension, setup
 from setuptools.command.build_ext import build_ext
 
+_FORTRAN_COMPILERS = ("gfortran", "ifx", "ifort", "flang-new", "flang")
 
-def _package_version() -> str:
-    """Read the package version without importing the package during setup."""
 
-    version_file = Path(__file__).parent / "rsutil" / "_version.py"
-    match = re.search(
-        r"^__version__\s*=\s*[\"']([^\"']+)[\"']",
-        version_file.read_text(),
-        re.MULTILINE,
+def _check_toolchain() -> None:
+    """Fail early, with install hints, if CMake or a Fortran compiler is missing."""
+
+    missing = []
+    if shutil.which("cmake") is None:
+        missing.append("CMake")
+    compiler = os.environ.get("FC") or next(
+        (name for name in _FORTRAN_COMPILERS if shutil.which(name)), None
     )
-    if match is None:
-        raise RuntimeError(f"Could not read package version from {version_file}")
-    return match.group(1)
+    if compiler is None or shutil.which(compiler) is None:
+        missing.append("a Fortran compiler (for example gfortran)")
+    if not missing:
+        return
+    raise RuntimeError(
+        "Building the RS-utils Fortran setup kernel needs "
+        + " and ".join(missing)
+        + ", which could not be found.\n"
+        "  - Easiest: install a pre-built wheel (Linux and macOS wheels are published "
+        "on PyPI): pip install rslmto-utils\n"
+        "  - Debian/Ubuntu: sudo apt install gfortran cmake\n"
+        "  - macOS (Homebrew): brew install gcc cmake\n"
+        "  - conda: conda install -c conda-forge gfortran cmake\n"
+        "Set FC to use a different Fortran compiler."
+    )
 
-
-PACKAGE_VERSION = _package_version()
-
-
-RUNTIME_REQUIRES = [
-    "numpy>=1.20.0",
-    "pymatgen",
-    "f90nml",
-]
-
-BANDS_REQUIRES = [
-    "matplotlib>=3.5.0",
-    "scipy>=1.7.0",
-    "spglib>=2.0.0",
-    "seekpath>=2.0.0",
-]
-
-TEST_REQUIRES = [
-    "pytest>=7.0.0",
-    "ase>=3.22",
-    *BANDS_REQUIRES,
-]
 
 class CMakeExtension(Extension):
     def __init__(self, name, sourcedir=""):
@@ -51,6 +49,7 @@ class CMakeExtension(Extension):
 
 class CMakeBuild(build_ext):
     def build_extension(self, ext):
+        _check_toolchain()
         ext_fullpath = Path(self.get_ext_fullpath(ext.name)).resolve()
         extdir = ext_fullpath.parent
         extdir.mkdir(parents=True, exist_ok=True)
@@ -67,6 +66,16 @@ class CMakeBuild(build_ext):
 
         if os.environ.get("RSUTIL_DEBUG_CMAKE_VERBOSE"):
             cmake_args.append("-DCMAKE_VERBOSE_MAKEFILE=ON")
+
+        # Wheel builds on macOS set this so that only *this* extension links the
+        # Fortran runtime statically (Homebrew's libgfortran dylibs demand the
+        # build machine's own macOS version). A global LDFLAGS would leak into
+        # every other package built in the same environment.
+        if os.environ.get("RSUTIL_STATIC_FORTRAN_RUNTIME"):
+            cmake_args.append(
+                "-DCMAKE_MODULE_LINKER_FLAGS="
+                "-static-libgfortran -static-libgcc -static-libquadmath"
+            )
 
         build_args = ["--config", "Release"]
 
@@ -109,33 +118,8 @@ class CMakeBuild(build_ext):
             )
 
 
-setup(
-    name="rsutil",
-    version=PACKAGE_VERSION,
-    author="Anders Bergman",
-    author_email="anders.bergman@physics.uu.se",
-    description="Utilities for the RS-LMTO code including band structure and DOS analysis",
-    long_description="Utilities for the RS-LMTO code including lattice processing, visualization, exchange mapping, UppASD export, band structure calculations, and density of states analysis",
-    ext_modules=[CMakeExtension("rsutil.rsutil")],
-    cmdclass={"build_ext": CMakeBuild},
-    packages=setuptools.find_packages(exclude=["tests", "tests.*"]),
-    include_package_data=True,  # ✅ Ensures package_data is included in the wheel
-    zip_safe=False,
-    package_data={"rsutil": ["viz/cpk_colors.json"]},
-    python_requires=">=3.9",
-    install_requires=RUNTIME_REQUIRES,
-    extras_require={
-        "ase": ["ase>=3.22"],
-        "bands": BANDS_REQUIRES,
-        "visualization": ["pyvista"],
-        "test": TEST_REQUIRES,
-        "full": [*BANDS_REQUIRES, "ase>=3.22", "pyvista"],
-        "dev": [*TEST_REQUIRES, "black", "flake8"],
-        "docs": ["sphinx", "myst-parser", "sphinx-rtd-theme", "sphinx-autodoc-typehints"],
-    },
-    entry_points={
-        "console_scripts": [
-            "rsutil=rsutil.cli:main"
-        ],
-    },
-)
+if __name__ == "__main__":  # setuptools runs this file as __main__; tests import it
+    setup(
+        ext_modules=[CMakeExtension("rsutil.rsutil")],
+        cmdclass={"build_ext": CMakeBuild},
+    )

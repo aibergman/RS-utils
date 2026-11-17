@@ -103,6 +103,7 @@ Getting Started
    rsutil_module
    core_submodule
    setup_submodule
+   cif_submodule
    campaign_submodule
    results_submodule
    ase_module

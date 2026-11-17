@@ -479,7 +479,7 @@ PEP 517 wheel-build path and the documented test extra. The observed local
 environment was:
 
 ```text
-Python 3.11.16       /Users/andersb/envs/p311/bin/python
+Python 3.11.16       <venv>/bin/python
 platform             macOS-26.5.2-arm64-arm-64bit (arm64)
 gfortran             GNU Fortran (Homebrew GCC 16.2.0)
 cmake                4.4.3
@@ -720,8 +720,8 @@ passed **164 tests, 15 warnings**. The artifact provenance assertion passed
 with these observed paths:
 
 ```text
-rsutil.__file__: /private/tmp/rsutil-r14-venv.BVRc7L/lib/python3.11/site-packages/rsutil/__init__.py
-native extension: /private/tmp/rsutil-r14-venv.BVRc7L/lib/python3.11/site-packages/rsutil/rsutil.so
+rsutil.__file__: <tmp>/rsutil-venv/lib/python3.11/site-packages/rsutil/__init__.py
+native extension: <tmp>/rsutil-venv/lib/python3.11/site-packages/rsutil/rsutil.so
 site-packages assertion: PASS
 pip check: No broken requirements found
 ```

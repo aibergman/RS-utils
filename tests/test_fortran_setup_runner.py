@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 import json
 import os
 import shutil
@@ -110,6 +112,9 @@ def _semantic(path: Path):
     return f90nml.read(path)
 
 
+@pytest.mark.native
+
+
 def test_worker_matches_direct_setup_outputs(tmp_path: Path) -> None:
     direct = tmp_path / "direct"
     worker = tmp_path / "worker"
@@ -130,6 +135,9 @@ def test_worker_matches_direct_setup_outputs(tmp_path: Path) -> None:
     assert {"lattice_new.nml", "input_new.nml", "radii.out", "spheres.log", "Fe.nml"} <= set(
         result.candidate_files
     )
+
+
+@pytest.mark.native
 
 
 def test_empty_spheres_found_on_first_pass_are_kept(tmp_path: Path) -> None:
@@ -207,6 +215,9 @@ def test_worker_failure_keeps_diagnostics_before_owned_workspace_cleanup(
     assert not Path(result.provenance["workspace"]).exists()
 
 
+@pytest.mark.native
+
+
 def test_fatal_worker_exit_is_returned_without_killing_parent(tmp_path: Path) -> None:
     _fixture(tmp_path)
     input_path = tmp_path / "input.nml"
@@ -264,6 +275,9 @@ def test_fatal_worker_exit_is_returned_without_killing_parent(tmp_path: Path) ->
     # The pytest parent is still running here; a normal assertion is enough to
     # make termination of the parent process observable in this test.
     assert workspace.exists()
+
+
+@pytest.mark.native
 
 
 def test_workers_are_concurrent_and_do_not_cross_contaminate(tmp_path: Path) -> None:

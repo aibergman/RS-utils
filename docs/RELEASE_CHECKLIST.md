@@ -43,3 +43,28 @@ publication, and cluster deployment are intentionally outside this task.
 - [ ] Git tag created
 - [ ] wheel published/copied to deployment location
 - [ ] cluster smoke test passes
+
+## Publishing to PyPI (trusted publishing)
+
+Releases are built and published by `.github/workflows/release.yaml` without
+API tokens. One-time setup (done by a maintainer on the websites):
+
+1. On <https://pypi.org/manage/account/publishing/> add a *pending publisher*
+   for the project name `rslmto-utils`: owner `aibergman`, repository
+   `RS-utils`, workflow `release.yaml`, environment `pypi`. Repeat on
+   <https://test.pypi.org/manage/account/publishing/> with environment
+   `testpypi`.
+2. In the GitHub repository settings create the environments `pypi` and
+   `testpypi` (optionally require a reviewer for `pypi`).
+
+Per release:
+
+- [ ] `rsutil/_version.py` and `CHANGELOG.md` updated; tests green on `main`
+- [ ] `NOTICE` reviewed (provenance of derived sources is current)
+- [ ] Dry run: *Actions → Release → Run workflow* with target `testpypi`, then
+      `pip install --pre -i https://test.pypi.org/simple/ rslmto-utils` in a clean
+      environment and run `rsutil --help`
+- [ ] Tag `vX.Y.Z` matching the package version and push it; the workflow
+      refuses a tag that does not match `rsutil/_version.py`
+- [ ] A final (non-`rc`) version is needed for plain `pip install rslmto-utils`;
+      pre-releases require `--pre`

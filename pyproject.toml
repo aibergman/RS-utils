@@ -1,18 +1,117 @@
 [build-system]
-requires = ["setuptools>=61", "wheel", "cmake>=3.10", "numpy>=1.20"]
+requires = ["setuptools>=77", "wheel", "cmake>=3.10", "numpy>=1.20"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rslmto-utils"
+dynamic = ["version"]
+description = "Utilities for the RS-LMTO-ASA code: CIF/structure setup, surfaces and impurities, exchange maps, UppASD export, band structure and DOS"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "GPL-3.0-only"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{ name = "Anders Bergman", email = "anders.bergman@physics.uu.se" }]
+keywords = ["RS-LMTO", "LMTO", "electronic structure", "DFT", "CIF", "exchange interactions", "UppASD"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Fortran",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Topic :: Scientific/Engineering :: Chemistry",
+]
+dependencies = [
+    "numpy>=1.20.0",
+    "pymatgen",
+    "f90nml",
+]
+
+[project.optional-dependencies]
+ase = ["ase>=3.22"]
+bands = [
+    "matplotlib>=3.5.0",
+    "scipy>=1.7.0",
+    "spglib>=2.0.0",
+    "seekpath>=2.0.0",
+]
+visualization = ["pyvista"]
+test = [
+    "pytest>=7.0.0",
+    "ase>=3.22",
+    "matplotlib>=3.5.0",
+    "scipy>=1.7.0",
+    "spglib>=2.0.0",
+    "seekpath>=2.0.0",
+]
+full = [
+    "matplotlib>=3.5.0",
+    "scipy>=1.7.0",
+    "spglib>=2.0.0",
+    "seekpath>=2.0.0",
+    "ase>=3.22",
+    "pyvista",
+]
+dev = [
+    "pytest>=7.0.0",
+    "ase>=3.22",
+    "matplotlib>=3.5.0",
+    "scipy>=1.7.0",
+    "spglib>=2.0.0",
+    "seekpath>=2.0.0",
+    "black",
+    "flake8",
+]
+docs = ["sphinx", "myst-parser", "sphinx-rtd-theme", "sphinx-autodoc-typehints"]
+
+[project.scripts]
+rsutil = "rsutil.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/aibergman/RS-utils"
+Documentation = "https://aibergman.github.io/RS-utils/"
+Source = "https://github.com/aibergman/RS-utils"
+Issues = "https://github.com/aibergman/RS-utils/issues"
+Changelog = "https://github.com/aibergman/RS-utils/blob/main/CHANGELOG.md"
+
+[tool.setuptools]
+include-package-data = true
+zip-safe = false
+
+[tool.setuptools.dynamic]
+version = { attr = "rsutil._version.__version__" }
+
+[tool.setuptools.packages.find]
+exclude = ["tests", "tests.*"]
+
+[tool.setuptools.package-data]
+rsutil = ["viz/cpk_colors.json"]
 
 [tool.cibuildwheel]
-skip = "pp* *-musllinux* cp36* cp37* cp38* cp314t-*"  # Skip PyPy, musl Linux, and unsupported free-threaded Python builds
+build = "cp311-* cp312-* cp313-* cp314-*"
+skip = "*-musllinux* cp314t-*"  # musl Linux and free-threaded builds are not supported
+build-verbosity = 1
 before-build = "python -m pip install --upgrade 'numpy>1.19' ninja scipy"
-test-requires = ["pytest>=7", "ase>=3.22", "matplotlib>=3.5", "scipy>=1.7", "spglib>=2.0"]
+test-extras = ["test"]
 test-sources = ["tests", "examples"]
 test-command = [
-    "python tests/python39_import_smoke.py",
+    "python tests/import_smoke.py",
     "python -m pytest -q tests",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["native: needs the compiled Fortran setup kernel (skipped when it is missing)"]
 
 [tool.cibuildwheel.linux]
 before-all = "yum clean packages && yum install -y gcc-gfortran cmake ninja-build"
+
+[tool.cibuildwheel.macos]
+# gfortran comes from Homebrew (installed by the workflow); the deployment
+# target is set per runner in the workflow environment.
+environment = { FC = "gfortran" }

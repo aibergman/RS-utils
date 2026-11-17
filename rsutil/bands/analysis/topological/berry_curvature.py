@@ -6,6 +6,7 @@ Calculates Berry curvature Ω(k) = ∇ × A(k) and related topological propertie
 The Berry connection A_n(k) = i⟨ψ_n(k)|∇_k|ψ_n(k)⟩ is a geometric phase.
 """
 
+import warnings
 import numpy as np
 from typing import Tuple, Optional, Dict, List
 from scipy.interpolate import LinearNDInterpolator, griddata
@@ -431,13 +432,23 @@ class BerryCurvatureCalculator:
             try:
                 chern = self.calculate_chern_number(band)
                 chern_numbers.append(chern)
-            except:
-                chern_numbers.append(0.0)
+            except (ValueError, IndexError, RuntimeError, np.linalg.LinAlgError) as exc:
+                # A failed calculation is *unknown*, not a trivial band (C = 0).
+                warnings.warn(
+                    f"Chern number for band {band} could not be computed "
+                    f"({type(exc).__name__}: {exc}); shown as missing",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+                chern_numbers.append(np.nan)
         
         fig, ax = plt.subplots(figsize=(10, 6))
         
         # Color code: non-trivial (non-zero) in red, trivial (zero) in blue
-        colors = ['#E63946' if abs(c) > 0.1 else '#457B9D' for c in chern_numbers]
+        colors = [
+            '#999999' if np.isnan(c) else ('#E63946' if abs(c) > 0.1 else '#457B9D')
+            for c in chern_numbers
+        ]
         bars = ax.bar(range(len(chern_numbers)), chern_numbers, 
                  color=colors, alpha=0.8, edgecolor='black', linewidth=1.2)
         
@@ -537,12 +548,11 @@ class BerryCurvatureCalculator:
         - Orbitals 0-8: spin-up (s, px, py, pz, dxy, dyz, dz2, dxz, dx2-y2)
         - Orbitals 9-17: spin-down (same sequence)
         """
-        # Calculate Berry curvature for this band
-        try:
-            berry_curv_z = self.calculate_berry_curvature_kubo(band_idx)
-        except:
-            # Fallback to 2D calculation
-            berry_curv_z, _ = self.calculate_berry_curvature_2d(band_idx)
+        # Berry curvature for this band (2D k-plane calculation).  An earlier
+        # version tried a ``calculate_berry_curvature_kubo`` method that was
+        # never implemented; a bare ``except`` hid that and always fell back to
+        # this call, which is therefore the only behaviour.
+        berry_curv_z, _ = self.calculate_berry_curvature_2d(band_idx)
         
         # Extract orbital contributions from eigenvectors
         total_orbitals = self.eigenvectors.shape[1]

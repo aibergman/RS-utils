@@ -11,6 +11,8 @@ from functools import lru_cache
 from pathlib import Path
 
 
+import pytest
+
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 EXAMPLES_ROOT = REPOSITORY_ROOT / "examples"
 TEST_MPLCONFIGDIR = Path(tempfile.gettempdir()) / f"rsutil-pytest-mpl-{os.getpid()}"
@@ -80,3 +82,25 @@ def assert_cli_success(result: subprocess.CompletedProcess[str]) -> None:
         f"stdout:\n{result.stdout}\n"
         f"stderr:\n{result.stderr}"
     )
+
+
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers", "native: needs the compiled Fortran setup kernel (skipped when it is missing)"
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    """Skip kernel-dependent tests, with a reason, when the library is unavailable."""
+
+    import rsutil
+
+    if rsutil.native_library_available():
+        return
+    skip = pytest.mark.skip(
+        reason=f"Fortran kernel unavailable ({rsutil._native_error}); "
+        "install a wheel or build with CMake + gfortran"
+    )
+    for item in items:
+        if "native" in item.keywords:
+            item.add_marker(skip)

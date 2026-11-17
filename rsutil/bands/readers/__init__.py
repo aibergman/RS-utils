@@ -42,7 +42,8 @@ def detect_lattice_format(filename: str) -> str:
                 return 'paoflow'
             elif 'KITE' in first_line:
                 return 'kite'
-        except:
+        except (OSError, UnicodeDecodeError, ValueError):
+            # Unreadable or non-text file: fall back to the default format
             pass
         
         # Default to RS-LMTO
@@ -90,7 +91,8 @@ def detect_hamiltonian_format(filename: str) -> str:
                 return 'paoflow'
             elif 'KITE' in first_line:
                 return 'kite'
-        except:
+        except (OSError, UnicodeDecodeError, ValueError):
+            # Unreadable or non-text file: fall back to the default format
             pass
         
         # Default to RS-LMTO

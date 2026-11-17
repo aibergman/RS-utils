@@ -1,6 +1,17 @@
 # RS-utils
 
-RS-utils is a Python + Fortran toolkit for RS-LMTO workflows. It now includes a pure-Python band structure and DOS analysis module alongside the existing Fortran utilities for lattice setup and exchange/export workflows.
+RS-utils is a Python + Fortran toolkit for preparing, running and analysing
+calculations with the real-space linear muffin-tin orbital code RS-LMTO-ASA
+([`rs-lmto-asa`](https://github.com/ramoncardias/rs-lmto-asa)). It converts
+crystal structures (including CIF files) into RS-LMTO input, sets up bulk,
+surface and impurity calculations, builds exchange maps and UppASD input, and
+includes pure-Python band-structure and DOS analysis.
+
+The package is distributed on PyPI as **`rslmto-utils`**; you import it as
+`rsutil` and run it as the `rsutil` command.
+
+- Documentation: <https://aibergman.github.io/RS-utils/>
+- Source and issue tracker: <https://github.com/aibergman/RS-utils>
 
 > **HT pilot release:** RS-utils `0.11.0rc1` is ready for controlled
 > high-throughput RS-LMTO use within the documented support matrix. Start with
@@ -9,11 +20,15 @@ RS-utils is a Python + Fortran toolkit for RS-LMTO workflows. It now includes a 
 
 ## Components
 
+- **Structure input (Python):**
+    - CIF to RS-LMTO `lattice.nml`/`input.nml` (primitive or conventional cell,
+      automatic neighbour cutoff), replacing the external `cif2cell` step
+
 - **Band/DOS analysis (Python):**
     - High-symmetry band structures with projections (orbital/site/spin)
     - DOS with tetrahedron or Gaussian broadening
     - DOS moments and Fermi level determination
-    - Requires only Python + NumPy/SciPy/Matplotlib/Spglib (no Fortran runtime)
+    - Requires only Python + NumPy/SciPy/Matplotlib/Spglib/seekpath (no Fortran runtime)
 
 - **Legacy RS-LMTO utilities (Fortran):**
     - Namelist I/O and lattice processing
@@ -31,11 +46,24 @@ RS-utils is a Python + Fortran toolkit for RS-LMTO workflows. It now includes a 
 
 ## Build and Installation
 
-### Release wheel (recommended for users)
+### From PyPI (recommended)
 
-Install the `0.11.0rc1` release wheel in a dedicated virtual environment;
-see the [HT quick start](docs/HT_QUICKSTART.md) for the cluster deployment
-model.
+```bash
+python -m venv rsutil-env && source rsutil-env/bin/activate
+pip install rslmto-utils            # core: setup, CIF conversion, exchange, campaigns
+pip install 'rslmto-utils[bands]'   # + band structure / DOS analysis and plotting
+pip install 'rslmto-utils[full]'    # + ASE interoperability and 3D structure viewer
+python -c "import rsutil; print(rsutil.__version__)"
+```
+
+Binary wheels (which include the compiled Fortran setup kernel) are provided
+for Linux and macOS. On other platforms `pip` builds from source, which needs
+CMake and a Fortran compiler such as `gfortran`. While a release is still a
+pre-release (for example `0.11.0rc1`), add `--pre`. Without the Fortran kernel
+the pure-Python parts (CIF conversion, bands/DOS, campaigns) still work; only
+the Fortran-backed setup (`rsutil setup bulk`, `-S`) needs it.
+
+For cluster deployment see the [HT quick start](docs/HT_QUICKSTART.md).
 
 ### Developer checkout
 
@@ -86,6 +114,13 @@ rsutil --help
 ### Single-run setup workflows (`setup`)
 
 ```bash
+# Start from a CIF file: convert it to lattice.nml/input.nml (primitive cell,
+# neighbour cutoff chosen automatically) and run the setup in one step
+rsutil setup bulk --cif structure.cif
+
+# ... or only convert, keeping the conventional cell and a larger cluster
+rsutil setup cif structure.cif -o run --cell conventional --ct-neighbors 19
+
 # Basic bulk setup (reads lattice.nml and input.nml in the current directory)
 rsutil setup bulk
 
@@ -416,4 +451,7 @@ described.
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+RS-utils is licensed under the GNU General Public License, version 3 (see
+[LICENSE](LICENSE)). Some Fortran sources under `source/` were adapted from
+earlier LMTO codes, including the LMTO47 lineage and the sphere routines of
+SPR-KKR/xband; see [NOTICE](NOTICE) for attribution and status.
