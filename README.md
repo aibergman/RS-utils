@@ -13,10 +13,13 @@ The package is distributed on PyPI as **`rslmto-utils`**; you import it as
 - Documentation: <https://aibergman.github.io/RS-utils/>
 - Source and issue tracker: <https://github.com/aibergman/RS-utils>
 
-> **HT pilot release:** RS-utils `0.11.0rc1` is ready for controlled
-> high-throughput RS-LMTO use within the documented support matrix. Start with
-> the [HT quick start](docs/HT_QUICKSTART.md) and review the [HT readiness
-> report](docs/HT_READINESS_REPORT.md).
+> **High-throughput workflows:** controlled high-throughput RS-LMTO use is
+> supported within the documented support matrix; some workflows remain
+> restricted or experimental. Start with the
+> [HT quick start](docs/HT_QUICKSTART.md) and review the [HT readiness
+> report](docs/HT_READINESS_REPORT.md), whose qualification evidence was
+> gathered on the 0.11.0rc1 candidate (see the [changelog](CHANGELOG.md) for
+> what changed since).
 
 ## Components
 
@@ -59,7 +62,7 @@ python -c "import rsutil; print(rsutil.__version__)"
 Binary wheels (which include the compiled Fortran setup kernel) are provided
 for Linux and macOS. On other platforms `pip` builds from source, which needs
 CMake and a Fortran compiler such as `gfortran`. While a release is still a
-pre-release (for example `0.11.0rc1`), add `--pre`. Without the Fortran kernel
+pre-release (for example `1.1.0rc1`), add `--pre`. Without the Fortran kernel
 the pure-Python parts (CIF conversion, bands/DOS, campaigns) still work; only
 the Fortran-backed setup (`rsutil setup bulk`, `-S`) needs it.
 
@@ -182,7 +185,7 @@ report or an atom's entry is missing, that moment falls back to 1.0 muB and a
 warning is printed.
 
 Existing UppASD export functionality remains available, but automated UppASD
-integration is not currently part of the validated `0.11.0rc1` HT campaign
+integration is not currently part of the validated HT campaign
 workflow. RS-utils does not claim an automatic `SCF -> exchange -> UppASD`
 pipeline.
 

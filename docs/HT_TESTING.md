@@ -103,7 +103,7 @@ The optional extras are:
 - `test` for the complete checked-in pytest suite;
 - `full` for all optional runtime features.
 
-The release candidate package version is `0.11.0rc1`. The wheel and installed
+The package version is `1.0.0`. The wheel and installed
 artifact checks in this page are the release evidence path; the editable
 installation above remains the developer/source-test workflow.
 

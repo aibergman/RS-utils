@@ -1,10 +1,10 @@
-# RS-utils 0.11.0rc1 release checklist
+# RS-utils release checklist
 
 This checklist separates local REL-01 evidence from release actions that must
 be performed by a human with deployment authority. A Git tag, package
 publication, and cluster deployment are intentionally outside this task.
 
-## REL-01 evidence
+## REL-01 evidence (0.11.0rc1 release candidate)
 
 - [x] version updated consistently
 - [x] wheel metadata reports `0.11.0rc1`
